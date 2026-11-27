@@ -472,9 +472,9 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
 
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
-    expect(within(dialog).getByRole('button', { name: '11:00 → 9:00으로 정정' })).toBeDisabled();
-    await user.type(within(dialog).getByLabelText(/정정 사유/), '심판 기록지 대조 결과 9분 경고');
-    await user.click(within(dialog).getByRole('button', { name: '11:00 → 9:00으로 정정' }));
+    expect(within(dialog).getByRole('button', { name: '11:00 → 9:00으로 고치기' })).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/고친 이유/), '심판 기록지 대조 결과 9분 경고');
+    await user.click(within(dialog).getByRole('button', { name: '11:00 → 9:00으로 고치기' }));
 
     await waitFor(() =>
       expect(hookMocks.correctEventTime.mutateAsync).toHaveBeenCalledWith({
@@ -1016,8 +1016,8 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     expect(within(dialog).getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
-    await user.type(within(dialog).getByLabelText(/정정 사유/), '심판 기록지 대조 결과 30분');
-    await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+    await user.type(within(dialog).getByLabelText(/고친 이유/), '심판 기록지 대조 결과 30분');
+    await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 고치기' }));
 
     await waitFor(() => expect(hookMocks.correctEventTime.mutateAsync).toHaveBeenCalledTimes(2));
     expect(hookMocks.correctEventTime.mutateAsync).toHaveBeenNthCalledWith(1, {
@@ -1051,8 +1051,8 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     await user.click(screen.getByRole('button', { name: '기록 고치기 (경고 누적 퇴장)' }));
     const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
-    await user.type(within(dialog).getByLabelText(/정정 사유/), '대조 결과');
-    await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+    await user.type(within(dialog).getByLabelText(/고친 이유/), '대조 결과');
+    await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 고치기' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요');
     expect(screen.getByRole('dialog', { name: '기록 시각 정정' })).toBeInTheDocument();

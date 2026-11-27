@@ -653,7 +653,7 @@ export function useV1GameOperationsConsole(
               // durable queue untouched for a later explicit recovery.
               dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
             }
-            setBannerMessage('운영 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
+            setBannerMessage('기록 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
           }
           if (resyncCoalesced) {
             resyncCoalesced = false;
@@ -776,7 +776,7 @@ export function useV1GameOperationsConsole(
           // 인수하지 않았다. "다른 운영자가 담당하고 있어요"는 재검증까지
           // 실패한 이 상태에서도 근거 없는 단정이라, 실제로 확인된 사실(재검증
           // 실패)만 말한다.
-          setBannerMessage('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
+          setBannerMessage('이 경기의 기록 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
         },
       );
     };
@@ -1265,7 +1265,7 @@ export function useV1GameOperationsConsole(
           takeoverTokenRef.current !== leaseToken
         ))
       ) {
-        throw new Error('경기 운영 권한이 없어 되돌릴 수 없어요.');
+        throw new Error('경기 기록 권한이 없어 되돌릴 수 없어요.');
       }
       const clientEventId = randomUuid();
       const result = await v1Post<{ gameId: string; state: GameState; version: number }>(
@@ -1306,7 +1306,7 @@ export function useV1GameOperationsConsole(
           takeoverTokenRef.current !== leaseToken
         ))
       ) {
-        throw new Error('경기 운영 권한이 없어 시각을 정정할 수 없어요.');
+        throw new Error('경기 기록 권한이 없어 시각을 고칠 수 없어요.');
       }
       const clientEventId = randomUuid();
       const result = await v1Post<{ gameId: string; state: GameState; version: number }>(
@@ -1351,7 +1351,7 @@ export function useV1GameOperationsConsole(
           takeoverTokenRef.current !== leaseToken
         ))
       ) {
-        throw new Error('경기 운영 권한이 없어 어시스트를 기록할 수 없어요.');
+        throw new Error('경기 기록 권한이 없어 어시스트를 기록할 수 없어요.');
       }
       const clientEventId = randomUuid();
       const result = await v1Post<AssignGoalAssistResult>(
@@ -1411,7 +1411,7 @@ export function useV1GameOperationsConsole(
 export function gameOperationsErrorMessage(code: string): string {
   switch (code) {
     case 'TAKEOVER_TOKEN_EXPIRED':
-      return '운영 권한 토큰이 만료됐어요. 다시 가져오는 중이에요.';
+      return '기록 권한이 만료됐어요. 다시 가져오는 중이에요.';
     // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): renew 실패
     // 중 "다른 콘솔이 방금 이 경기를 가져감"만 이 코드로 온다(자연 만료는
     // 여전히 TAKEOVER_TOKEN_EXPIRED). 이 경우엔 자동 재요청하지 않으므로
@@ -1419,7 +1419,7 @@ export function gameOperationsErrorMessage(code: string): string {
     // 실제로 아무것도 다시 시도하지 않는데 그렇게 말하면 운영자가 기다리기만
     // 하다 골을 놓친다.
     case 'TAKEOVER_SUPERSEDED':
-      return '다른 화면에서 이 경기 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.';
+      return '다른 화면에서 이 경기 기록 권한을 가져갔어요. 지금은 보기만 할 수 있어요.';
     // MD-QA #165: 다른 사람이 운영 중이라 콘솔을 보기 모드로 열었다. 가져오려면 확인을 거친다.
     case 'TAKEOVER_HELD':
       return '다른 운영자가 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.';
@@ -1431,7 +1431,7 @@ export function gameOperationsErrorMessage(code: string): string {
       // 서버가 거부 사유 코드를 주지 않은 경우만 여기로 온다. 연결 자체는 살아 있을 수
       // 있으므로(실제로 "실시간 연결됨" 상태에서 이 코드가 뜬 사례가 있었다) 원인을
       // 단정하지 않는다.
-      return '경기 운영 권한을 가져오지 못했어요. 새로고침 후 다시 시도해 주세요.';
+      return '경기 기록 권한을 가져오지 못했어요. 새로고침 후 다시 시도해 주세요.';
     case 'VERSION_CONFLICT':
       return '경기 상태가 변경되어 다시 시도해주세요.';
     case 'CLOCK_DRIFT':
@@ -1467,11 +1467,11 @@ export function gameOperationsErrorMessage(code: string): string {
     case 'PERIOD_NOT_STARTED':
       return '경기가 진행 중이 아니에요. 경기를 먼저 시작해 주세요.';
     case 'PERIOD_ALREADY_ENDED':
-      return '이미 종료된 피리어드예요. 새로고침 후 다시 확인해주세요.';
+      return '이미 종료된 경기 시간이에요. 새로고침 후 다시 확인해주세요.';
     case 'NO_NEXT_PERIOD':
-      return '마지막 피리어드예요. 경기를 종료해 주세요.';
+      return '마지막 경기 시간이에요. 경기를 종료해 주세요.';
     case 'EVENT_LATE':
-      return '기록하려는 시점이 이미 지난 피리어드예요. 새로고침 후 다시 확인해주세요.';
+      return '기록하려는 시점이 이미 지난 경기 시간이에요. 새로고침 후 다시 확인해주세요.';
     // 실측 사고(6건 시도 중 2건 실패) 사후조사에서 드러난 미매핑 코드 9개 — 서버는 이미
     // 이 코드들을 던질 수 있었는데(games.service.ts) 콘솔이 전부 default 로 뭉개
     // "다시 시도해주세요" 를 보여주고 있었다. 아래는 재시도로 풀리는지 여부에 따라

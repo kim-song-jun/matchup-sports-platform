@@ -499,7 +499,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     expect(within(dialog).getByText(/정우진/)).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: '6:00 → 5:00으로 정정' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '6:00 → 5:00으로 고치기' }));
 
     await waitFor(() => expect(correctEventTime).toHaveBeenCalledTimes(1));
     expect(correctEventTime).toHaveBeenCalledWith({
@@ -545,7 +545,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     fireEvent.click(screen.getByRole('button', { name: '기록 고치기 (골)' }));
     const dialog = await screen.findByRole('dialog', { name: '골 기록 고치기' });
     fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: '6:00 → 5:00으로 정정' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '6:00 → 5:00으로 고치기' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 취소된 기록은 시각을 고칠 수 없어요.');
     expect(screen.getByRole('dialog', { name: '골 기록 고치기' })).toBeInTheDocument();
@@ -2858,7 +2858,7 @@ describe('OperateConsole — 경고 누적 퇴장 합친 줄의 고치기·취�
     return screen.findByRole('dialog', { name: SHEET });
   };
 
-  it('시각을 고치면 옐로, 이어서 레드를 같은 시각·같은 사유로 정정한다', async () => {
+  it('시각을 고치면 옐로, 이어서 레드를 같은 시각·같은 이유로 고친다', async () => {
     const correctEventTime = vi.fn<NonNullable<OperationsContract['correctEventTime']>>().mockResolvedValue(undefined);
     testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [first, second, red], correctEventTime }));
     render(<CoreHarness />);
@@ -2866,7 +2866,7 @@ describe('OperateConsole — 경고 누적 퇴장 합친 줄의 고치기·취�
     const dialog = await openMergedSheet();
     expect(within(dialog).getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 고치기' }));
 
     await waitFor(() => expect(correctEventTime).toHaveBeenCalledTimes(2));
     const reason = '경기 중 기록 시각 고치기 (31:00 → 30:00)';
@@ -2875,7 +2875,7 @@ describe('OperateConsole — 경고 누적 퇴장 합친 줄의 고치기·취�
     await waitFor(() => expect(screen.queryByRole('dialog', { name: SHEET })).toBeNull());
   });
 
-  it('옐로만 옮겨지고 레드가 실패하면 안내를 남기고, 다시 정정하면 이미 옮긴 옐로는 건너뛰고 레드만 옮긴다', async () => {
+  it('옐로만 옮겨지고 레드가 실패하면 안내를 남기고, 다시 고치면 이미 옮긴 옐로는 건너뛰고 레드만 옮긴다', async () => {
     const correctEventTime = vi
       .fn<NonNullable<OperationsContract['correctEventTime']>>()
       .mockResolvedValueOnce(undefined)
@@ -2886,7 +2886,7 @@ describe('OperateConsole — 경고 누적 퇴장 합친 줄의 고치기·취�
 
     const dialog = await openMergedSheet();
     fireEvent.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 고치기' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요');
     expect(screen.getByRole('dialog', { name: SHEET })).toBeInTheDocument();
@@ -2906,7 +2906,7 @@ describe('OperateConsole — 경고 누적 퇴장 합친 줄의 고치기·취�
     } as GameEventRecord;
     testFixtures.operations.mockReturnValue(consoleState({ liveEvents: [first, second, red, yellowCorrection], correctEventTime }));
     view.rerender(<CoreHarness />);
-    fireEvent.click(within(screen.getByRole('dialog', { name: SHEET })).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: SHEET })).getByRole('button', { name: '31:00 → 30:00으로 고치기' }));
 
     await waitFor(() => expect(correctEventTime).toHaveBeenCalledTimes(3));
     expect(correctEventTime).toHaveBeenLastCalledWith({

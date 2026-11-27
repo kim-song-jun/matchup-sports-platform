@@ -338,7 +338,7 @@ export function EventTimeCorrectionSheet({
               {isAdmin ? (
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor={reasonId} className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">
-                    정정 사유 <span className="font-medium text-[var(--text-muted)]">(필수)</span>
+                    고친 이유 <span className="font-medium text-[var(--text-muted)]">(필수)</span>
                   </label>
                   <textarea
                     id={reasonId}

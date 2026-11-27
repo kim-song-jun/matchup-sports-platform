@@ -142,7 +142,7 @@ describe('useV1GameOperationsConsole — game.permission.revoked는 즉시 영�
     // 서버 리스(GameTakeoverService)는 이 축출 경로에서 건드려지지 않으므로
     // 아무도 실제로 인수하지 않았다 — "다른 운영자가 담당하고 있어요"라고
     // 근거 없이 단정하지 않는다.
-    expect(result.current.bannerMessage).toBe('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
+    expect(result.current.bannerMessage).toBe('이 경기의 기록 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
 
     unmount();
   });

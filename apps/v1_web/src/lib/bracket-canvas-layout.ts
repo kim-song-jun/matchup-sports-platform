@@ -47,6 +47,7 @@ export type CanvasLayout = {
   columns: CanvasColumnLayout[];
   nodes: CanvasNodeLayout[];
   byeNodes: (CanvasNodeLayout & { slotId: string })[];
+  manualByes: { id: string; groupId: string; x: number; y: number; height: number }[];
   edges: CanvasEdgeLayout[];
   /** 조별+결선 대진의 조 편성 블록. 순위 자리가 없는 대진은 빈 배열. */
   groupBlocks: GroupBlockLayout[];
@@ -104,6 +105,7 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
   const slotsById = new Map(input.slots.map((slot) => [slot.id, slot]));
   const placed = new Map<string, CanvasNodeLayout>();
   const byeNodes: (CanvasNodeLayout & { slotId: string })[] = [];
+  const manualByes: CanvasLayout['manualByes'] = [];
   const columns: CanvasColumnLayout[] = [];
   const groupBlocks: GroupBlockLayout[] = [];
 
@@ -130,7 +132,20 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
       byeNodes.push({ slotId: slot.id, fixtureId: target.id, columnKey: seed.key, x, y: cursor, width: CANVAS_NODE_WIDTH, height: 112 });
       cursor += 112 + CANVAS_ROW_GAP;
     };
-    for (const fixture of seed.fixtures) {
+    const manual = (input.groups.find(g => g.id === seed.groupId)?.groupTeams ?? []).filter(bye =>
+      bye.isBye && !input.slots.some(slot => slot.groupId === seed.groupId && slot.byeSortOrder === bye.sortOrder))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    let insertIndex = 0;
+    const insertManual = (until: number) => {
+      while (manual.length && manual[0].sortOrder <= until + insertIndex) {
+        const bye = manual.shift()!;
+        manualByes.push({ id: bye.id, groupId: bye.groupId, x, y: cursor, height: 112 });
+        cursor += 112 + CANVAS_ROW_GAP;
+        insertIndex++;
+      }
+    };
+    for (const [index, fixture] of seed.fixtures.entries()) {
+      insertManual(index);
       const target = input.groups.find(group => group.id === seed.groupId)?.phase === 'round12' ? input.fixtures.find(f => f.bracketSources?.some(source => source.fixtureId === fixture.id) && [f.homeSlotId, f.awaySlotId].some(id => id && slotsById.get(id)?.kind === 'BYE')) : undefined;
       const bye = target ? input.slots.find(slot => slot.kind === 'BYE' && [target.homeSlotId, target.awaySlotId].includes(slot.id)) : undefined;
       if (bye && target && target.homeSlotId === bye.id) placeBye(bye, target);
@@ -146,6 +161,7 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
       cursor = y + CANVAS_NODE_HEIGHT + CANVAS_ROW_GAP;
       if (bye && target && target.awaySlotId === bye.id) placeBye(bye, target);
     }
+    insertManual(Infinity);
     if (input.groups.find(group => group.id === seed.groupId)?.phase !== 'group') {
       for (const slot of input.slots.filter(slot => (slot.kind === 'BYE' || slot.byeSortOrder != null) && slot.groupId === seed.groupId && !byeNodes.some(node => node.slotId === slot.id)).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
         const target = input.fixtures.find(f => f.homeSlotId === slot.id || f.awaySlotId === slot.id);
@@ -205,9 +221,9 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
 
   const nodes = [...placed.values()];
   const width = seeds.length === 0 ? CANVAS_PADDING * 2 : CANVAS_PADDING * 2 + seeds.length * CANVAS_NODE_WIDTH + (seeds.length - 1) * CANVAS_COLUMN_GAP;
-  const nodesBottom = [...nodes, ...byeNodes].reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
+  const nodesBottom = [...nodes, ...byeNodes, ...manualByes].reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
   const bottom = groupBlocks.reduce((max, block) => Math.max(max, block.y + block.height), nodesBottom);
-  return { width, height: bottom + CANVAS_PADDING, columns, nodes, byeNodes, edges, groupBlocks };
+  return { width, height: bottom + CANVAS_PADDING, columns, nodes, byeNodes, manualByes, edges, groupBlocks };
 }
 
 /** 확정 전 결과(제출됨·정정 초안)도 `submitted` — 무효는 다시 입력할 수 있는 `scheduled` 로 돌아간다. */

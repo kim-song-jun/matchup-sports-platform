@@ -91,6 +91,14 @@ export class CreateGroupTeamDto {
 
 /** 단독 부전승 대진. 라운드는 소속 group의 phase로 결정한다. */
 export class CreateBracketByeDto {
+  @ValidateIf(o => o.targetFixtureId !== undefined || o.targetSide !== undefined)
+  @IsUUID()
+  targetFixtureId?: string;
+
+  @ValidateIf(o => o.targetFixtureId !== undefined || o.targetSide !== undefined)
+  @IsIn(['HOME', 'AWAY'])
+  targetSide?: 'HOME' | 'AWAY';
+
   /** Existing bye slot to edit; absent creates a new slot. */
   @IsOptional()
   @IsUUID()

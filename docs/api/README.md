@@ -67,6 +67,8 @@ Personal-match online place classification: public detail includes `isOnline`; t
 
 12강 부전승 홈·어웨이 교환은 [Tournaments 계약](./domains/tournaments.md)의 `PUT /admin/tournament-slots/:slotId/bye-side`를 따른다. 저장 배치와 승자 연결을 함께 변경한다.
 
+다른 경기로 옮길 때는 `PUT /api/v1/admin/tournament-slots/:slotId/bye-position`에 `sourceFixtureId`, `expectedSide`, `targetFixtureId`, `side`, `expectedOrigin`을 보낸다. 목적지의 기존 슬롯 ID, 승자 원천 경기 ID, 직접 배정한 팀의 참가 ID 또는 빈 자리의 목적지 경기 ID를 검증한다. 수동 부전승 저장 API는 `targetFixtureId`와 `targetSide`를 함께 받아 직행 경기를 연결한다.
+
 Ordinary team-match period rules (MD-QA #141): host-authorized defaults, separate single/two-period selection, immutable pins and pre-play edit gates are documented in [team matches](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141).
 
 Public competition overall standings include nullable `teamLogoUrl` under the existing team-identity visibility gate; see [tournaments](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).

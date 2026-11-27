@@ -5952,6 +5952,8 @@ export type V1AdminRosterEligibleMembersResponse = {
 };
 
 export interface V1CreateBracketByePayload {
+  targetFixtureId?: string;
+  targetSide?: 'HOME' | 'AWAY';
   groupId: string;
   byeId?: string;
   registrationId?: string | null;

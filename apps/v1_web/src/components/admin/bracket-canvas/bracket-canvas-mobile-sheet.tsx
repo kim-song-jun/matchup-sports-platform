@@ -383,7 +383,7 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
   if (node.byeSlotId && scope === 'tournament') {
     const slot = props.slots.find(slot => slot.id === node.byeSlotId);
     const fixture = props.fixtures?.find(f => f.id === node.fixtureId);
-    if (slot && fixture) return <ByeSlotEditor tournamentId={props.competitionId} slot={slot} fixture={fixture} groups={groups} slots={props.slots} candidates={props.candidates} canWrite={canWrite && !managedFinal} registrationsLoaded={props.registrationsState.status === 'success'} />;
+    if (slot && fixture) return <ByeSlotEditor fixtures={props.fixtures} tournamentId={props.competitionId} slot={slot} fixture={fixture} groups={groups} slots={props.slots} candidates={props.candidates} canWrite={canWrite && !groups.find(group => group.id === slot.groupId)?.bracketTrack?.startsWith('stage:')} registrationsLoaded={props.registrationsState.status === 'success'} />;
   }
   if (view.kind === 'pick') {
     const side = view.side === 'HOME' ? node.home : node.away;

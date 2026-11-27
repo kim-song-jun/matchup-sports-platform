@@ -64,6 +64,18 @@ function statusSheet() {
 
 const score = () => screen.getByLabelText(/^스코어 /).getAttribute('aria-label');
 
+/** The undo button of the toast that announced this record. */
+function undoButtonOf(message: string) {
+  return within(screen.getByText(message).closest('[role="status"]') as HTMLElement).getByRole('button', { name: '되돌리기' });
+}
+
+/** Lets requests already on their way reach the fake server (real event-loop turns, no clock movement). */
+async function flushTransport() {
+  await act(async () => {
+    for (let turn = 0; turn < 40; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+  });
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(() => {
@@ -184,5 +196,80 @@ describe('OperateConsole — 되돌리기는 서버의 실제 상태를 보고 �
     expect(document.body).not.toHaveTextContent('되돌릴 것이 없어요');
     expect(fixture.reversals).toHaveLength(0);
     expect(screen.queryByText('되돌렸어요')).toBeNull();
+  });
+});
+
+describe('OperateConsole — 되돌리기와 다른 전송은 같은 버전으로 겹치지 않는다', () => {
+  const HOME_GOAL = '골 · 홈 팀 (선수 모름) 기록했어요';
+  const AWAY_GOAL = '골 · 원정 팀 (선수 모름) 기록했어요';
+
+  it('다른 기록이 나가는 중이면 그 기록이 확정된 뒤에 되돌린다 — 새 기록이 거절되지 않는다', async () => {
+    await openConsole();
+    await recordGoal('홈 팀');
+    await screen.findByText(HOME_GOAL);
+    // 원정 골은 느린 망을 지나는 중이다.
+    fixture.nextAppends('hold');
+    await recordGoal('원정 팀');
+    await waitFor(() => expect(fixture.heldCount).toBe(1));
+
+    fireEvent.click(undoButtonOf(HOME_GOAL));
+    await flushTransport();
+    expect(fixture.reversals).toHaveLength(0);
+    expect(screen.getByText('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.')).toBeInTheDocument();
+
+    act(() => fixture.releaseHeld());
+
+    await waitFor(() => expect(fixture.reversals).toHaveLength(1));
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+    // 원정 골이 올린 버전(7)으로 되돌리기를 보낸다.
+    expect(fixture.reversals[0]).toMatchObject({ eventId: 'server-event-1', expectedVersion: 7, outcome: 'reversed' });
+    expect(fixture.appends.map((append) => append.outcome)).toEqual(['committed', 'committed']);
+    await waitFor(() => expect(score()).toBe('스코어 홈 팀 0점, 원정 팀 1점'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('되돌리기가 서버에 가 있는 동안 누른 새 기록은 되돌리기가 끝난 뒤에 보낸다 — 되돌리기가 거절되지 않는다', async () => {
+    await openConsole();
+    await recordGoal('홈 팀');
+    await screen.findByText(HOME_GOAL);
+    const reversal = fixture.holdNextReversal();
+    fireEvent.click(undoButtonOf(HOME_GOAL));
+    await act(async () => { await reversal.started; });
+
+    await recordGoal('원정 팀');
+    await flushTransport();
+    // 되돌리기가 아직 서버에 있다 — 원정 골은 같은 버전(6)으로 나가지 않고 기다린다.
+    expect(fixture.appends).toHaveLength(1);
+
+    await act(async () => { reversal.release(); });
+
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+    expect(await screen.findByText(AWAY_GOAL)).toBeInTheDocument();
+    await waitFor(() => expect(fixture.appends).toHaveLength(2));
+    expect(fixture.reversals).toHaveLength(1);
+    expect(fixture.reversals[0]).toMatchObject({ expectedVersion: 6, outcome: 'reversed' });
+    // 되돌리기가 올린 버전(7)으로 원정 골을 보낸다.
+    expect(fixture.appends[1]).toMatchObject({ expectedVersion: 7, outcome: 'committed' });
+    await waitFor(() => expect(score()).toBe('스코어 홈 팀 0점, 원정 팀 1점'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.body).not.toHaveTextContent('Expected version is stale');
+  });
+
+  it('그래도 남는 버전 충돌은 서버 영어 원문이 아니라 해요체로 알린다', async () => {
+    await openConsole();
+    await recordGoal('홈 팀');
+    await screen.findByText(HOME_GOAL);
+    // 다른 기기가 경기를 바꿨고 이 기기는 아직 모른다.
+    fixture.bumpVersionElsewhere();
+
+    fireEvent.click(undoButtonOf(HOME_GOAL));
+
+    await waitFor(() => expect(fixture.reversals[0]?.outcome).toBe('conflict'));
+    expect(
+      await within(statusSheet()).findByText('그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('Expected version is stale');
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
+    expect(score()).toBe('스코어 홈 팀 1점, 원정 팀 0점');
   });
 });

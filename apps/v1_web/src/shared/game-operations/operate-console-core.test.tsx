@@ -3186,22 +3186,143 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     expect(screen.queryByText('되돌렸어요')).toBeNull();
   });
 
-  it('reverseEvent 가 거절되면 오류를 알리고 「되돌렸어요」는 없다', async () => {
-    const state = setup();
-    state.reverseEvent.mockRejectedValue(
-      new V1ApiError({ status: 'error', message: '이미 확정된 결과라 기록을 바꿀 수 없어요.', statusCode: 409, code: 'RESULT_ALREADY_OFFICIAL', timestamp: '2026-10-14T01:00:00Z' }),
-    );
-    const { rerender } = render(<CoreHarness />);
+  const rejection = (code: string, message: string, statusCode = 409) =>
+    new V1ApiError({ status: 'error', message, statusCode, code, timestamp: '2026-10-14T01:00:00Z' });
+
+  /** 골 하나를 기록해 서버 목록에 올린 뒤 되돌리기 버튼을 돌려준다. */
+  async function recordedGoalWithUndo(state: MockedOperations, overrides: Partial<MockedOperations> = {}) {
+    const view = render(<CoreHarness />);
     recordGoal();
     const undo = await screen.findByRole('button', { name: '되돌리기' });
-    advance(state, { liveEvents: [recorded('e9', 'c1')] });
-    rerender(<CoreHarness />);
+    const next = advance(state, { liveEvents: [recorded('e9', 'c1')], ...overrides });
+    view.rerender(<CoreHarness />);
+    return { ...view, undo, next };
+  }
+
+  // 서버 메시지는 영어 원문이거나 옛 용어일 수 있다 — 화면에는 코드별 해요체 안내만 나간다.
+  it.each([
+    ['VERSION_CONFLICT', 'Expected version is stale', '그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'],
+    ['COMMAND_CONCURRENCY_CONFLICT', '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.', '그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'],
+    ['RESULT_ALREADY_OFFICIAL', '이미 확정된 결과예요. 이벤트를 취소하려면 결과 정정을 이용해주세요.', '결과가 이미 확정돼 되돌릴 수 없어요. 결과 고치기에서 고쳐 주세요.'],
+    ['GAME_EVENT_NOT_FOUND', 'Game event was not found', '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'],
+    ['STAFF_SCOPE_DENIED', 'Tournament staff scope is denied', '이 경기를 운영할 권한이 없어요.'],
+    ['SOMETHING_NEW', '잠시 후 다시 시도해 주세요.', '잠시 후 다시 시도해 주세요.'],
+  ])('reverseEvent 가 %s 로 거절되면 해요체로 알리고 「되돌렸어요」는 없다', async (code, serverMessage, shown) => {
+    const state = setup();
+    state.reverseEvent.mockRejectedValue(rejection(code, serverMessage));
+    const { undo } = await recordedGoalWithUndo(state);
 
     fireEvent.click(undo);
 
-    expect(await findConsoleNotice('이미 확정된 결과라 기록을 바꿀 수 없어요.')).toBeInTheDocument();
+    expect(await findConsoleNotice(shown)).toBeInTheDocument();
     expect(state.reverseEvent).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('되돌렸어요')).toBeNull();
+    if (/[A-Za-z]{4,}/.test(serverMessage)) expect(document.body).not.toHaveTextContent(serverMessage);
+  });
+
+  it('서버가 이미 취소된 기록이라고 답하면 실패가 아니라 「이미 취소한 기록이에요」', async () => {
+    const state = setup();
+    state.reverseEvent.mockRejectedValue(rejection('EVENT_ALREADY_REVERSED', 'This event was already reversed once'));
+    const { undo } = await recordedGoalWithUndo(state);
+
+    fireEvent.click(undo);
+
+    expect(await screen.findByText('이미 취소한 기록이에요')).toBeInTheDocument();
+    expect(within(openStatusSheet()).queryByText(/되돌리지 못했어요/)).toBeNull();
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
+  });
+
+  it('거절된 되돌리기는 다시 누르면 다시 보낸다', async () => {
+    const state = setup();
+    state.reverseEvent.mockRejectedValueOnce(rejection('VERSION_CONFLICT', 'Expected version is stale')).mockResolvedValue(undefined);
+    const { undo } = await recordedGoalWithUndo(state);
+
+    fireEvent.click(undo);
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
+    await findConsoleNotice('그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+    fireEvent.click(undo);
+
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+  });
+
+  it('다른 기록이 전송 중이면 큐가 빌 때까지 기다렸다가 되돌린다', async () => {
+    const state = setup();
+    const { undo, rerender } = await recordedGoalWithUndo(state, { queue: { items: [queuedEvent('c2', 'sending')] } });
+
+    fireEvent.click(undo);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+    expect(screen.getByText('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.')).toBeInTheDocument();
+
+    advance(state, { liveEvents: [recorded('e9', 'c1'), recorded('e10', 'c2', { sequence: 10 })], queue: { items: [queuedEvent('c2', 'acked')] } });
+    rerender(<CoreHarness />);
+
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledWith({ eventId: 'e9', reason: '골 기록 되돌리기' }));
+    expect(state.reverseEvent).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
+  });
+
+  it('큐를 기다리는 사이 다른 길로 취소된 기록은 다시 되돌리지 않는다', async () => {
+    const state = setup();
+    const { undo, rerender } = await recordedGoalWithUndo(state, { queue: { items: [queuedEvent('c2', 'sending')] } });
+
+    fireEvent.click(undo);
+    await screen.findByText('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.');
+    advance(state, {
+      liveEvents: [recorded('e9', 'c1'), recorded('e10', 'c-cancel', { type: 'CORRECTION', sequence: 10, reversesEventId: 'e9' })],
+      queue: { items: [queuedEvent('c2', 'acked')] },
+    });
+    rerender(<CoreHarness />);
+
+    expect(await screen.findByText('이미 취소한 기록이에요')).toBeInTheDocument();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+  });
+
+  it('큐를 기다리는 사이 진행 요청이 시작되면 되돌리기를 보내지 않고 알린다', async () => {
+    const state = setup();
+    // 진행 요청이 서버에서 돌아오지 않은 채 걸려 있다.
+    testFixtures.sendCommand.mockReturnValue(new Promise(() => {}));
+    const { undo, rerender } = await recordedGoalWithUndo(state, { queue: { items: [queuedEvent('c2', 'sending')] } });
+    fireEvent.click(undo);
+    await screen.findByText('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.');
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '전반 종료' }));
+    await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1));
+
+    advance(state, { liveEvents: [recorded('e9', 'c1'), recorded('e10', 'c2', { sequence: 10 })], queue: { items: [queuedEvent('c2', 'acked')] } });
+    rerender(<CoreHarness />);
+
+    expect(
+      await findConsoleNotice('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
+    expect(state.reverseEvent).not.toHaveBeenCalled();
+    expect(screen.queryByText('되돌렸어요')).toBeNull();
+  });
+
+  it('되돌리기가 서버에 가 있는 동안 누른 새 기록은 되돌리기가 끝난 뒤에 큐에 넣는다', async () => {
+    const state = setup();
+    const reversal = Promise.withResolvers<void>();
+    state.reverseEvent.mockReturnValue(reversal.promise);
+    const { undo } = await recordedGoalWithUndo(state);
+    fireEvent.click(undo);
+    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
+
+    recordGoal();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    // 첫 골 하나뿐이다 — 새 골은 되돌리기와 같은 버전으로 나가지 않게 기다린다.
+    expect(state.submitEvent).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      reversal.resolve();
+    });
+
+    await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
+    expect(state.reverseEvent.mock.invocationCallOrder[0]).toBeLessThan(state.submitEvent.mock.invocationCallOrder[1]);
   });
 
   it('5초 뒤 토스트가 사라진다', async () => {

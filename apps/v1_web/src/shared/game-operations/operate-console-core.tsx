@@ -314,6 +314,32 @@ const STAGE_CHIP_CLASS =
   'flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-[length:var(--font-size-body-sm)] font-bold text-[var(--blue700)] dark:bg-blue-500/10';
 
 const RECORD_SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
+const UNDO_FAILED = '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_BLOCKED_BY_COMMAND = '진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_CONFLICT = '그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
+const UNDO_FAILURE_BY_CODE: Readonly<Record<string, string>> = {
+  VERSION_CONFLICT: UNDO_CONFLICT,
+  COMMAND_CONCURRENCY_CONFLICT: UNDO_CONFLICT,
+  RESULT_ALREADY_OFFICIAL: '결과가 이미 확정돼 되돌릴 수 없어요. 결과 고치기에서 고쳐 주세요.',
+  TERMINAL_GAME_IMMUTABLE: '취소된 경기라 기록을 되돌릴 수 없어요.',
+};
+/** 기록 권한을 잃어 거절된 코드 — 호스트의 코드별 안내가 이유를 그대로 말한다. */
+const UNDO_PERMISSION_CODES: ReadonlySet<string> = new Set([
+  'TAKEOVER_TOKEN_EXPIRED',
+  'TAKEOVER_SUPERSEDED',
+  'TAKEOVER_HELD',
+  'STAFF_SCOPE_DENIED',
+  'INVALID_ACTOR_SCOPE',
+]);
+
+/** 되돌리기 실패 안내. 서버 메시지는 영어 원문일 수 있어 한글 안내만 그대로 쓰고, 아니면 코드별 문구나 기본 문구로 바꾼다. */
+function undoFailureMessage(err: unknown, permissionMessage: (code: string) => string): string {
+  const code = extractErrorCode(err);
+  if (code !== null && UNDO_FAILURE_BY_CODE[code] !== undefined) return UNDO_FAILURE_BY_CODE[code];
+  if (code !== null && UNDO_PERMISSION_CODES.has(code)) return permissionMessage(code);
+  const message = extractErrorMessage(err, UNDO_FAILED);
+  return /[가-힣]/.test(message) ? message : UNDO_FAILED;
+}
 
 /** 진행 명령 REST 응답을 기다리는 한도. 이벤트 전송의 ack 한도(`SEND_ACK_TIMEOUT_MS`)와 같다. */
 export const COMMAND_RESPONSE_TIMEOUT_MS = 10_000;
@@ -1202,6 +1228,21 @@ export function OperateConsoleCore({
   }, [commandBlocked]);
   // 토스트가 사라지는 동안 버튼이 잠깐 남아 두 번 눌릴 수 있다 — 같은 기록을 두 번 되돌리지 않는다.
   const undoStartedRef = useRef(new Set<string>());
+  // 되돌리기와 기록 전송은 둘 다 지금 버전을 싣는다. 같은 버전으로 겹치면 서버가 한쪽을 거절하므로
+  // 되돌리기는 큐가 빈 뒤에 보내고, 새 기록은 서버에 가 있는 되돌리기가 끝난 뒤에 큐에 넣는다.
+  const reverseInFlightRef = useRef<Promise<void> | null>(null);
+  const waitForReverseInFlight = useCallback(() => {
+    const inFlight = reverseInFlightRef.current;
+    if (inFlight === null) return Promise.resolve();
+    // 응답이 끝내 오지 않아도 새 기록을 영영 붙잡지 않는다.
+    return new Promise<void>((resolve) => {
+      const giveUp = setTimeout(resolve, COMMAND_RESPONSE_TIMEOUT_MS);
+      void inFlight.then(() => {
+        clearTimeout(giveUp);
+        resolve();
+      });
+    });
+  }, []);
 
   // 서버 기록 목록을 직접 읽어 이 기록이 저장됐는지 확인한다. 읽지 못하면 없다고 단정하지 않는다(`unknown`).
   const lookUpRecordedEvent = useCallback(
@@ -1266,14 +1307,13 @@ export function OperateConsoleCore({
     async (clientEventIds: readonly string[], noun: string) => {
       if (clientEventIds.some((id) => undoStartedRef.current.has(id))) return;
       clientEventIds.forEach((id) => undoStartedRef.current.add(id));
-      let sent = false;
       const stop = (message: string) => {
-        // 서버에 아무것도 보내지 않았으면 잠금을 푼다 — 남은 토스트로 다시 누를 수 있게.
-        if (!sent) clientEventIds.forEach((id) => undoStartedRef.current.delete(id));
+        // 끝내지 못했으면 잠금을 푼다 — 다시 누르면 이미 취소된 기록은 건너뛰고 남은 것만 보낸다.
+        clientEventIds.forEach((id) => undoStartedRef.current.delete(id));
         setRecordError(message);
       };
       if (commandBlockedRef.current) {
-        stop('진행 요청을 처리하는 중이라 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+        stop(UNDO_BLOCKED_BY_COMMAND);
         return;
       }
       let reversed = 0;
@@ -1288,18 +1328,39 @@ export function OperateConsoleCore({
           return;
         }
         if (found.reversed) continue;
-        sent = true;
-        try {
-          await opsRef.current.reverseEvent({ eventId: found.event.id, reason: `${noun} 기록 되돌리기` });
-        } catch (err) {
-          stop(extractErrorMessage(err, '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'));
+        const eventId = found.event.id;
+        if (hasPendingWork(opsRef.current.queue)) {
+          showToast('다른 기록을 보내는 중이에요. 다 보내면 되돌릴게요.');
+          await waitForQueueIdle();
+          // 기다리는 사이 다른 길로 취소됐을 수 있다.
+          if (opsRef.current.liveEvents.some((candidate) => candidate.reversesEventId === eventId)) continue;
+        }
+        // 기다리는 사이 진행 요청이 시작됐을 수 있다.
+        if (commandBlockedRef.current) {
+          stop(UNDO_BLOCKED_BY_COMMAND);
           return;
+        }
+        const request = opsRef.current.reverseEvent({ eventId, reason: `${noun} 기록 되돌리기` });
+        const settled = request.then(
+          () => undefined,
+          () => undefined,
+        );
+        reverseInFlightRef.current = settled;
+        try {
+          await request;
+        } catch (err) {
+          // 다른 길로 이미 취소된 기록이다 — 실패가 아니다.
+          if (extractErrorCode(err) === 'EVENT_ALREADY_REVERSED') continue;
+          stop(undoFailureMessage(err, gameOperationsErrorMessage));
+          return;
+        } finally {
+          if (reverseInFlightRef.current === settled) reverseInFlightRef.current = null;
         }
         reversed += 1;
       }
       showToast(reversed > 0 ? '되돌렸어요' : '이미 취소한 기록이에요');
     },
-    [showToast, resolveRecordedEvent],
+    [showToast, resolveRecordedEvent, waitForQueueIdle, gameOperationsErrorMessage],
   );
 
   // 기록은 확인 없이 저장하고 5초 되돌리기로 복구한다. 확인을 남기는 예외는 수상한 시계와 두 번째 옐로 뒤의 레드뿐이다
@@ -1321,6 +1382,7 @@ export function OperateConsoleCore({
       const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
       // 끊긴 채 적은 기록은 이 기기 큐에만 있다 — 서버 되돌리기를 약속하지 않는다.
       const connected = opsRef.current.connectionStatus === 'connected';
+      await waitForReverseInFlight();
       const recordedId = await opsRef.current.submitEvent(input);
       if (recordedId === null) {
         setRecordError(RECORD_SAVE_FAILED);
@@ -1338,6 +1400,7 @@ export function OperateConsoleCore({
             return;
           }
           await waitForQueueIdle();
+          await waitForReverseInFlight();
           const redId = await opsRef.current.submitEvent(redInput);
           if (redId === null) {
             setRecordError(RECORD_SAVE_FAILED);
@@ -1357,7 +1420,7 @@ export function OperateConsoleCore({
         action: { label: '되돌리기', onClick: () => void undoRecord(recordedIds, noun) },
       });
     },
-    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, undoRecord, gameDetail.data?.sides, lineupsQuery.data, clockWarningMinutes, periodCount],
+    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, waitForReverseInFlight, undoRecord, gameDetail.data?.sides, lineupsQuery.data, clockWarningMinutes, periodCount],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번

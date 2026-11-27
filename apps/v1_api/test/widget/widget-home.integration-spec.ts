@@ -7,6 +7,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { ScheduleAttendanceService } from '../../src/team-schedules/attendance.service';
+import { resolveTeamLogoUrl } from '../../src/teams/team-logo-presets';
 import { WidgetHomeService } from '../../src/widget/widget-home.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
@@ -32,6 +33,7 @@ describe('위젯 홈 HTTP/DB 계약', () => {
   let regionId: string;
   let configId: string;
   let previousSecret: string | undefined;
+  let periodStart: Date;
   const games: Record<string, string> = {};
   const sched: Record<string, string> = {};
   const createdTeamMatchIds: string[] = [];
@@ -130,11 +132,13 @@ describe('위젯 홈 HTTP/DB 계약', () => {
         { teamId: team3, userId: userD, role: 'owner', status: 'active' },
       ],
     });
+    await db.v1Team.update({ where: { id: team1 }, data: { memberCount: 2 } });
+    await db.v1TeamProfile.create({ data: { teamId: team2, logoUrl: '/uploads/widget-opponent.png' } });
     await db.v1GameOperationFlag.upsert({ where: { key: 'PUBLIC_LIVE' }, create: { key: 'PUBLIC_LIVE', value: 'on', ownerActor: 'widget-home-integration' }, update: { value: 'on' } });
 
     // 일정: 마감 있는 모임 / 마감 없는 훈련 / 마감 지난 훈련 / 경기 일정 / 이미 응답한 훈련 / 완료·취소 / 남의 팀.
     await makeSchedule('deadline', team1, 3 * DAY, { type: 'EVENT', rsvpDeadlineAt: new Date(Date.now() + 1 * DAY) });
-    await makeSchedule('open', team1, 2 * DAY);
+    await makeSchedule('open', team1, 2 * DAY, { capacity: 12 });
     await makeSchedule('closed', team1, 4 * DAY, { rsvpDeadlineAt: new Date(Date.now() - 1 * HOUR) });
     await makeSchedule('matchType', team1, 1 * DAY, { type: 'MATCH' });
     await makeSchedule('answered', team1, 1.5 * DAY);
@@ -148,15 +152,33 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     await goal(live.gameId, live.side('HOME'));
     await goal(live.gameId, live.side('AWAY'));
     await goal(live.gameId, live.side('AWAY'));
+    // 득점자: 우리(원정) 김득점 5분 / 상대(홈) 박상대 9분 / 우리 이름 모름 21분 / 취소된 상대 골(15분)은 빠진다.
+    const lineupOf = async (gameId: string, sideId: string) =>
+      (await db.v1GameLineup.findFirst({ where: { gameId, sideId }, orderBy: { revision: 'desc' } })) ?? db.v1GameLineup.create({ data: { gameId, sideId, revision: 1, state: 'LOCKED' } });
+    const playerOf = async (gameId: string, sideId: string, name: string) =>
+      (await db.v1GameParticipant.create({ data: { gameId, sideId, lineupId: (await lineupOf(gameId, sideId)).id, displayNameSnapshot: name } })).id;
+    const mineKim = await playerOf(live.gameId, live.side('AWAY'), '김득점');
+    const oppPark = await playerOf(live.gameId, live.side('HOME'), '박상대');
+    const liveEvents = await db.v1GameEvent.findMany({ where: { gameId: live.gameId }, orderBy: { sequence: 'asc' } });
+    await db.v1GameEvent.update({ where: { id: liveEvents[0].id }, data: { participantId: oppPark, clockMs: 8 * 60_000 + 500 } }); // 상대(홈) 9분
+    await db.v1GameEvent.update({ where: { id: liveEvents[1].id }, data: { participantId: mineKim, clockMs: 5 * 60_000 } }); // 우리 5분
+    await db.v1GameEvent.update({ where: { id: liveEvents[2].id }, data: { clockMs: 20 * 60_000 + 1 } }); // 우리 21분(이름 모름)
+    const cancelled = await goal(live.gameId, live.side('HOME'));
+    await db.v1GameEvent.update({ where: { id: cancelled.id }, data: { clockMs: 15 * 60_000 } });
+    await db.v1GameEvent.create({
+      data: { gameId: live.gameId, sequence: ++seq, clientEventId: `c-${tag}-${seq}`, payloadHash: `h-${seq}`, type: 'CORRECTION', sideId: live.side('HOME'), reversesEventId: cancelled.id, period: 1, clockMs: 15 * 60_000, occurredAt: new Date(), actorUserId: userA, payload: {} },
+    });
     // 친선 팀 매치: 득점이 경기 이벤트가 아니라 공유 기록에 있다(우리가 홈, 2 : 1).
     const friendly = await makeGame('friendly', { startOffsetMs: -10 * MIN, state: 'LIVE', policy: 'LIVE' });
+    const friendlyMine = await playerOf(friendly.gameId, friendly.side('HOME'), '우리선수');
+    const friendlyOpp = await playerOf(friendly.gameId, friendly.side('AWAY'), '상대선수');
     await db.v1TeamMatchRecord.create({
       data: {
         gameId: friendly.gameId,
         goals: [
-          { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: null, minute: 3, subMatchId: null },
+          { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: friendlyMine, minute: 3, subMatchId: null },
           { id: randomUUID(), sideId: friendly.side('HOME'), ownGoal: false, participantId: null, minute: 9, subMatchId: null },
-          { id: randomUUID(), sideId: friendly.side('AWAY'), ownGoal: false, participantId: null, minute: 14, subMatchId: null },
+          { id: randomUUID(), sideId: friendly.side('AWAY'), ownGoal: false, participantId: friendlyOpp, minute: null, subMatchId: null },
         ],
       },
     });
@@ -172,6 +194,19 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     await makeGame('endedBumped', { startOffsetMs: -2 * DAY, state: 'ENDED', policy: 'LIVE', endedAgoMs: 2 * DAY, bumpedNow: true });
     await makeGame('endedAway', { startOffsetMs: -100 * MIN, state: 'ENDED', policy: 'LIVE', mineIsAway: true, endedAgoMs: 5 * MIN });
     await makeGame('endedHidden', { startOffsetMs: -80 * MIN, state: 'ENDED', policy: 'HIDDEN', endedAgoMs: 4 * MIN });
+
+    // 구간: live 는 후반(2구간) 진행 중 — 1구간은 끝났고 멈춘 시간 60초. hidden 은 하프타임(다음 구간 HALFTIME).
+    const period = (gameId: string, number: number, state: 'ENDED' | 'LIVE' | 'HALFTIME', extra: object = {}) =>
+      db.v1GamePeriod.upsert({ where: { gameId_number: { gameId, number } }, create: { gameId, number, state, ...extra }, update: { state, ...extra } });
+    periodStart = new Date(Date.now() - 12 * MIN);
+    await period(games.live, 1, 'ENDED', { startedAt: new Date(Date.now() - 40 * MIN), endedAt: new Date(Date.now() - 27 * MIN) });
+    await period(games.live, 2, 'LIVE', { startedAt: periodStart, pausedTotalMs: 60_000 });
+    await period(games.hidden, 1, 'ENDED', { startedAt: new Date(Date.now() - 40 * MIN), endedAt: new Date(Date.now() - 8 * MIN) });
+    await period(games.hidden, 2, 'HALFTIME');
+
+    // 경기 일정: matchType 일정을 친선 경기(우리 ↔ 상대팀, 장소 `구장-friendly`)에 연결한다.
+    const friendlyMatch = await db.v1TeamMatch.findFirstOrThrow({ where: { title: `경기-friendly-${tag}` } });
+    await db.v1TeamSchedule.update({ where: { id: sched.matchType }, data: { teamMatchId: friendlyMatch.id } });
   });
 
   afterAll(async () => {
@@ -221,6 +256,42 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     expect(live.map((g) => g.state)).toEqual(['LIVE', 'LIVE', 'LIVE', 'LIVE', 'ENDED', 'ENDED', 'ENDED']); // 진행 중이 앞
   });
 
+  it('진행 중 경기 부가 정보: 팀 마크(저장된 것·기본 마크), 장소, 현재 구간, 하프타임', async () => {
+    const live = (await homeOf(await tokenOf(userB))).live as Array<Record<string, unknown> & { gameId: string }>;
+    const running = live.find((g) => g.gameId === games.live)!;
+    expect(running).toMatchObject({ venueName: '구장-live', competitionName: null, teamLogoUrl: resolveTeamLogoUrl(team1, null), opponentLogoUrl: '/uploads/widget-opponent.png' });
+    expect(running.teamLogoUrl).toMatch(/^\/images\/team-logos\/team-logo-\d{2}\.jpg$/); // 로고가 비면 팀 페이지와 같은 기본 마크
+    expect(running.period).toMatchObject({ number: 2, phase: 'RUNNING', pausedMs: 60_000, pausedAt: null });
+    expect(new Date((running.period as { startedAt: string }).startedAt).getTime()).toBe(periodStart.getTime());
+    expect(live.find((g) => g.gameId === games.hidden)!.period).toMatchObject({ number: 2, phase: 'HALFTIME', startedAt: null });
+    expect(live.find((g) => g.gameId === games.friendly)!.period).toBeNull(); // 친선 팀 매치는 구간 기록이 없다
+    expect(live.find((g) => g.gameId === games.justEnded)!.period).toBeNull(); // 끝난 경기
+  });
+
+  it('득점자: 시간순·분 환산, 취소된 골 제외, 친선은 우리 팀 골만 이름, 점수를 가린 경기는 비어 있다', async () => {
+    const live = (await homeOf(await tokenOf(userB))).live as Array<{ gameId: string; scorers: unknown[] }>;
+    // 경기 이벤트(대회·리그와 같은 경로): 분 = ceil(clockMs / 60000), 시간순, 취소된 상대 골(15분)은 빠진다.
+    expect(live.find((g) => g.gameId === games.live)!.scorers).toEqual([
+      { side: 'MINE', name: '김득점', minute: 5, ownGoal: false },
+      { side: 'OPPONENT', name: '박상대', minute: 9, ownGoal: false },
+      { side: 'MINE', name: null, minute: 21, ownGoal: false },
+    ]);
+    // 친선 팀 매치(공유 기록): 우리 팀 골만 이름을 붙이고 상대 골은 이름 없이, 분을 모르는 골은 맨 뒤.
+    expect(live.find((g) => g.gameId === games.friendly)!.scorers).toEqual([
+      { side: 'MINE', name: '우리선수', minute: 3, ownGoal: false },
+      { side: 'MINE', name: null, minute: 9, ownGoal: false },
+      { side: 'OPPONENT', name: null, minute: null, ownGoal: false },
+    ]);
+    expect(live.find((g) => g.gameId === games.hidden)!.scorers).toEqual([]); // 점수를 가린 경기는 골 요약도 가린다
+    expect(live.find((g) => g.gameId === games.endedHidden)!.scorers).toEqual([]);
+  });
+
+  it('지난 경기: 가장 최근 공식 결과(가린 경기는 건너뛴다)와 승무패', async () => {
+    const home = await homeOf(await tokenOf(userB));
+    expect(home.lastResult).toMatchObject({ gameId: games.justEnded, score: { mine: 2, opponent: 1 }, penalties: null, result: 'WIN', competitionName: null, teamName: `우리팀-${tag}` });
+    expect((await homeOf(await tokenOf(userC))).lastResult).toBeNull();
+  });
+
   it('응답 대기: 훈련·모임 중 내가 응답 안 했고 마감 전인 것만, 마감이 가까운 순(마감 없는 것은 뒤)', async () => {
     const home = await homeOf(await tokenOf(userB));
     const ids = (home.pending as Array<{ scheduleId: string }>).map((i) => i.scheduleId);
@@ -237,6 +308,10 @@ describe('위젯 홈 HTTP/DB 계약', () => {
     expect(items.map((i) => i.scheduleId)).toEqual([sched.matchType, sched.answered, sched.open, sched.deadline]);
     expect(items.find((i) => i.scheduleId === sched.answered)).toMatchObject({ myResponse: 'GOING', canRespond: true });
     expect(items.find((i) => i.scheduleId === sched.matchType)).toMatchObject({ myResponse: null, canRespond: false });
+    // 경기 일정: 상대팀(저장된 마크)·장소. 훈련은 상대가 없다. 참석 인원·정원(없으면 팀원 수).
+    expect(items.find((i) => i.scheduleId === sched.matchType)).toMatchObject({ opponentName: `상대팀-${tag}`, opponentLogoUrl: '/uploads/widget-opponent.png', placeName: '구장-friendly', competitionName: null });
+    expect(items.find((i) => i.scheduleId === sched.open)).toMatchObject({ opponentName: null, opponentLogoUrl: null, placeName: null, goingCount: 0, capacity: 12 });
+    expect(items.find((i) => i.scheduleId === sched.answered)).toMatchObject({ goingCount: 1, capacity: 2 });
     expect(items.find((i) => i.scheduleId === sched.open)).toMatchObject({ myResponse: null, canRespond: true, teamName: `우리팀-${tag}` });
     const all = items.map((i) => i.scheduleId);
     for (const key of ['done', 'cancelled', 'other']) expect(all).not.toContain(sched[key]);

@@ -3,6 +3,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { TeamLineupsModule } from '../team-lineups/team-lineups.module';
 import { TeamSchedulesModule } from '../team-schedules/team-schedules.module';
 import { WidgetHomeService } from './widget-home.service';
+import { WidgetScorersService } from './widget-scorers.service';
 import { MyWidgetTokenController, WidgetController } from './widget.controller';
 import { WidgetService } from './widget.service';
 
@@ -10,6 +11,6 @@ import { WidgetService } from './widget.service';
 @Module({
   imports: [TeamLineupsModule, TeamSchedulesModule],
   controllers: [MyWidgetTokenController, WidgetController],
-  providers: [WidgetService, WidgetHomeService, V1AuthGuard],
+  providers: [WidgetService, WidgetHomeService, WidgetScorersService, V1AuthGuard],
 })
 export class WidgetModule {}

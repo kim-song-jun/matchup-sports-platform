@@ -1,3 +1,4 @@
+// 서버(위젯)에 같은 알고리즘의 사본이 있다: apps/v1_api/src/teams/team-logo-presets.ts — 마크 개수·해시를 바꾸면 그쪽과 spec 기대값도 같이 바꾼다.
 export const TEAM_LOGO_PRESETS = Array.from(
   { length: 10 },
   (_, index) => `/images/team-logos/team-logo-${String(index + 1).padStart(2, '0')}.jpg`,

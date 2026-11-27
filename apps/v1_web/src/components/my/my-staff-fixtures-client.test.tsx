@@ -174,7 +174,7 @@ describe('MyStaffFixturesPageClient', () => {
 
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
-    expect(screen.getByRole('link', { name: /\(테스트\)1010 · A조 · 조별리그 3라운드 3, 경기 운영 콘솔 열기/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /\(테스트\)1010 · A조 · 조별리그 3라운드 3, 경기 콘솔 열기/ })).toBeInTheDocument();
   });
 
   it('담당 경기만 보여주고 각 행이 경기 콘솔로 링크된다', () => {
@@ -188,7 +188,7 @@ describe('MyStaffFixturesPageClient', () => {
 
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
-    const link = screen.getByRole('link', { name: /성수 FC vs 망원 FC, 경기 운영 콘솔 열기/ });
+    const link = screen.getByRole('link', { name: /성수 FC vs 망원 FC, 경기 콘솔 열기/ });
     expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate?from=staff');
     expect(screen.queryByText(/남의 팀/)).toBeNull();
     expect(screen.queryByText(/\(테스트\)1010/)).toBeNull();

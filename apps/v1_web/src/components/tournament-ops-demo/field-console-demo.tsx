@@ -40,7 +40,7 @@ export function FieldConsoleDemo() {
         </div>
       </div></header>
       <main className={styles.container}>
-        <h1 className="tm-text-heading mb-3">경기 운영콘솔 체험</h1>
+        <h1 className="tm-text-heading mb-3">경기 콘솔 체험</h1>
         <p className={styles.notice}>실제 구장 담당자와 같은 조작 화면이에요. 5인제 축구·팀별 교체 3회의 샘플 경기로 체험해요. 팀·선수는 모두 샘플이며 실제 서버에 전송하지 않아요. 새로고침하면 체험 기록이 초기화돼요.</p>
         <QueryClientProvider client={client}>
           <div hidden={step !== null}><FieldConsoleSession key={session} /></div>

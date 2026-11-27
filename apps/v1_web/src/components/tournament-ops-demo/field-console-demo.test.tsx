@@ -58,6 +58,7 @@ describe('필드 운영콘솔 안내와 체험', () => {
     expect(screen.getByText('콘솔 사용 안내 · 5/5')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '직접 체험하기' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: '경기 콘솔 체험' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '대회 운영으로 돌아가기' })).toHaveAttribute('href', '/tournament-management');
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     expect(screen.getByLabelText(/스코어 블루 FC 0점, 오렌지 FS 0점/)).toBeInTheDocument();

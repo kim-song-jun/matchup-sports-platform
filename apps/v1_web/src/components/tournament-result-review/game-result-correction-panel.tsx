@@ -212,6 +212,7 @@ export function GameResultCorrectionPanel({
         modalMessage:
           '새로 확정할 점수·참가자 기록과 사유를 입력해 주세요. 확정 전까지는 무효 상태가 그대로 유지돼요.',
         modalConfirmLabel: '결과 제출',
+        submitHint: '제출한 뒤 결과 확정을 눌러야 순위표에 반영돼요.',
         reasonLabel: '재입력 사유',
       }
     : {
@@ -224,7 +225,8 @@ export function GameResultCorrectionPanel({
         modalTitle: '결과를 고칠까요?',
         modalMessage:
           '변경할 점수·참가자 기록과 사유를 입력해 주세요. 확정 전까지는 기존 공식 결과가 그대로 유지돼요.',
-        modalConfirmLabel: '고친 결과로 확정',
+        modalConfirmLabel: '고친 내용 저장',
+        submitHint: '저장한 뒤 결과 확정을 눌러야 순위표에 반영돼요.',
         reasonLabel: '고친 이유',
       };
   const readOnly = !canActOnResultReview(game.actorRole);
@@ -284,6 +286,7 @@ export function GameResultCorrectionPanel({
         title={entryCopy.modalTitle}
         message={entryCopy.modalMessage}
         confirmLabel={entryCopy.modalConfirmLabel}
+        submitHint={entryCopy.submitHint}
         reasonLabel={entryCopy.reasonLabel}
         base={{
           score: editPrefill.score,

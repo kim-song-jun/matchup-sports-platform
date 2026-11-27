@@ -575,7 +575,7 @@ describe('correction -- create against the current official revision, always cap
     expect(screen.getByLabelText('1번째 카드 시간(분)')).toHaveValue(8);
     fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '12' } });
     fireEvent.change(screen.getByLabelText('고친 이유'), { target: { value: '카드 시간 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 내용 저장' }));
     expect(hookMocks.createCorrection.mutate.mock.calls[0][0].changes.actualParticipants[0].cards).toEqual({
       yellow: 1, red: 0, events: [{ id: 'existing-yellow', card: 'YELLOW', minute: 12, period: 2 }],
     });
@@ -604,7 +604,7 @@ describe('correction -- create against the current official revision, always cap
     expect(within(dialog).getByText('점수 변경: 1:1 → 2:1')).toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText('고친 이유'), '득점 누락 정정');
-    await user.click(within(dialog).getByRole('button', { name: '고친 결과로 확정' }));
+    await user.click(within(dialog).getByRole('button', { name: '고친 내용 저장' }));
 
     expect(hookMocks.createCorrection.mutate).toHaveBeenCalledWith(
       {
@@ -639,6 +639,20 @@ describe('correction -- create against the current official revision, always cap
     );
   });
 
+  it('고치기 폼의 첫 버튼은 하는 일 그대로 「고친 내용 저장」이고, 저장 뒤 결과 확정이 필요하다고 안내한다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 2, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' })];
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '결과 고치기' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('button', { name: '고친 내용 저장' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '고친 결과로 확정' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('저장한 뒤 결과 확정을 눌러야 순위표에 반영돼요.')).toBeInTheDocument();
+  });
+
   it('the correction confirm button stays disabled until a reason is entered', async () => {
     hookMocks.game.data = buildGame('platform_ops', { version: 2, currentOfficialRevisionId: 'rev-1' });
     hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' })];
@@ -647,7 +661,7 @@ describe('correction -- create against the current official revision, always cap
 
     await user.click(screen.getByRole('button', { name: '결과 고치기' }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: '고친 결과로 확정' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: '고친 내용 저장' })).toBeDisabled();
   });
 
   it('보기만 하는 역할은 딥링크 autoOpen 으로 열려도 고치기 폼이 보이지 않는다', () => {

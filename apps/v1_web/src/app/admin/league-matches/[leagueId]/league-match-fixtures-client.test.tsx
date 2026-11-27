@@ -1575,7 +1575,7 @@ describe('LeagueMatchFixturesClient', () => {
   // 감사 확인(A-league-void-stage): voided(무효화된 결과)도 백엔드가 신규 입력을 이미
   // 허용하므로 '결과 입력' 버튼이 떠야 한다 — 여기서 빠지면 무효 대진은 재입력 버튼
   // 자체가 사라져 그 시즌 승강 확정이 영구히 막힌다.
-  it('결과 진행 단계에 따라 ⋯ 시트의 결과 항목이 갈린다 — 결과 없음은 항목 없음, 확정은 결과 고치기, 그 밖에는 결과 검토', () => {
+  it('결과 진행 단계에 따라 ⋯ 시트의 결과 항목이 갈린다 — 결과 없음은 항목 없음, 확정은 결과 고치기, 그 밖에는 결과 확정', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -1615,22 +1615,20 @@ describe('LeagueMatchFixturesClient', () => {
     const results = new Map<string, { label: string; href: string } | null>();
     for (const title of ['1주차', '2주차', '3주차', '4주차', '5주차', '6주차']) {
       const { sheet, close } = sheetFor(title);
-      const link = within(sheet).queryByRole('link', { name: /^결과 (고치기|검토)/ });
+      const link = within(sheet).queryByRole('link', { name: /^결과 (고치기|확정)/ });
       results.set(title, link === null ? null : { label: link.textContent ?? '', href: link.getAttribute('href') ?? '' });
       close();
     }
     // 아직 결과가 없는 경기에는 항목이 없다 — 눌러도 빈 화면인 "결과 고치기"를 두지 않는다.
     expect(results.get('1주차')).toBeNull();
-    // 제출·초안·정정 요청·무효는 결과 검토 화면으로 간다.
+    // 제출·초안·고치기 요청·무효는 결과 화면의 확정으로 간다.
     for (const title of ['2주차', '3주차', '5주차', '6주차']) {
-      expect(results.get(title)?.label).toMatch(/^결과 검토/);
-      expect(results.get(title)?.href).toMatch(/^\/admin\/live\/league-1\/result-review\?fixtureId=tm-/);
+      expect(results.get(title)?.label).toMatch(/^결과 확정/);
+      expect(results.get(title)?.href).toMatch(/^\/admin\/live\/league-1\/results\?fixtureId=tm-/);
     }
-    // 확정된 경기는 **정정 화면**으로 간다. `result-review` 는 *검토 대기* 목록이라 확정된 경기가 거기
-    // 없어, 라벨은 "결과 고치기" 인데 "검토할 결과가 없어요" 가 열리는 데드엔드였다(alpha 실측).
-    // 라벨이 아니라 **href** 로 잰다.
+    // 확정된 경기도 같은 결과 화면이고 그 경기가 골라진 채 열린다. 라벨이 아니라 **href** 로 잰다.
     expect(results.get('4주차')?.label).toMatch(/^결과 고치기/);
-    expect(results.get('4주차')?.href).toBe('/admin/live/league-1/records/corrections?fixtureId=tm-official');
+    expect(results.get('4주차')?.href).toBe('/admin/live/league-1/results?fixtureId=tm-official');
   });
 
   // U1: 요구사항 3 — 정정 모드는 확정 전 "전 → 후" 비교를 보여준다. 이게 이 안의 존재 이유라

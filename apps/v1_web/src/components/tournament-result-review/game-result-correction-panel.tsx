@@ -60,9 +60,8 @@ function resolveEditPrefill(
 }
 
 /**
- * GameResultCorrectionPanel -- the records/corrections screen's per-game
- * surface (screen A-04, and the correction half of A-03's officialize/void
- * authority). Drives `POST /games/:gameId/corrections` (create),
+ * GameResultCorrectionPanel -- the results screen's per-game surface for an
+ * already-confirmed result (fix, re-enter after void, void). Drives `POST /games/:gameId/corrections` (create),
  * `.../officialize` (confirm a correction draft), and `.../void`
  * (retract the current official result) -- all named in
  * `tournament-result-review.controller.ts`.

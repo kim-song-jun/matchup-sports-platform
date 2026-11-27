@@ -36,8 +36,8 @@ import { regularPeriodCountOf } from '@/shared/game-operations';
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 
 /**
- * GameResultReviewPanel -- the result-review screen's per-game surface
- * (screen A-03's review half). Given a `gameId`, drives exactly the Task 22
+ * GameResultReviewPanel -- the results screen's per-game surface for a
+ * submitted result waiting to be confirmed. Given a `gameId`, drives exactly the Task 22
  * REST endpoints named in `tournament-result-review.controller.ts`: review-
  * decision (reject/request_supplement), supersede-and-submit (resubmit), and
  * officialize (approve). Correction/void live in

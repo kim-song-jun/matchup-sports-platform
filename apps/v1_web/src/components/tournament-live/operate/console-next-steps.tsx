@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation';
 import { canManageTournamentResults, useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { findNextFixture } from '@/lib/next-fixture';
-import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { resolveTournamentLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 
 /**
- * 결과를 확정한 뒤 콘솔에서 이어 갈 곳 — 순위표, 이 경기의 결과 정정, 다음 경기. 확정 뒤 "갈 곳이 없던" 막다른
+ * 결과를 확정한 뒤 콘솔에서 이어 갈 곳 — 순위표, 이 경기의 결과 고치기, 다음 경기. 확정 뒤 "갈 곳이 없던" 막다른
  * 화면을 없애는 자리라, 결과 확정 카드가 확정 상태일 때만 그 옆에 붙는다.
  *
  * 대회/리그 종류와 대진 목록은 셸이 이미 받아 둔 공개 대회 상세(`useV1Tournament`)를 재사용한다.
@@ -31,7 +31,7 @@ export function ConsoleNextSteps({ tournamentId, fixtureId }: { tournamentId: st
       </Link>
       {canCorrect ? (
         <Link
-          href={`${base}/records/corrections?fixtureId=${encodeURIComponent(fixtureId)}`}
+          href={resultsHref(base, fixtureId)}
           className="tm-btn tm-btn-sm tm-btn-outline whitespace-nowrap"
         >
           결과 고치기

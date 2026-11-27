@@ -9,6 +9,7 @@ import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-brac
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { placedRegistrationIdsForSlot } from '@/lib/bracket-slot-candidates';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
 import type {
   V1AdminBracketFixture,
@@ -163,7 +164,7 @@ export function BracketNodePanel({
           <div className="flex flex-col items-start gap-2">
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{DIRECT_SIDE_BLOCKED[teamChangeAccess]}</p>
             {teamChangeAccess === 'official' && canWrite ? (
-              <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
+              <Link href={resultHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기</Link>
             ) : null}
           </div>
         );
@@ -238,7 +239,7 @@ export function BracketNodePanel({
     });
   };
 
-  const correctionsHref = `/admin/live/${encodeURIComponent(tournamentId)}/records/corrections?fixtureId=${encodeURIComponent(fixture.id)}`;
+  const resultHref = resultsHref(adminLiveBase(tournamentId), fixture.id);
 
   const renderResult = () => {
     if (game === null) return <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>경기 정보가 아직 준비되지 않았어요.</p>;
@@ -264,8 +265,8 @@ export function BracketNodePanel({
     if (game.hasLiveRecords) {
       return (
         <div className="flex flex-col items-start gap-2">
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>라이브로 득점이 기록된 경기예요. 결과 고치기 화면에서 처리해 주세요.</p>
-          <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>라이브로 득점이 기록된 경기예요. 결과 화면에서 처리해 주세요.</p>
+          <Link href={resultHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 화면 열기</Link>
         </div>
       );
     }

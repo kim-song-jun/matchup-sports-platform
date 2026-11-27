@@ -132,7 +132,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const unscheduledShown = shown.filter((card) => card.dayKey === null);
 
   const dayCards = cards.filter((card) => card.dayKey === activeDay);
-  const endedCount = dayCards.filter((card) => card.state === 'result-pending' || card.state === 'result-done').length;
+  const endedCount = dayCards.filter((card) => card.state === 'result-pending' || card.state === 'result-done' || card.state === 'result-void').length;
   const liveCount = dayCards.filter((card) => card.state === 'live').length;
   const remainingCount = dayCards.filter((card) => card.state === 'scheduled').length;
 

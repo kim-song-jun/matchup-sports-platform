@@ -9,6 +9,7 @@ import {
   UserX,
   ShieldAlert,
   Hourglass,
+  Ban,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type {
@@ -61,13 +62,14 @@ export function GameStateBadge({ state }: { state: V1GameState | null }) {
 }
 
 /** 운영 보드 카드의 상태 — 경기 상태에 결과 확정 단계를 더한 말. */
-export type BoardCardState = 'scheduled' | 'live' | 'result-pending' | 'result-done' | 'cancelled';
+export type BoardCardState = 'scheduled' | 'live' | 'result-pending' | 'result-done' | 'result-void' | 'cancelled';
 
 const BOARD_CARD_STATE_META: Record<BoardCardState, { label: string; tone: Tone; icon: ReactNode }> = {
   scheduled: { label: '예정', tone: 'gray', icon: <CalendarClock size={12} aria-hidden="true" /> },
   live: { label: '진행 중', tone: 'blue', icon: <CircleDot size={12} aria-hidden="true" /> },
   'result-pending': { label: '결과 확정 대기', tone: 'amber', icon: <Hourglass size={12} aria-hidden="true" /> },
   'result-done': { label: '결과 확정됨', tone: 'green', icon: <CheckCircle2 size={12} aria-hidden="true" /> },
+  'result-void': { label: '결과 무효', tone: 'red', icon: <Ban size={12} aria-hidden="true" /> },
   cancelled: { label: '취소됨', tone: 'red', icon: <XCircle size={12} aria-hidden="true" /> },
 };
 
@@ -77,12 +79,10 @@ export function BoardCardStateBadge({ state }: { state: BoardCardState }) {
 }
 
 /** 결과 화면 목록 줄의 배지. 보드 카드의 「결과 확정 대기·결과 확정됨」과 같은 색·아이콘이다. */
-export function ResultListBadge({ confirmed }: { confirmed: boolean }) {
-  return confirmed ? (
-    <Pill tone="green" icon={<CheckCircle2 size={12} aria-hidden="true" />} label="확정됨" />
-  ) : (
-    <Pill tone="amber" icon={<Hourglass size={12} aria-hidden="true" />} label="확정 대기" />
-  );
+export function ResultListBadge({ kind }: { kind: 'pending' | 'confirmed' | 'void' }) {
+  if (kind === 'confirmed') return <Pill tone="green" icon={<CheckCircle2 size={12} aria-hidden="true" />} label="확정됨" />;
+  if (kind === 'void') return <Pill tone="red" icon={<Ban size={12} aria-hidden="true" />} label="결과 무효" />;
+  return <Pill tone="amber" icon={<Hourglass size={12} aria-hidden="true" />} label="확정 대기" />;
 }
 
 const PUBLIC_FIXTURE_STATE: Readonly<Record<string, V1GameState>> = {

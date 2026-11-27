@@ -215,11 +215,13 @@ describe('OperationsBoardClient — 데스크톱', () => {
     expect(screen.queryByRole('link', { name: /담당자 배정하기/ })).not.toBeInTheDocument();
   });
 
-  it('지원은 결과·담당자 버튼 없이 점수와 상태만 본다', async () => {
+  it('지원은 확정·고치기·담당자 버튼 없이 결과 보기만 얻고 점수와 상태를 본다', async () => {
     renderBoard('SUPPORT_READONLY');
     await screen.findByRole('columnheader', { name: /구장 1/ });
 
     expect(screen.queryByRole('link', { name: /결과 확정|결과 고치기|담당자 배정하기/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('article', { name: '홈7 vs 원정7' })).getByRole('link', { name: /결과 보기/ })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f7');
+    expect(within(screen.getByRole('article', { name: '홈1 vs 원정1' })).getByRole('link', { name: /결과 보기/ })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f1');
     expect(screen.queryByText(/구장 담당자가 아직 없어요/)).not.toBeInTheDocument();
     expect(screen.getByRole('article', { name: '홈1 vs 원정1' })).toHaveTextContent('2 : 1');
     expect(screen.getByRole('article', { name: '홈7 vs 원정7' })).toHaveTextContent('결과 확정 대기');
@@ -235,6 +237,21 @@ describe('OperationsBoardClient — 데스크톱', () => {
     const dialog = screen.getByRole('dialog', { name: '홈3 vs 원정3 경기 정보' });
     expect(within(dialog).getByRole('link', { name: '경기 콘솔 열기' })).toHaveAttribute('href', '/admin/live/t-1/fixtures/f3/operate');
     expect(within(dialog).getByRole('combobox', { name: '홈3 vs 원정3 구장' })).toHaveValue('fld1');
+  });
+});
+
+describe('OperationsBoardClient — 결과 무효', () => {
+  it('무효 처리된 결과는 확정 대기가 아니라 「결과 무효」이고 결과 다시 입력으로 간다', async () => {
+    scenario.pages = [{ items: [fx(5, 'fld1', kst(D20, '09:00'), { gameState: 'ENDED', revisionId: 'rev', currentRevisionState: 'VOID' })], nextCursor: null }];
+    scenario.fixtures = [{ id: 'f5', homeTeamName: '홈5', awayTeamName: '원정5', homeSlotLabel: null, awaySlotLabel: null }];
+    scenario.staff = [];
+    const { container } = renderBoard();
+
+    const card = await screen.findByRole('article', { name: '홈5 vs 원정5' });
+    expect(within(card).getByText('결과 무효')).toBeInTheDocument();
+    expect(within(card).queryByText('결과 확정 대기')).not.toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: /결과 다시 입력/ })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f5');
+    expect(container.textContent).toMatch(/끝남 1/);
   });
 });
 

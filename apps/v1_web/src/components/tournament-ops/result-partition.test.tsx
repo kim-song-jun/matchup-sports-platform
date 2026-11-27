@@ -6,15 +6,16 @@ import type { ReactNode } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { partitionResultFixtures, usePendingResultCount } from './result-partition';
 
-const row = (fixtureId: string, gameId: string | null, revisionId: string | null) => ({ fixtureId, gameId, revisionId });
+const row = (fixtureId: string, gameId: string | null, revisionId: string | null, currentRevisionState?: string) => ({ fixtureId, gameId, revisionId, currentRevisionState });
 
 describe('partitionResultFixtures', () => {
   const none: ReadonlySet<string> = new Set();
 
   it('확정된 결과가 없으면 확정 대기다', () => {
-    const { pending, confirmed } = partitionResultFixtures([row('a', 'g-a', null)], none);
+    const { pending, confirmed, voided } = partitionResultFixtures([row('a', 'g-a', null)], none);
     expect(pending.map((r) => r.fixtureId)).toEqual(['a']);
     expect(confirmed).toEqual([]);
+    expect(voided).toEqual([]);
   });
 
   it('확정된 결과가 있어도 검토 기한을 넘겼으면 확정 대기다', () => {
@@ -27,6 +28,16 @@ describe('partitionResultFixtures', () => {
     const { pending, confirmed } = partitionResultFixtures([row('a', 'g-a', 'r-a')], none);
     expect(pending).toEqual([]);
     expect(confirmed.map((r) => r.fixtureId)).toEqual(['a']);
+  });
+
+  it('무효 처리된 결과는 확정 대기도 확정됨도 아닌 무효 묶음이다(카드와 같은 분류)', () => {
+    const { pending, confirmed, voided } = partitionResultFixtures(
+      [row('a', 'g-a', 'r-a', 'VOID'), row('b', 'g-b', 'r-b', 'VOID'), row('c', 'g-c', 'r-c', 'OFFICIAL')],
+      new Set(['b']),
+    );
+    expect(voided.map((r) => r.fixtureId)).toEqual(['a', 'b']);
+    expect(pending).toEqual([]);
+    expect(confirmed.map((r) => r.fixtureId)).toEqual(['c']);
   });
 
   it('경기가 만들어지지 않은 행(gameId 없음)은 어느 쪽에도 없다', () => {

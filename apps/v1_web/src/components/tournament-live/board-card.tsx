@@ -1,4 +1,4 @@
-import { Check, Pencil, Play, UserPlus } from 'lucide-react';
+import { Check, Eye, Pencil, Play, UserPlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { BoardCardStateBadge } from '@/components/tournament-ops/badges';
@@ -10,6 +10,7 @@ const CARD_SURFACE: Record<CardState, string> = {
   live: 'bg-[var(--blue50)]',
   'result-pending': 'bg-[var(--tint-orange)]',
   'result-done': 'bg-[var(--surface-soft)]',
+  'result-void': 'bg-[var(--red50)]',
   scheduled: 'bg-[var(--card-surface)]',
   cancelled: 'bg-[var(--surface-soft)]',
 };
@@ -18,6 +19,7 @@ const ACTION_ICON: Record<CardActionKind, ReactNode> = {
   console: <Play size={14} aria-hidden="true" />,
   'confirm-result': <Check size={14} aria-hidden="true" />,
   'fix-result': <Pencil size={14} aria-hidden="true" />,
+  'view-result': <Eye size={14} aria-hidden="true" />,
   'assign-staff': <UserPlus size={14} aria-hidden="true" />,
 };
 
@@ -33,6 +35,7 @@ function actionHref(action: CardAction, card: BoardCard, liveBase: string, conso
       return `${liveBase}/fixtures/${encodeURIComponent(card.fixtureId)}/operate${consoleQuery}`;
     case 'confirm-result':
     case 'fix-result':
+    case 'view-result':
       return resultsHref(liveBase, card.fixtureId);
     case 'assign-staff':
       return `${liveBase}/staff`;

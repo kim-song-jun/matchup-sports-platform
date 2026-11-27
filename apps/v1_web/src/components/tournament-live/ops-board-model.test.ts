@@ -201,14 +201,33 @@ describe('buildBoardCards — 상태와 할 일', () => {
     expect(byId(cards, 'c')).toMatchObject({ state: 'cancelled', action: null });
   });
 
-  it('지원: 결과 확정 대기 카드에 액션이 없고 상태는 그대로다', () => {
+  it('지원: 결과 카드는 확정·고치기 대신 결과 보기만 얻고 상태는 그대로다', () => {
     const cards = buildBoardCards({
       ...base,
       role: 'SUPPORT_READONLY',
-      items: [ended('pending', { revisionId: null }), ended('done', { revisionId: 'r2', currentRevisionState: 'OFFICIAL' })],
+      items: [
+        ended('pending', { revisionId: null }),
+        ended('done', { revisionId: 'r2', currentRevisionState: 'OFFICIAL' }),
+        ended('void', { revisionId: 'r3', currentRevisionState: 'VOID' }),
+      ],
     });
-    expect(byId(cards, 'pending')).toMatchObject({ state: 'result-pending', action: null });
-    expect(byId(cards, 'done')).toMatchObject({ state: 'result-done', action: null });
+    expect(byId(cards, 'pending')).toMatchObject({ state: 'result-pending', action: { kind: 'view-result', label: '결과 보기', emphasis: 'secondary' } });
+    expect(byId(cards, 'done')).toMatchObject({ state: 'result-done', action: { kind: 'view-result' } });
+    expect(byId(cards, 'void')).toMatchObject({ state: 'result-void', action: { kind: 'view-result' } });
+  });
+
+  it('무효 처리된 결과는 확정 대기가 아니라 결과 무효이고, 운영자는 결과를 다시 입력한다', () => {
+    const cards = buildBoardCards({
+      ...base,
+      items: [
+        ended('void', { revisionId: 'r3', currentRevisionState: 'VOID' }),
+        ended('void-late', { revisionId: 'r4', currentRevisionState: 'VOID' }),
+      ],
+      liveWarnings: new Map<string, readonly V1TournamentOperationsWarningCode[]>([['void-late', ['RESULT_REVIEW_OVERDUE']]]),
+    });
+    for (const id of ['void', 'void-late']) {
+      expect(byId(cards, id)).toMatchObject({ state: 'result-void', action: { kind: 'fix-result', label: '결과 다시 입력', emphasis: 'primary' } });
+    }
   });
 
   it('구장마다 첫 예정 경기에만 경기 콘솔 열기(secondary)와 isFieldNext 가 붙는다', () => {

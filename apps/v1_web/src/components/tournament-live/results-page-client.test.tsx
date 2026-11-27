@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
 import { installViewport } from '@/test/viewport';
+import type { V1TournamentStaffRole } from '@/types/api';
 import { ResultsPageClient } from './results-page-client';
 
 const nav = vi.hoisted(() => ({ search: '', pathname: '/admin/live/t-1/results' }));
@@ -31,7 +33,7 @@ vi.mock('@/components/tournament-result-review/game-result-correction-panel', ()
 
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', timestamp: 't', data });
 
-interface Row { fixtureId: string; gameId: string; revisionId: string | null; fieldName?: string; fixtureNumber?: number; scheduledAt?: string; currentScore?: unknown }
+interface Row { fixtureId: string; gameId: string; revisionId: string | null; currentRevisionState?: string; fieldName?: string; fixtureNumber?: number; scheduledAt?: string; currentScore?: unknown }
 let pages: Array<{ items: Row[]; nextCursor: string | null }>;
 let revisionStates: Record<string, string>;
 let fixtures: unknown[];
@@ -82,11 +84,13 @@ beforeEach(() => {
 });
 afterEach(() => restoreViewport());
 
-function renderPage() {
+function renderPage(role: V1TournamentStaffRole = 'PLATFORM_OPS') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ResultsPageClient tournamentId="t-1" />
+      <TournamentOpsRoleProvider role={role}>
+        <ResultsPageClient tournamentId="t-1" />
+      </TournamentOpsRoleProvider>
     </QueryClientProvider>,
   );
 }
@@ -178,6 +182,51 @@ describe('ResultsPageClient', () => {
     expect(screen.getByRole('region', { name: '확정 대기 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /홈101 vs 원정101/ })).toBeInTheDocument();
     expect(requestedCursors).toEqual([null, 'c1']);
+  });
+
+  it('무효 처리된 결과는 확정 대기도 확정됨도 아닌 「결과 무효」 묶음에 있다', async () => {
+    pages = [
+      {
+        items: [
+          { fixtureId: 'f1', gameId: 'g1', revisionId: null },
+          { fixtureId: 'f2', gameId: 'g2', revisionId: 'r2', currentRevisionState: 'OFFICIAL' },
+          { fixtureId: 'f3', gameId: 'g3', revisionId: 'r3', currentRevisionState: 'VOID' },
+        ],
+        nextCursor: null,
+      },
+    ];
+    fixtures = [fixtureNames(1, '노원 킥스', '강서 드리블러'), fixtureNames(2, '잠실 레전드', '마포 FS'), fixtureNames(3, '성수 유나이티드', '한강 FC')];
+    renderPage();
+
+    const voidSection = await screen.findByRole('region', { name: '결과 무효 1' });
+    expect(within(voidSection).getByText('성수 유나이티드 vs 한강 FC')).toBeInTheDocument();
+    expect(within(voidSection).getByText('결과 무효')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '확정 대기 1' })).queryByText('성수 유나이티드 vs 한강 FC')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '확정됨 1' })).queryByText('성수 유나이티드 vs 한강 FC')).not.toBeInTheDocument();
+    expect(screen.getByText('끝난 경기 3')).toBeInTheDocument();
+  });
+
+  it('무효 결과가 없으면 결과 무효 묶음을 그리지 않는다', async () => {
+    renderPage();
+    await screen.findByRole('region', { name: '확정 대기 1' });
+    expect(screen.queryByRole('region', { name: /결과 무효/ })).not.toBeInTheDocument();
+  });
+
+  it('지원도 목록과 패널을 보고, 확정·고치기는 못 한다는 이유를 읽는다', async () => {
+    renderPage('SUPPORT_READONLY');
+
+    expect(await screen.findByTestId('review-panel')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '확정 대기 1' })).toBeInTheDocument();
+    expect(screen.getByText('보기만 할 수 있어요. 결과 확정·고치기는 대회 운영자·플랫폼 운영자만 할 수 있어요.')).toBeInTheDocument();
+    // 이 화면 자체의 확정·고치기 버튼은 없다(패널 안 버튼은 패널이 권한으로 숨긴다).
+    expect(screen.queryByRole('button', { name: '결과 확정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '결과 고치기' })).not.toBeInTheDocument();
+  });
+
+  it('운영자에게는 읽기 전용 안내가 없다', async () => {
+    renderPage('TOURNAMENT_DIRECTOR');
+    await screen.findByTestId('review-panel');
+    expect(screen.queryByText(/보기만 할 수 있어요/)).not.toBeInTheDocument();
   });
 
   it('확정 대기가 없으면 알리고 운영 보드로 가는 길을 준다', async () => {

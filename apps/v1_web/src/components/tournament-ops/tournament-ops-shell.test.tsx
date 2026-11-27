@@ -92,16 +92,14 @@ describe('TournamentOpsShell 메뉴', () => {
     expect(requests[0]).toContain('status=ENDED');
   });
 
-  it('지원의 결과 메뉴는 잠기고 이유가 보이며, 결과 목록은 읽지 않는다', async () => {
+  it('지원도 결과 메뉴를 열 수 있다 — 화면 안에서 보기만 한다', async () => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/operations';
     renderShell(shell({ role: 'SUPPORT_READONLY', origin: 'home' }));
 
-    const locked = within(sidebar()).getByText('결과').closest('button');
-    expect(locked).toBeDisabled();
-    expect(locked).toHaveAttribute('title', '결과 확정·고치기는 대회 운영자·플랫폼 운영자만 할 수 있어요.');
-    expect(within(sidebar()).getByText('결과 확정·고치기는 대회 운영자·플랫폼 운영자만 할 수 있어요.')).toBeInTheDocument();
-    expect(within(sidebar()).queryByLabelText(/확정 대기/)).not.toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(requests).toHaveLength(0);
+    const link = within(sidebar()).getByRole('link', { name: /^결과/ });
+    expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/results');
+    expect(within(sidebar()).queryByRole('button', { name: /^결과/ })).not.toBeInTheDocument();
+    expect(await within(sidebar()).findByLabelText('확정 대기 2')).toBeInTheDocument();
   });
 
   it('다른 대회 고르기는 플랫폼 운영자의 어드민 표면에만 있다', () => {

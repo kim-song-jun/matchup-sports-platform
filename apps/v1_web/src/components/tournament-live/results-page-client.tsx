@@ -7,6 +7,7 @@ import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { canManageTournamentResults, useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { overdueFixtureIdsOf, partitionResultFixtures } from '@/components/tournament-ops/result-partition';
 import { buildLeagueFixtureTitles, resolveFixtureLabel } from '@/components/tournament-result-review/fixture-label';
 import { describeResultReviewError } from '@/components/tournament-result-review/result-review-copy';
@@ -25,6 +26,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   const searchParams = useSearchParams();
   const deepLinkFixtureId = searchParams.get('fixtureId');
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
+  const canAct = canManageTournamentResults(useTournamentOpsRole());
 
   const tournament = useV1Tournament(tournamentId);
   const ended = useTournamentEndedFixtures(tournamentId);
@@ -56,11 +58,11 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
     [teamNamesByFixtureId, leagueTitles],
   );
 
-  const { pending, confirmed } = useMemo(
+  const { pending, confirmed, voided } = useMemo(
     () => partitionResultFixtures(ended.data?.items ?? [], overdueFixtureIdsOf(ended.data?.liveWarnings)),
     [ended.data],
   );
-  const all = useMemo(() => [...pending, ...confirmed], [pending, confirmed]);
+  const all = useMemo(() => [...pending, ...confirmed, ...voided], [pending, confirmed, voided]);
   // 고른 경기가 목록에 없으면(딥링크 경기가 아직 안 끝났거나 이미 처리됨) 첫 확정 대기로 대신하고 이유를 알린다.
   const selected = all.find((item) => item.fixtureId === pickedFixtureId) ?? pending[0] ?? null;
   const pickMissing = ended.isSuccess && pickedFixtureId !== null && !all.some((item) => item.fixtureId === pickedFixtureId);
@@ -84,6 +86,12 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
         description="끝난 경기의 결과를 확정하거나 고쳐요."
         action={ended.isSuccess ? <p className="shrink-0 pt-1 text-[length:var(--font-size-label)] text-[var(--text-muted)]">끝난 경기 {all.length}</p> : undefined}
       />
+
+      {canAct ? null : (
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
+          보기만 할 수 있어요. 결과 확정·고치기는 대회 운영자·플랫폼 운영자만 할 수 있어요.
+        </p>
+      )}
 
       {officializedFixtureId !== null && officializedFixtureId === selected?.fixtureId ? (
         <p role="status" className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
@@ -117,6 +125,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
             <ResultFixtureList
               pending={pending}
               confirmed={confirmed}
+              voided={voided}
               selectedFixtureId={selected?.fixtureId ?? null}
               onSelect={select}
               titleFor={titleFor}

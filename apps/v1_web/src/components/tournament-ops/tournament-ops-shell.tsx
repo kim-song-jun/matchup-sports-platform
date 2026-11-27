@@ -20,7 +20,6 @@ import { competitionOpsTitle } from '@/lib/competition-kind';
 import { useV1Tournament, useV1TournamentFields } from '@/hooks/use-v1-api';
 import { staffRoleLabel } from './badges';
 import { consoleContextLabel, resolveOpsBridge, type OpsBridge } from './ops-bridge';
-import { canManageTournamentResults } from './role-context';
 import { usePendingResultCount } from './result-partition';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
@@ -103,32 +102,25 @@ interface NavItem {
   label: string;
   href: string;
   icon: ReactNode;
-  /** D-16 — 숨기지 않고 비활성 + 사유로 보여줄 때만 채운다. */
-  disabled?: boolean;
-  disabledReason?: string;
   /** 메뉴 옆 숫자 배지(확정 대기 수). 0 이면 그리지 않는다. */
   count?: number;
   countLabel?: string;
 }
 
-const RESULT_MANAGEMENT_DISABLED_REASON = '결과 확정·고치기는 대회 운영자·플랫폼 운영자만 할 수 있어요.';
-
 /**
  * 이 셸에 들어올 수 있는 역할은 플랫폼 운영자·대회 운영자·지원(보기만)이다(구장 담당자는 대회 전역 읽기 권한이
- * 없어 게이트에서 걸러진다). 운영 보드·스태프·영상은 셋 모두 열려 있고, 결과는 확정·고치기 권한이 있는 두 역할만
- * 연다 — 지원에게는 숨기지 않고 잠금 + 이유로 보여 준다(D-16). 라우트를 더하면 이 목록도 같이 본다.
+ * 없어 게이트에서 걸러진다). 메뉴 넷은 셋 모두 열려 있다 — 결과 화면은 지원에게 읽기 전용으로 보이고,
+ * 확정·고치기는 화면 안에서 권한으로 막힌다. 라우트를 더하면 이 목록도 같이 본다.
  */
-function buildNavItems(basePath: string, role: V1TournamentStaffRole, pendingResults: number): NavItem[] {
-  const canResults = canManageTournamentResults(role);
+function buildNavItems(basePath: string, pendingResults: number): NavItem[] {
   return [
     { label: '운영 보드', href: `${basePath}/operations`, icon: <LayoutDashboard size={18} aria-hidden="true" /> },
     {
       label: '결과',
       href: `${basePath}/results`,
       icon: <Flag size={18} aria-hidden="true" />,
-      ...(canResults
-        ? { count: pendingResults, countLabel: `확정 대기 ${pendingResults}` }
-        : { disabled: true, disabledReason: RESULT_MANAGEMENT_DISABLED_REASON }),
+      count: pendingResults,
+      countLabel: `확정 대기 ${pendingResults}`,
     },
     { label: '스태프·구장', href: `${basePath}/staff`, icon: <Users size={18} aria-hidden="true" /> },
     // 영상 등록·삭제는 서버가 event_append 권한을 요구한다 — 지원은 목록만 보고 버튼은 화면 안에서 사라진다.
@@ -151,32 +143,10 @@ function NavCount({ item }: { item: NavItem }) {
   );
 }
 
-// 잠긴 메뉴 줄 — 사이드바와 폰 시트가 같이 쓴다.
-function NavItemDisabledRow({ item }: { item: NavItem }) {
-  return (
-    <button
-      type="button"
-      disabled
-      aria-disabled="true"
-      title={item.disabledReason}
-      className={`${NAV_ROW} w-full cursor-not-allowed py-3 text-left text-gray-300 dark:text-gray-600`}
-    >
-      <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">{item.icon}</span>
-      <span className="flex flex-col items-start">
-        <span>{item.label}</span>
-        {item.disabledReason ? (
-          <span className="text-[length:var(--font-size-micro)] font-normal text-[var(--text-muted)] dark:text-gray-500">{item.disabledReason}</span>
-        ) : null}
-      </span>
-    </button>
-  );
-}
-
 function NavList({ items, isActive, onNavigate, pathname }: { items: NavItem[]; isActive: (item: NavItem) => boolean; onNavigate?: () => void; pathname: string }) {
   return (
     <>
       {items.map((item) => {
-        if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
         const active = isActive(item);
         return (
           <Link
@@ -395,8 +365,8 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const basePath = resolveTournamentLiveBase(pathname, tournamentId);
   const consoleFixtureId = fixtureIdFromConsolePath(pathname, tournamentId);
   const isFixtureConsole = consoleFixtureId !== null;
-  const pendingResults = usePendingResultCount(tournamentId, canManageTournamentResults(role));
-  const navItems = buildNavItems(basePath, role, pendingResults);
+  const pendingResults = usePendingResultCount(tournamentId, true);
+  const navItems = buildNavItems(basePath, pendingResults);
   const showPickAnother = role === 'PLATFORM_OPS' && basePath.startsWith('/admin/');
   const [menuOpen, setMenuOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);

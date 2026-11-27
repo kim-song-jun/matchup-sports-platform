@@ -10,6 +10,8 @@ export type ResultListItem = TournamentOperationsBoardItem & { gameId: string };
 interface ResultFixtureListProps {
   pending: readonly ResultListItem[];
   confirmed: readonly ResultListItem[];
+  /** 무효 처리된 결과. 없으면 묶음을 그리지 않는다. */
+  voided: readonly ResultListItem[];
   selectedFixtureId: string | null;
   onSelect: (item: ResultListItem) => void;
   titleFor: (item: ResultListItem) => string;
@@ -26,8 +28,8 @@ function metaOf(item: ResultListItem): string {
     .join(' · ');
 }
 
-function Row({ item, confirmed, selected, onSelect, title }: { item: ResultListItem; confirmed: boolean; selected: boolean; onSelect: (item: ResultListItem) => void; title: string }) {
-  const score = confirmed && readGameResultScore(item.currentScore) !== null ? formatGameResultScoreWithPenalties(item.currentScore) : null;
+function Row({ item, kind, selected, onSelect, title }: { item: ResultListItem; kind: 'pending' | 'confirmed' | 'void'; selected: boolean; onSelect: (item: ResultListItem) => void; title: string }) {
+  const score = kind === 'confirmed' && readGameResultScore(item.currentScore) !== null ? formatGameResultScoreWithPenalties(item.currentScore) : null;
   const meta = metaOf(item);
   return (
     <li>
@@ -44,7 +46,7 @@ function Row({ item, confirmed, selected, onSelect, title }: { item: ResultListI
           {meta ? <span className="mt-0.5 block text-[length:var(--font-size-caption)] tabular-nums text-[var(--text-muted)]">{meta}</span> : null}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          <ResultListBadge confirmed={confirmed} />
+          <ResultListBadge kind={kind} />
           {score ? <span className="text-[length:var(--font-size-label)] font-semibold tabular-nums text-[var(--text-strong)]">{score}</span> : null}
         </span>
       </button>
@@ -53,9 +55,10 @@ function Row({ item, confirmed, selected, onSelect, title }: { item: ResultListI
 }
 
 /** 끝난 경기를 확정 대기와 확정됨 두 묶음으로 보여 준다. 대기 줄의 점수는 패널에서 본다. */
-export function ResultFixtureList({ pending, confirmed, selectedFixtureId, onSelect, titleFor, boardHref }: ResultFixtureListProps) {
+export function ResultFixtureList({ pending, confirmed, voided, selectedFixtureId, onSelect, titleFor, boardHref }: ResultFixtureListProps) {
   const pendingId = useId();
   const confirmedId = useId();
+  const voidedId = useId();
   return (
     <div className="flex flex-col gap-5">
       <section aria-labelledby={pendingId} className="flex flex-col gap-2">
@@ -72,7 +75,7 @@ export function ResultFixtureList({ pending, confirmed, selectedFixtureId, onSel
         ) : (
           <ul className="flex flex-col gap-2" role="list">
             {pending.map((item) => (
-              <Row key={item.fixtureId} item={item} confirmed={false} selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
+              <Row key={item.fixtureId} item={item} kind="pending" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
             ))}
           </ul>
         )}
@@ -86,11 +89,23 @@ export function ResultFixtureList({ pending, confirmed, selectedFixtureId, onSel
         ) : (
           <ul className="flex flex-col gap-2" role="list">
             {confirmed.map((item) => (
-              <Row key={item.fixtureId} item={item} confirmed selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
+              <Row key={item.fixtureId} item={item} kind="confirmed" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
             ))}
           </ul>
         )}
       </section>
+      {voided.length > 0 ? (
+        <section aria-labelledby={voidedId} className="flex flex-col gap-2">
+          <h2 id={voidedId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
+            결과 무효 {voided.length}
+          </h2>
+          <ul className="flex flex-col gap-2" role="list">
+            {voided.map((item) => (
+              <Row key={item.fixtureId} item={item} kind="void" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

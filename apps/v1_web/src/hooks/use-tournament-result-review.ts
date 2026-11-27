@@ -181,6 +181,8 @@ export type TournamentOperationsBoardItem = {
   awayRegistrationId: string | null;
   scheduledAt: string | null;
   currentScore: GameResultScore | null;
+  /** 공식 결과 포인터의 상태(`OFFICIAL`·`VOID`). 확정 결과가 없으면 `null`. */
+  currentRevisionState?: string | null;
   warnings: TournamentOperationsBoardWarning[];
   version: number | null;
   revisionId: string | null;

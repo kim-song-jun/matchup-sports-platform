@@ -1,4 +1,5 @@
 import type { BoardCardState } from '@/components/tournament-ops/badges';
+import { classifyEndedResult } from '@/components/tournament-ops/result-kind';
 import { canAssignOperations, canManageTournamentResults } from '@/components/tournament-ops/role-context';
 import { DAY_MS, isoToKstDatetimeLocal, kstMidnightMs } from '@/lib/kst-calendar';
 import type {
@@ -12,7 +13,7 @@ import type {
 export const NO_FIELD_KEY = '__no_field__';
 
 export type CardState = BoardCardState;
-export type CardActionKind = 'console' | 'confirm-result' | 'fix-result' | 'assign-staff';
+export type CardActionKind = 'console' | 'confirm-result' | 'fix-result' | 'view-result' | 'assign-staff';
 export interface CardAction {
   kind: CardActionKind;
   label: string;
@@ -80,8 +81,10 @@ function stateOf(item: V1TournamentOperationsBoardItem, overdue: boolean): CardS
     case 'LIVE':
     case 'PAUSED':
       return 'live';
-    case 'ENDED':
-      return !item.revisionId || item.currentRevisionState !== 'OFFICIAL' || overdue ? 'result-pending' : 'result-done';
+    case 'ENDED': {
+      const kind = classifyEndedResult(item, overdue);
+      return kind === 'pending' ? 'result-pending' : kind === 'void' ? 'result-void' : 'result-done';
+    }
     case 'CANCELLED':
       return 'cancelled';
     default:
@@ -128,10 +131,12 @@ export function buildBoardCards(input: BuildBoardCardsInput): BoardCard[] {
     let action: CardAction | null = null;
     if (state === 'live') {
       action = { kind: 'console', label: CONSOLE_LABEL, emphasis: 'primary' };
-    } else if (state === 'result-pending') {
-      if (canResults) action = { kind: 'confirm-result', label: '결과 확정', emphasis: 'primary' };
-    } else if (state === 'result-done') {
-      if (canResults) action = { kind: 'fix-result', label: '결과 고치기', emphasis: 'secondary' };
+    } else if (state === 'result-pending' || state === 'result-done' || state === 'result-void') {
+      // 지원은 결과 화면을 읽기만 한다 — 확정·고치기 버튼은 서버가 거부하므로 두지 않는다.
+      if (!canResults) action = { kind: 'view-result', label: '결과 보기', emphasis: 'secondary' };
+      else if (state === 'result-pending') action = { kind: 'confirm-result', label: '결과 확정', emphasis: 'primary' };
+      else if (state === 'result-void') action = { kind: 'fix-result', label: '결과 다시 입력', emphasis: 'primary' };
+      else action = { kind: 'fix-result', label: '결과 고치기', emphasis: 'secondary' };
     } else if (state === 'scheduled') {
       if (staffMissing) {
         if (canAssign) action = { kind: 'assign-staff', label: '담당자 배정하기', emphasis: 'warning' };

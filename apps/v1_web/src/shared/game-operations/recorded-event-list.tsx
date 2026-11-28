@@ -169,7 +169,7 @@ export function RecordedEventList({
   const events = lastReset ? history.filter(event => event.sequence > lastReset) : history;
   if (events.length === 0) {
     return (
-      <p className="px-1 py-3 text-xs text-[var(--text-muted)]">
+      <p className={`py-3 text-xs text-[var(--text-muted)] ${plain ? '' : 'px-1'}`}>
         아직 기록이 없어요.
       </p>
     );

@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminShell } from './admin-shell';
+import { AdminTabNav } from '@/components/admin/admin-tab-nav';
 import { TAB_CONTAINER_SELECTOR, TAB_LINK_SELECTOR } from '@/components/v1-ui/navigation-tab-selectors';
 
 vi.mock('next/navigation', () => ({
@@ -209,5 +210,58 @@ describe('AdminShell nav', () => {
       expect(link.matches(TAB_LINK_SELECTOR)).toBe(true);
       expect(link.closest(TAB_CONTAINER_SELECTOR)).not.toBeNull();
     }
+  });
+});
+
+describe('AdminShell 사이드바 선택 표시', () => {
+  // 선택 표시는 테두리가 아니라 배경이다 — 링크에 border 계열 클래스가 하나도 없어야 한다.
+  const borderClasses = (className: string) => className.split(/\s+/).filter((token) => token.startsWith('border'));
+
+  it('선택된 항목과 나머지 모두 왼쪽 색 띠 클래스가 없고, 선택은 aria-current 와 옅은 배경으로 표시한다', () => {
+    render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }));
+
+    const selected = screen.getAllByRole('link', { name: '대시보드' });
+    expect(selected.length).toBeGreaterThanOrEqual(2);
+    for (const link of selected) {
+      expect(link).toHaveAttribute('aria-current', 'page');
+      expect(borderClasses(link.className)).toEqual([]);
+      expect(link.className).toContain('bg-[var(--blue50)]');
+    }
+
+    const others = screen.getAllByRole('link', { name: '모니터링' });
+    expect(others.length).toBeGreaterThanOrEqual(2);
+    for (const link of others) {
+      expect(link).not.toHaveAttribute('aria-current');
+      expect(borderClasses(link.className)).toEqual([]);
+      expect(link.className).not.toContain('bg-[var(--blue50)]');
+    }
+  });
+});
+
+describe('AdminShell 가 하위 탭 줄에 내려 주는 고정 기준', () => {
+  const ancestorClasses = (element: HTMLElement) => {
+    const classes: string[] = [];
+    for (let node = element.parentElement; node; node = node.parentElement) classes.push(node.className);
+    return classes.join(' ');
+  };
+
+  it('모바일 앱바 높이를 고정 오프셋으로, 본문 좌우 패딩을 여백으로 내려 준다', () => {
+    render(
+      <AdminShell>
+        <AdminTabNav ariaLabel="섹션" tabs={[{ slug: 'overview', label: '개요' }]} basePath="/admin/things/1" pathname="/admin/things/1/overview" />
+      </AdminShell>,
+    );
+
+    const hosts = ancestorClasses(screen.getByRole('navigation', { name: '섹션' }));
+    expect(hosts).toContain('[--admin-sticky-top:52px]');
+    expect(hosts).toContain('[--admin-gutter:1rem]');
+    expect(hosts).toContain('md:[--admin-gutter:1.5rem]');
+    // 52px 는 같은 셸의 모바일 앱바 높이다.
+    expect(screen.getByRole('banner').className).toContain('h-[52px]');
   });
 });

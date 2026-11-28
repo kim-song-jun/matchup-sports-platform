@@ -228,3 +228,8 @@ SecureString 경로를 유지하고 권한을 넓히는 쪽을 택했다.
 
 정책을 고친 뒤에는 다음 dev 머지(=alpha 배포)에서 동기화가 성공한다. 배포 로그의
 `Sync APNs runtime env` 단계에 경고가 없으면 반영된 것이다.
+
+## 실시간 카드(Live Activity)·위젯 푸시 켜기
+
+같은 APNs 키를 쓰고 새 키는 필요 없다. 실시간 카드 푸시는 토픽이 `<APNS_BUNDLE_ID>.push-type.liveactivity`, 푸시 종류가 `liveactivity` 다.
+경기 상태가 바뀔 때 위젯·실시간 카드에 알리는 주기 작업은 **`V1_WIDGET_PUSH_ENABLED=true` 일 때만** 돈다(기본 꺼짐). API 컨테이너 환경에 넣고 재기동해야 켜지며, 알파에서 먼저 확인한 뒤 운영에 켠다. 설계와 계약은 `docs/api/domains/widget.md`.

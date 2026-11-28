@@ -11,7 +11,7 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import { AdminSectionNav, type AdminSectionNavGroup } from '@/components/admin/admin-section-nav';
+import { AdminTabNav, splitTabGroups, type AdminTabNavGroup } from '@/components/admin/admin-tab-nav';
 import { TournamentOpsQuickLinks } from '@/app/admin/tournaments/[id]/tournament-ops-quick-links';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1AdminLeagueMatch } from '@/hooks/use-v1-api';
@@ -21,6 +21,9 @@ import { LeagueRegistrationActions } from './league-registration-actions';
 import { LeagueStateModal } from './league-state-modal';
 import { Button } from '@/components/v1-ui/button';
 import { LeagueVisibilityControl } from './league-visibility-control';
+
+/** 탭 줄에 두는 섹션 수 — 나머지는 더보기로 간다. */
+const LEAGUE_TAB_LIMIT = 5;
 
 /**
  * 리그 상세 섹션 구획 — 대회 상세(`TournamentAdminShell`)와 같은 틀이다.
@@ -73,7 +76,7 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
     );
   }
 
-  const navGroups: AdminSectionNavGroup[] = [
+  const navGroups: AdminTabNavGroup[] = [
     {
       label: '운영',
       items: [
@@ -110,6 +113,8 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
       ],
     },
   ];
+
+  const nav = splitTabGroups(navGroups, LEAGUE_TAB_LIMIT);
 
   return (
     <div className="tm-content-enter">
@@ -159,18 +164,16 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
           리그도 대회와 같은 id 로 같은 화면이 열린다. */}
       <TournamentOpsQuickLinks tournamentId={leagueId} />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-        {/* 섹션 내비 — 데스크톱은 좌측 세로 목록, 모바일은 가로 스크롤 한 줄 */}
-        <AdminSectionNav
-          ariaLabel="리그 관리 섹션"
-          groups={navGroups}
-          basePath={basePath}
-          pathname={pathname}
-          query={query}
-        />
+      <AdminTabNav
+        ariaLabel="리그 관리 섹션"
+        tabs={nav.tabs}
+        more={{ label: '더보기', groups: nav.more }}
+        basePath={basePath}
+        pathname={pathname}
+        query={query}
+      />
 
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
+      <div className="mt-6 min-w-0">{children}</div>
 
       <AdminToasts toasts={toasts} />
     </div>

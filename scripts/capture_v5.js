@@ -11,8 +11,8 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const WEB = 'http://localhost:3013';
-const OUT = process.env.CAPTURE_OUT_DIR || path.join(os.tmpdir(), 'teameet-capture-v5', 'fp-shots');
-const GIF = process.env.CAPTURE_GIF_DIR || path.join(os.tmpdir(), 'teameet-capture-v5', 'gif-frames');
+const OUT = process.env.CAPTURE_OUT_DIR?.trim() || path.join(os.tmpdir(), 'teameet-capture-v5', 'fp-shots');
+const GIF = process.env.CAPTURE_GIF_DIR?.trim() || path.join(os.tmpdir(), 'teameet-capture-v5', 'gif-frames');
 fs.mkdirSync(OUT, { recursive: true });
 fs.mkdirSync(GIF, { recursive: true });
 

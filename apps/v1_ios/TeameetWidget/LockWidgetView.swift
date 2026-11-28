@@ -22,18 +22,20 @@ struct LockWidgetView: View {
             }
         }.widgetURL(WidgetEnvironment.current.origin.appendingPathComponent("my/schedule"))
             .modifier(LockBackground())
-            .privacySensitive()
     }
     private func rectangular(_ plan: WidgetPlan) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             if let game = plan.live {
-                Text(WidgetPresentation.liveStatus(game) + (entry.snapshot.stale ? " · 갱신 지연" : ""))
-                    .font(.caption2.bold()).lineLimit(1)
+                // 윗줄에 상태와 시계(후반 12:03), 가운데 점수, 아랫줄에 리그·장소 — 카드 크기는 그대로다.
+                HStack(spacing: 4) {
+                    Text(WidgetPresentation.liveStatus(game) + (entry.snapshot.stale ? " · 갱신 지연" : ""))
+                    if let penalties = game.penalties { Text("승부차기 \(WidgetFormat.score(penalties))") }
+                    else if let period = game.period { clock(period, game: game) }
+                }.font(.caption2.bold()).lineLimit(1)
                 Text("\(game.teamName) \(WidgetFormat.score(game.score)) \(game.opponentName ?? "상대팀")")
                     .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.8)
-                if let penalties = game.penalties { Text("승부차기 \(WidgetFormat.score(penalties))").font(.caption2) }
-                else if let period = game.period { clock(period, game: game) }
-                else { Text(game.state == "ENDED" ? "경기 종료" : game.competitionName ?? game.venueName ?? "경기 중").font(.caption2).lineLimit(1) }
+                let place = [game.competitionName, game.venueName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                Text(place.isEmpty ? (game.state == "ENDED" ? "경기 종료" : "경기 중") : place).font(.caption2).lineLimit(1)
             } else if let schedule = plan.schedule {
                 Text(plan.kind == .pending ? "응답 대기" : WidgetFormat.dayWord(schedule.startAt, now: now)).font(.caption2.bold())
                 Text("\(WidgetFormat.clock(schedule.startAt)) \(schedule.opponentName.map { "vs " + $0 } ?? schedule.title)")

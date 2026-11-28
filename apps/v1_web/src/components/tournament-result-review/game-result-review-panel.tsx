@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import {
   useGameResultRevisions,
   useOfficializeResultRevision,
@@ -14,7 +13,8 @@ import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
 import { RecordedEventList } from '@/shared/game-operations';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
-import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
+import { josa } from '@/lib/korean';
 import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -48,7 +48,6 @@ type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 export function GameResultReviewPanel({
   gameId,
   tournamentId,
-  correctionsHref,
   inline = false,
   onSaved,
   onOfficialized,
@@ -57,7 +56,6 @@ export function GameResultReviewPanel({
 }: {
   gameId: string;
   tournamentId?: string;
-  correctionsHref?: string;
   inline?: boolean;
   onSaved?: () => void;
   onOfficialized?: () => void;
@@ -164,8 +162,8 @@ export function GameResultReviewPanel({
       // 승부차기 누락 사고와 같은 종류의 결함이다.
       message: `${formatGameResultScoreWithPenalties(freshRevision.score)}${
         freshOutcome !== null ? ` (${matchOutcomeReasonLabel(freshOutcome)})` : ''
-      } 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
-      confirmLabel: '확정',
+      } 결과를 공식 결과로 확정해요. 확정한 뒤에도 「결과 고치기」로 바꿀 수 있어요.`,
+      confirmLabel: '결과 확정',
     });
     if (!ok) return;
     officialize.mutate(
@@ -186,6 +184,8 @@ export function GameResultReviewPanel({
     );
   }
 
+  const submittedScore = latest ? readGameResultScore(latest.score) : null;
+  const officializeLabel = submittedScore === null ? '결과 확정' : `${josa(`${submittedScore.home} : ${submittedScore.away}`, ['으로', '로'])} 결과 확정`;
   const missingAssists = latest ? countMissingAssists(latest.resultParticipants) : 0;
   // 이 배너는 **지금 승인 버튼을 누를 대상**의 사유를 보여줘야 한다. 검토 대기 리비전이
   // 있으면(latest.state === 'SUBMITTED') 그게 승인 대상이므로 그것을, 없으면 지금 유효한
@@ -346,7 +346,7 @@ export function GameResultReviewPanel({
           {/* Task 166: 반려·보완 요청 버튼을 없앴다 — 그 두 명령의 백엔드가 사라졌다
               (정본 §4: 결과는 보내기 → 확인 한 단계, 팀에게 되돌려 보내는 왕복 없음).
               틀린 결과는 되돌려 보내지 않고 **이 카드 안에서 고쳐서 확인**한다. */}
-          <p className="tm-text-label" style={{ fontWeight: 600 }}>이 결과를 확인해 주세요</p>
+          <p className="tm-text-label" style={{ fontWeight: 600 }}>이 결과를 확정해 주세요</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {showOfficializeCta ? (
               <Button
@@ -355,7 +355,7 @@ export function GameResultReviewPanel({
                 loading={officialize.isPending}
                 onClick={() => void handleOfficialize(latest)}
               >
-                확인
+                {officializeLabel}
               </Button>
             ) : null}
             {/* 재제출 모달을 그대로 재사용한다(신규 컴포넌트 없음) — 저장하면 새 SUBMITTED
@@ -368,7 +368,7 @@ export function GameResultReviewPanel({
                 setResubmitExpectedVersion(game.version);
               }}
             >
-              고치고 확인
+              결과 고치기
             </Button>
           </div>
           {!officializeAlwaysVisible && directorGateStatus === 'disabled' ? (
@@ -388,25 +388,7 @@ export function GameResultReviewPanel({
         </div>
       ) : null}
 
-      {latest && latest.state === 'OFFICIAL' ? (
-        <AlertBanner
-          tone="info"
-          message={
-            correctionsHref
-              ? '이미 확정된 결과예요. 정정이 필요하면 정정 화면에서 진행해 주세요.'
-              : '이미 확정된 결과예요.'
-          }
-        />
-      ) : null}
-      {/* **공개 화면 링크는 여기 두지 않는다.** 한 번 뒀다가 도달 불가로 걷어냈다 — 확정
-          한 번에 `revisions`(링크를 띄운다)와 `board`(이 패널을 걷어낸다) 무효화가 같은
-          콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다. 확정된 결과가 사라지지
-          않는 정정 화면(`corrections-page-client.tsx`)으로 옮겼다. */}
-      {latest && latest.state === 'OFFICIAL' && correctionsHref ? (
-        <Link href={correctionsHref} className="tm-section-action">
-          정정 화면으로 이동
-        </Link>
-      ) : null}
+      {latest && latest.state === 'OFFICIAL' ? <AlertBanner tone="info" message="이미 확정된 결과예요." /> : null}
 
       {latest && latest.state === 'VOID' ? (
         <AlertBanner tone="error" message="무효 처리된 결과예요." />

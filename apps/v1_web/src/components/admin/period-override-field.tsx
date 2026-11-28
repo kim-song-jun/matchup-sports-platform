@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { periodLabels, switchPeriodCount, tournamentPeriodPhaseShortLabel } from '@/app/admin/tournaments/new/tournament-create-model';
+import { periodLabels, switchPeriodCount, tournamentPeriodPhaseShortLabel } from '@/lib/tournament-period-phases';
 import {
   useTournamentMatchPeriods,
   useTournamentPeriodSettings,
@@ -41,7 +41,7 @@ export function periodOverridePayload(initial: PeriodOverrideChoice, choice: Per
 export function periodOverrideError(choice: PeriodOverrideChoice): string | null {
   if (choice.mode === 'inherit') return null;
   return choice.minutes.length === 0 || choice.minutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240)
-    ? '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.'
+    ? '경기 시간은 전·후반(단판은 한 번)마다 1~240분 사이의 정수로 입력해 주세요.'
     : null;
 }
 

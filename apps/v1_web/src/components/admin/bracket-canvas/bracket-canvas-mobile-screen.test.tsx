@@ -1,33 +1,37 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot, makeStanding } from '@/test/bracket-canvas-fixtures';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 import { BracketCanvasMobileScreen } from './bracket-canvas-mobile-screen';
+import type { BracketViewControls } from './use-bracket-view-controls';
 
 const { bracketState, refetch } = vi.hoisted(() => ({
   bracketState: { value: {} as Record<string, unknown> },
   refetch: vi.fn(),
 }));
 
-const { previewGet } = vi.hoisted(() => ({ previewGet: vi.fn() }));
-vi.mock('@/lib/api-client', async (original) => ({ ...await original<typeof import('@/lib/api-client')>(), v1Get: previewGet }));
-
 vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminBracket: () => bracketState.value }));
 vi.mock('./bracket-canvas-mobile', () => ({
-  BracketCanvasMobile: (props: { competitionId: string; scope: string; canWrite: boolean; rounds: Array<{ label: string }>; candidates: unknown[]; slots: unknown[]; groups?: unknown[]; registrationsState: RegistrationsLoadState }) => (
+  BracketCanvasMobile: (props: { competitionId: string; scope: string; canWrite: boolean; rounds: Array<{ label: string; sections: Array<{ nodes: Array<{ fixtureId: string }> }> }>; candidates: unknown[]; slots: unknown[]; groups?: unknown[]; registrationsState: RegistrationsLoadState; hint?: string | null; focusFixtureId?: string | null }) => (
     <div
       data-testid="mobile-canvas"
       data-competition-id={props.competitionId}
       data-scope={props.scope}
       data-can-write={String(props.canWrite)}
       data-rounds={props.rounds.map((round) => round.label).join(',')}
+      data-nodes={props.rounds.flatMap((round) => round.sections.flatMap((section) => section.nodes.map((node) => node.fixtureId))).join(',')}
+      data-hint={props.hint === null ? 'none' : String(props.hint)}
+      data-focus={props.focusFixtureId ?? ''}
       data-candidates={props.candidates.length}
       data-slots={props.slots.length}
       data-groups={props.groups?.length ?? -1}
       data-registrations-status={props.registrationsState.status}
     />
   ),
+}));
+
+vi.mock('./mobile-team-fill-sheet', () => ({
+  MobileTeamFillSheet: (props: { open: boolean; onClose: () => void }) => (props.open ? <div data-testid="team-fill-sheet"><button type="button" onClick={props.onClose}>팀 시트 닫기</button></div> : null),
 }));
 
 const registrations = [
@@ -41,29 +45,24 @@ const bracket = makeBracket({
   slots: [makeSlot({ id: 's-1' })],
 });
 
-function renderScreen(canWrite = true, format: 'league' | 'knockout' | undefined = 'knockout') {
-  return render(
-    <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite={canWrite} format={format} showToast={vi.fn()} />,
+const controlsOf = (overrides: Partial<BracketViewControls> = {}): BracketViewControls => ({
+  trayOpen: null, setTrayOpen: vi.fn(), unscheduledOnly: false, setUnscheduledOnly: vi.fn(), focusRequest: null, requestFocus: vi.fn(), clearFocusRequest: vi.fn(), ...overrides,
+});
+
+function renderScreen(canWrite = true, format: 'league' | 'knockout' | undefined = 'knockout', controls = controlsOf()) {
+  render(
+    <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite={canWrite} format={format} showToast={vi.fn()} controls={controls} />,
   );
+  return controls;
 }
 
+afterEach(() => cleanup());
 beforeEach(() => {
   refetch.mockReset();
   bracketState.value = { data: bracket, isPending: false, isError: false, error: null, refetch };
 });
 
 describe('BracketCanvasMobileScreen', () => {
-  it('모바일 수동 대진에서도 결선 배정을 열고 실제 미리보기 API를 조회한다', async () => {
-    bracketState.value = { data: makeBracket({ ...bracket, groups: [makeGroup({ id: 'g-a', phase: 'group', name: 'A조' }), ...bracket.groups], slots: [] }), isPending: false, isError: false, error: null, refetch };
-    previewGet.mockResolvedValue({ version: 'v', groups: [], targets: [], blockedReason: '모든 조별 경기의 공식 결과를 확정해 주세요.' });
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format="group_knockout" showToast={vi.fn()} /></QueryClientProvider>);
-    fireEvent.click(screen.getByRole('button', { name: '결선 진출팀 배정' }));
-    await screen.findByText('모든 조별 경기의 공식 결과를 확정해 주세요.');
-    expect(previewGet).toHaveBeenCalledWith('/admin/tournaments/t-1/bracket/finalist-preview');
-    expect(screen.getByRole('button', { name: '조별 교차 자동 배정' })).toBeDisabled();
-  });
-
   it('응답에서 만든 라운드·자리와 확정된 참가팀만 후보로 모바일 목록에 넘긴다', () => {
     renderScreen();
     const mobile = screen.getByTestId('mobile-canvas');
@@ -115,13 +114,14 @@ describe('BracketCanvasMobileScreen', () => {
   });
 
   it('대회 형식을 알기 전에는 라운드 목록을 그리지 않고 로딩을 보여 준다', () => {
+    const controls = controlsOf();
     const { rerender } = render(
-      <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format={undefined} showToast={vi.fn()} />,
+      <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format={undefined} showToast={vi.fn()} controls={controls} />,
     );
     expect(screen.getByRole('status', { name: '대진을 불러오는 중이에요' })).toBeInTheDocument();
     expect(screen.queryByTestId('mobile-canvas')).not.toBeInTheDocument();
     rerender(
-      <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format="league" showToast={vi.fn()} />,
+      <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format="league" showToast={vi.fn()} controls={controls} />,
     );
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-canvas').getAttribute('data-rounds')).toMatch(/^1라운드/);
@@ -131,5 +131,66 @@ describe('BracketCanvasMobileScreen', () => {
     renderScreen(true, 'knockout');
     expect(screen.queryByText('조별 순위')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-rounds', '8강');
+  });
+
+  it('구조 편집 안내(「대진 구조는 큰 화면에서 편집해요」)를 숨기도록 hint=null 을 넘긴다', () => {
+    renderScreen();
+    expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-hint', 'none');
+  });
+
+  it('도구 메뉴의 결선 진출팀 항목이 생겼으므로 화면 위 「결선 진출팀 배정」 버튼은 없다', () => {
+    bracketState.value = { data: makeBracket({ ...bracket, groups: [makeGroup({ id: 'g-a', phase: 'group', name: 'A조' }), ...bracket.groups] }), isPending: false, isError: false, error: null, refetch };
+    renderScreen(true, 'knockout');
+    expect(screen.queryByRole('button', { name: '결선 진출팀 배정' })).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketCanvasMobileScreen — 도구 줄과 주고받는 보기 상태', () => {
+  const scheduled = makeBracket({
+    groups: [makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 })],
+    fixtures: [
+      makeFixture({ id: 'fx-timed', groupId: 'g-q', fixtureNumber: 1, scheduledAt: '2026-11-20T01:00:00.000Z' }),
+      makeFixture({ id: 'fx-open', groupId: 'g-q', fixtureNumber: 2 }),
+    ],
+    slots: [],
+  });
+  beforeEach(() => { bracketState.value = { data: scheduled, isPending: false, isError: false, error: null, refetch }; });
+
+  it('시간 미정만 보기를 켜면 시간 있는 카드가 사라진다(끄면 전부 보인다)', () => {
+    renderScreen();
+    expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-nodes', 'fx-timed,fx-open');
+    cleanup();
+    renderScreen(true, 'knockout', controlsOf({ unscheduledOnly: true }));
+    expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-nodes', 'fx-open');
+  });
+
+  it('시간 미정 경기가 0건이면 「시간 미정 경기가 없어요」와 「모든 경기 보기」를 보이고 누르면 켠 것을 끈다', () => {
+    bracketState.value = { data: makeBracket({ ...scheduled, fixtures: [scheduled.fixtures[0]] }), isPending: false, isError: false, error: null, refetch };
+    const controls = renderScreen(true, 'knockout', controlsOf({ unscheduledOnly: true }));
+    expect(screen.getByText('시간 미정 경기가 없어요')).toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-canvas')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '모든 경기 보기' }));
+    expect(controls.setUnscheduledOnly).toHaveBeenCalledWith(false);
+  });
+
+  it('controls.focusRequest 의 경기를 시트로 열도록 넘기고, 넘긴 뒤 요청을 비운다', () => {
+    const controls = renderScreen(true, 'knockout', controlsOf({ focusRequest: { fixtureId: 'fx-open', nonce: 1 } }));
+    expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-focus', 'fx-open');
+    expect(controls.clearFocusRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('없는 경기 요청은 열지도 비우지도 않는다', () => {
+    const controls = renderScreen(true, 'knockout', controlsOf({ focusRequest: { fixtureId: 'nope', nonce: 1 } }));
+    expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-focus', '');
+    expect(controls.clearFocusRequest).not.toHaveBeenCalled();
+  });
+
+  it('controls.trayOpen=true 면 팀 시트가 열리고 닫으면 setTrayOpen(false)', () => {
+    const controls = renderScreen(true, 'knockout', controlsOf({ trayOpen: true }));
+    fireEvent.click(screen.getByRole('button', { name: '팀 시트 닫기' }));
+    expect(controls.setTrayOpen).toHaveBeenCalledWith(false);
+    cleanup();
+    renderScreen();
+    expect(screen.queryByTestId('team-fill-sheet')).not.toBeInTheDocument();
   });
 });

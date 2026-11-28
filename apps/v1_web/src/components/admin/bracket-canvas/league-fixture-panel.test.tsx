@@ -180,9 +180,9 @@ describe('LeagueFixturePanel — 결과', () => {
     expect(mocks.formProps).toHaveLength(0);
   });
 
-  it('라이브 득점 기록이 있으면 정정 화면으로 보내고, 진행 중이면 콘솔로 보낸다', () => {
+  it('라이브 득점 기록이 있으면 고치기 화면으로 보내고, 진행 중이면 콘솔로 보낸다', () => {
     const { unmount } = renderPanel(nodeOf({ ...TEAMS_FILLED, game: makeGame({ id: 'g1', hasLiveRecords: true }) }));
-    expect(screen.getByRole('link', { name: '결과 정정 화면 열기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '결과 고치기 화면 열기' })).toHaveAttribute(
       'href',
       '/admin/live/league-1/records/corrections?fixtureId=fx-1',
     );
@@ -282,7 +282,7 @@ describe('LeagueFixturePanel — 경기 삭제', () => {
     renderPanel(nodeOf({ game: makeGame({ id: 'g1', state: 'LIVE' }) }));
     const button = screen.getByRole('button', { name: '경기 삭제' });
     expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription('경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.');
+    expect(button).toHaveAccessibleDescription('경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 끝내기’로 먼저 끝내 주세요.');
   });
 
   it('취소된 경기는 결과가 있었어도 삭제할 수 있다 — 취소 뒤 삭제의 두 번째 단계', () => {

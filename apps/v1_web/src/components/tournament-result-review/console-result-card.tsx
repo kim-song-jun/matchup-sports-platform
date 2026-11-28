@@ -74,7 +74,7 @@ export function ConsoleResultCard({
     );
   }
 
-  // 확정 대기(SUBMITTED)만 카드 대상이다 — 정정 초안(DRAFT) 등은 결과 정정 화면의 몫이다.
+  // 확정 대기(SUBMITTED)만 카드 대상이다 — 고치는 중인 초안(DRAFT) 등은 결과 고치기 화면의 몫이다.
   if (latest.state !== 'SUBMITTED') return null;
 
   if (readOnly) {
@@ -119,7 +119,7 @@ export function ConsoleResultCard({
         <div className="mb-3">
           <AlertBanner
             tone="info"
-            message={`어시스트 미기입 ${missingAssists}건 — 확정에는 영향 없어요. 기록된 이벤트에서 “어시스트”로 넣을 수 있어요.`}
+            message={`어시스트 미기입 ${missingAssists}건 — 확정에는 영향 없어요. 기록 목록에서 “어시스트”로 넣을 수 있어요.`}
           />
         </div>
       ) : null}
@@ -130,11 +130,11 @@ export function ConsoleResultCard({
           </Button>
         ) : null}
         <Button variant="outline" size="md" disabled={officializing} onClick={onResubmit}>
-          고치고 확인
+          결과 고치기
         </Button>
       </div>
       <p className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-        확정하면 순위표와 전적에 반영돼요. 그 뒤에는 결과 정정에서만 고칠 수 있어요.
+        확정하면 순위표와 전적에 반영돼요.
       </p>
       {officializeGateClosed ? (
         <div className="mt-3 flex flex-col gap-2">

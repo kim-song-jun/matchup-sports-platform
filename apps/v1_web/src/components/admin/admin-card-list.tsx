@@ -24,8 +24,6 @@ export interface AdminCardModel {
   statusNode?: ReactNode;
   meta?: AdminCardMeta[];
   description?: ReactNode;
-  /** 위험/경고 상태 좌측 accent + 배경 tint (AdminDataTable rowTone 과 동일 시각언어) */
-  tone?: 'danger' | 'warning';
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -50,12 +48,6 @@ interface AdminCardListProps<T> {
   /** 카드 펼침 영역. null 이 아니면 그 카드가 그리드 한 줄을 다 쓰고 액션 아래에 내용을 그린다. */
   renderExpanded?: (row: T) => ReactNode | null;
 }
-
-// ── tone → class (AdminDataTable 과 동일 매핑) ──────────────────────────────
-const TONE_CARD: Record<'danger' | 'warning', string> = {
-  danger: 'tm-on-tint bg-[var(--red50)]/40 border-l-2 border-l-red-400',
-  warning: 'tm-on-tint bg-[var(--tint-orange)] border-l-2 border-l-[var(--orange500)]',
-};
 
 // 모바일 1열 → 좁은 화면부터 채워지는 반응형 그리드.
 const GRID_CLASS = 'grid gap-3';
@@ -140,14 +132,12 @@ export function AdminCardList<T>({
     <ul className={GRID_CLASS} style={gridStyle} role="list">
       {rows.map((row) => {
         const model = card(row);
-        const tone = model.tone;
         const expanded = renderExpanded?.(row) ?? null;
         return (
           <li
             key={keyExtractor(row)}
             className={[
               'bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-4 flex flex-col transition-colors hover:border-[var(--border-strong)]',
-              tone ? TONE_CARD[tone] : '',
               expanded === null ? '' : 'col-span-full min-w-0',
             ]
               .filter(Boolean)

@@ -85,36 +85,36 @@ describe('ConsoleNextSteps', () => {
     expect(screen.queryByRole('link', { name: /다음 경기/ })).toBeNull();
   });
 
-  it('결과 정정: 이 경기를 고른 채 정정 화면으로 간다 — 어드민 표면', () => {
+  it('결과 고치기: 이 경기를 고른 채 고치는 화면으로 간다 — 어드민 표면', () => {
     mocks.useV1Tournament.mockReturnValue({ data: LEAGUE_DETAIL });
     render(<ConsoleNextSteps tournamentId="league-1" fixtureId="m1" />);
 
-    expect(screen.getByRole('link', { name: '결과 정정' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '결과 고치기' })).toHaveAttribute(
       'href',
       '/admin/live/league-1/records/corrections?fixtureId=m1',
     );
   });
 
-  it('결과 정정: 스태프 표면에서는 스태프 경로로, 플랫폼 운영자에게도 열린다', () => {
+  it('결과 고치기: 스태프 표면에서는 스태프 경로로, 플랫폼 운영자에게도 열린다', () => {
     mocks.usePathname.mockReturnValue('/tournament-ops/tournaments/t-1/fixtures/f1/operate');
     mocks.useTournamentOpsRole.mockReturnValue('PLATFORM_OPS');
     mocks.useV1Tournament.mockReturnValue({ data: { kind: 'regular_tournament', leagueFixtures: [], fixtures: [], participantTeams: [] } });
     render(<ConsoleNextSteps tournamentId="t-1" fixtureId="f1" />);
 
-    expect(screen.getByRole('link', { name: '결과 정정' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '결과 고치기' })).toHaveAttribute(
       'href',
       '/tournament-ops/tournaments/t-1/records/corrections?fixtureId=f1',
     );
   });
 
   it.each(['FIELD_OPERATOR', 'SUPPORT_READONLY'] as const)(
-    '결과 정정: %s 는 정정 권한이 없어 링크를 보이지 않는다 (순위표는 그대로)',
+    '결과 고치기: %s 는 고칠 권한이 없어 링크를 보이지 않는다 (순위표는 그대로)',
     (role) => {
       mocks.useTournamentOpsRole.mockReturnValue(role);
       mocks.useV1Tournament.mockReturnValue({ data: LEAGUE_DETAIL });
       render(<ConsoleNextSteps tournamentId="league-1" fixtureId="m1" />);
 
-      expect(screen.queryByRole('link', { name: '결과 정정' })).toBeNull();
+      expect(screen.queryByRole('link', { name: '결과 고치기' })).toBeNull();
       expect(screen.getByRole('link', { name: '순위표 보기' })).toBeInTheDocument();
     },
   );

@@ -34,7 +34,7 @@ export function ConsoleNextSteps({ tournamentId, fixtureId }: { tournamentId: st
           href={`${base}/records/corrections?fixtureId=${encodeURIComponent(fixtureId)}`}
           className="tm-btn tm-btn-sm tm-btn-outline whitespace-nowrap"
         >
-          결과 정정
+          결과 고치기
         </Link>
       ) : null}
       {next ? (

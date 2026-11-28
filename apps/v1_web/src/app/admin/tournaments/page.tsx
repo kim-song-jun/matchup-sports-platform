@@ -7,6 +7,7 @@ import { useV1AdminTournaments } from '@/hooks/use-v1-api';
 import type { V1Tournament } from '@/types/api';
 import { formatAdminKstDateTimeShort, formatEntryFee } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { tournamentStatusLabel } from '@/lib/v1-status-labels';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminUrlListQuery } from '../use-admin-url-list-query';
 import { useAdminVisibilityParam } from '../use-admin-visibility-param';
@@ -39,12 +40,10 @@ function formatDateRange(startStr: string | null, endStr: string | null): { star
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '전체' },
-  { value: 'draft', label: '초안' },
-  { value: 'open', label: '접수 중' },
-  { value: 'closed', label: '마감' },
-  { value: 'in_progress', label: '진행 중' },
-  { value: 'completed', label: '완료' },
-  { value: 'cancelled', label: '취소됨' },
+  ...(['draft', 'open', 'closed', 'in_progress', 'completed', 'cancelled'] as const).map((value) => ({
+    value,
+    label: tournamentStatusLabel(value),
+  })),
 ];
 
 const PAGE_SIZE = 20;
@@ -109,7 +108,7 @@ function AdminTournamentsPageContent() {
               <Plus size={16} aria-hidden="true" />
               대회 만들기
             </Link>
-            <Link href="/admin/tournaments/new-staged" className="tm-btn tm-btn-md tm-btn-neutral">단계형 대회 만들기</Link>
+            <Link href="/admin/league-matches/new" className="tm-btn tm-btn-md tm-btn-neutral">정규 리그 만들기</Link>
             </div>
           ) : undefined
         }
@@ -164,7 +163,7 @@ function AdminTournamentsPageContent() {
                 key: 'status',
                 header: '상태',
                 width: 'w-[104px]',
-                render: (row) => <AdminStatusPill status={row.status} />,
+                render: (row) => <AdminStatusPill status={row.status} label={tournamentStatusLabel(row.status)} />,
               },
               {
                 key: 'visibility',

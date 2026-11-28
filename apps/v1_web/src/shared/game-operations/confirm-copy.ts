@@ -1,30 +1,10 @@
 /**
- * 운영 콘솔의 모든 확인 모달 문구를 한 곳에 모은다.
+ * 운영 콘솔의 확인 창·기록 토스트 문구를 한 곳에 모은다.
  *
- * 배경(사용자 결정): 이 화면은 원래 `end`(경기 종료) 하나에만 확인 게이트를
- * 걸었다 — "나머지 명령은 되돌릴 수 있으니 확인을 생략한다"는 전제였다.
- * **그 전제는 사실이 아니었다**: 피리어드 종료(`end-period`)를 되돌리는
- * `revert-period`는 "다음 피리어드를 SCHEDULED로 되감는" 명령이라 (a) 다음
- * 피리어드에 이벤트가 하나라도 기록되면 거부되고(PERIOD_REVERT_HAS_EVENTS),
- * (b) 마지막 피리어드 종료(= 후반 종료)는 되감을 다음 피리어드 자체가 없어
- * 아예 되돌릴 수 없다(PERIOD_REVERT_NOT_AVAILABLE). 사용자에게 트레이드오프
- * (경기 중 빠르게 눌러야 하는데 모달이 기록을 늦춘다)를 안내했지만, 사용자는
- * "모달이 떠야하긴해 실수를 막는게 더 중요한거지"라며 예외 없이 전부에 확인을
- * 걸기로 했다 — "빠른 기록 모드" 같은 우회로도 만들지 않기로 했다. 단
- * `revert-period`(되돌리기)만은 그 자체가 이미 교정 행동이라 제외한다
- * (사용자가 고른 목록에도 없다).
+ * 기록(골·카드·파울·교체)은 확인 없이 저장하고 5초 되돌리기로 복구한다. 진행 명령·승부차기 시작·종료는
+ * 확인을 거친다. 기록에 확인을 남기는 예외는 셋뿐이다 — 수상한 시계, 퇴장한 선수, 두 번째 옐로 뒤의 레드.
  *
- * 문구 원칙: "정말?" 같은 무의미한 문구를 쓰지 않는다 — 무엇이(팀·선수·
- * 시각) 기록되는지 보여야 실수를 실제로 잡는다. 되돌릴 수 없는 액션
- * (`end`, 레드카드, 승부차기 종료)은 `tone: 'danger'`로 나머지와 톤을
- * 구분한다.
- *
- * 시계 경고 병합: alpha "452′" 사고 대응으로 있던 `confirmIfClockSuspicious`
- * 는 시계가 수상할 때만 별도 확인을 띄웠다. 이제 모든 액션이 확인을 거치므로
- * 그 경고를 별도 모달로 다시 띄우면 확인이 두 번 뜬다(나쁜 UX) — 대신 같은
- * 모달 안에 시계 경고 문구를 병합하고, confirmLabel/타이틀을 시계 경고
- * 전용으로 바꿔치기한다(호출부는 `clockWarningPeriodMinutes`로 이 병합
- * 여부를 결정한다).
+ * 문구 원칙: 무엇이(팀·선수·시각) 기록되는지 보여야 실수를 잡는다. 되돌릴 수 없는 동작은 `tone: 'danger'`.
  */
 
 import type { ConfirmTone } from '@/components/v1-ui/confirm-modal';
@@ -78,24 +58,20 @@ export function eventTimeSummary(
   );
 }
 
-function eventActionNoun(input: Pick<EventCaptureCommitInput, 'type' | 'payload'>): {
-  readonly noun: string;
-  readonly tone: ConfirmTone;
-} {
+function eventActionNoun(input: Pick<EventCaptureCommitInput, 'type' | 'payload'>): string {
   switch (input.type) {
     case 'GOAL':
-      return { noun: '골', tone: 'default' };
+      return '골';
     case 'OWN_GOAL':
-      return { noun: '자책골', tone: 'default' };
+      return '자책골';
     case 'CARD':
-      // 요구사항 3 — 레드카드는 파급이 커서(퇴장) danger, 옐로카드는 기본 톤.
-      return input.payload.card === 'RED' ? { noun: '레드카드', tone: 'danger' } : { noun: '옐로카드', tone: 'default' };
+      return input.payload.card === 'RED' ? '레드카드' : '옐로카드';
     case 'FOUL':
-      return { noun: '파울', tone: 'default' };
+      return '파울';
     case 'SUBSTITUTION':
-      return { noun: '교체', tone: 'default' };
+      return '교체';
     default:
-      return { noun: '기록', tone: 'default' };
+      return '기록';
   }
 }
 
@@ -113,49 +89,54 @@ function eventTargetDescription(
     // sideId는 점수를 받는 상대 팀이다(action-target-picker가 귀속을 뒤집는다) —
     // 자책골을 넣은 선수는 반대편 팀 소속이라 그 팀명을 앞에 붙인다.
     const ownSide = sideLabel(sides.find((candidate) => candidate.id !== input.sideId)?.id, sides);
-    const scorer = input.participantId === undefined ? ownSide : `${ownSide} · ${playerLabel(input.participantId, lineups)}`;
-    return `${scorer} (${side} 득점)`;
+    return input.participantId === undefined
+      ? `${ownSide} (선수 모름, ${side} 득점)`
+      : `${ownSide} · ${playerLabel(input.participantId, lineups)} (${side} 득점)`;
   }
   if (input.participantId === undefined) {
-    return `${side} (선수 지정 없이)`;
+    return `${side} (선수 모름)`;
   }
   return `${side} · ${playerLabel(input.participantId, lineups)}`;
 }
 
 /**
- * 골/카드/파울/교체(빠른 교체 포함) 커밋 확인 문구. `clockWarningPeriodMinutes`
- * 가 `null`이 아니면 alpha "452′" 시계 경고를 같은 모달에 병합한다 — 절대
- * 별도 모달을 띄우지 않는다(위 파일 doc 참고).
+ * 기록 시각이 이 경기 시간의 보통 길이를 크게 넘을 때만 띄우는 확인. 취소하면 기록하지 않는다.
  */
-export function commitActionConfirmCopy(
+export function clockCheckConfirmCopy(
   input: EventCaptureCommitInput,
   sides: readonly GameSide[],
   lineups: readonly GameLineup[],
-  clockWarningPeriodMinutes: number | null,
+  clockWarningPeriodMinutes: number,
   periodCount?: number | null,
 ): ConfirmCopy {
-  const { noun, tone } = eventActionNoun(input);
+  const noun = eventActionNoun(input);
   const target = eventTargetDescription(input, sides, lineups);
   const when = `${periodPrefix(input.period, periodCount)}${formatMatchClock(input.clockMs)}`;
-  if (clockWarningPeriodMinutes !== null) {
-    return {
-      title: '기록 시각을 확인해주세요',
-      message: `${target} · ${when}에 ${josa(noun, ['을', '를'])} 기록해요. 이 피리어드는 보통 ${clockWarningPeriodMinutes}분이에요 — 경기 종료를 누르지 않은 채 시간이 흘렀을 수 있어요. 그대로 기록할까요?`,
-      confirmLabel: '그대로 기록',
-      tone: 'danger',
-    };
-  }
   return {
-    title: `${josa(noun, ['을', '를'])} 기록할까요?`,
-    message: `${target} · ${when}에 기록해요.`,
-    confirmLabel: `${noun} 기록`,
-    tone,
+    title: '기록 시각을 확인해주세요',
+    message: `${target} · ${when}에 ${josa(noun, ['을', '를'])} 기록해요. 이 경기 시간은 보통 ${clockWarningPeriodMinutes}분이에요 — 경기 종료를 누르지 않은 채 시간이 흘렀을 수 있어요. 그대로 기록할까요?`,
+    confirmLabel: '그대로 기록',
+    tone: 'danger',
   };
+}
+
+/**
+ * 기록 직후 토스트. 끊긴 동안에는 서버에 아직 없으므로 `offlineMessage` 를 쓴다.
+ * `noun` 은 한 번에 묶어 알릴 때의 이름(경고 누적 퇴장)이다.
+ */
+export function recordedToastCopy(
+  input: EventCaptureCommitInput,
+  sides: readonly GameSide[],
+  lineups: readonly GameLineup[],
+  noun: string = eventActionNoun(input),
+): { readonly message: string; readonly offlineMessage: string } {
+  const what = `${noun} · ${eventTargetDescription(input, sides, lineups)}`;
+  return { message: `${what} 기록했어요`, offlineMessage: `${what} 이 기기에 기록해 뒀어요` };
 }
 
 /** 선수를 골랐을 때 "그래도 ○○을 기록할까요?"에 들어가는 기록 이름(골·자책골·파울·옐로카드·레드카드). */
 export function recordNounOf(input: Pick<EventCaptureCommitInput, 'type' | 'payload'>): string {
-  return eventActionNoun(input).noun;
+  return eventActionNoun(input);
 }
 
 export interface SentOffPlayerNoticeCopy {
@@ -168,8 +149,8 @@ export interface SentOffPlayerNoticeCopy {
 /**
  * 이미 퇴장(레드카드)한 선수를 골랐을 때 선택 화면 안에서 한 번 더 묻는 문구.
  *
- * 평소 "○○을 기록할까요?" 확인과 모양이 비슷하면 습관적으로 넘기게 되므로, 제목이 "퇴장한 선수"라는
- * 사실을 먼저 말하고 왜 그런지(몇 분에 레드카드)를 보여 준다. 되돌아갈 길("다른 선수 고르기")이 첫째 버튼이다.
+ * 습관적으로 넘기지 않게 제목이 "퇴장한 선수"라는 사실을 먼저 말하고 왜 그런지(몇 분에 레드카드)를
+ * 보여 준다. 되돌아갈 길("다른 선수 고르기")이 첫째 버튼이다.
  * `verb`는 새 이벤트 기록은 `기록`, 이미 기록된 골에 붙이는 어시스트는 `추가`.
  */
 export function sentOffPlayerNoticeCopy(input: {
@@ -208,8 +189,7 @@ export function secondYellowConfirmCopy(
 
 /**
  * start/pause/resume/end-period/start-period/end 확인 문구.
- * `revert-period`는 이 함수의 도메인이 아니다(사용자 결정으로 확인 자체가
- * 없다 — 호출부가 `revert-period`는 애초에 이 함수를 거치지 않는다).
+ * `revert-period`는 그 자체가 되돌리기라 확인이 없어 이 함수를 거치지 않는다.
  * `label`은 호출부가 이미 계산해 둔 `commandLabel(...)` 결과를 그대로
  * 받는다 — operate-console.tsx의 그 함수를 여기서 다시 import하면 두
  * 파일이 서로를 참조하는 순환 import가 생기기 때문에, 계산된 문자열만
@@ -260,14 +240,14 @@ export function commandConfirmCopy(
           }
         : {
             title: `${label}할까요?`,
-            message: `${josa(scoreText ?? '현재 스코어', ['으로', '로'])} 종료하고 하프타임으로 넘어가요. 다음 피리어드에 기록이 생기기 전까지는 되돌릴 수 있어요.`,
+            message: `${josa(scoreText ?? '현재 스코어', ['으로', '로'])} 종료하고 하프타임으로 넘어가요. 다음 경기 시간에 기록이 생기기 전까지는 되돌릴 수 있어요.`,
             confirmLabel: label,
             tone: 'default',
           };
     case 'start-period':
       return {
         title: `${label}할까요?`,
-        message: '하프타임을 마치고 다음 피리어드를 시작해요.',
+        message: '하프타임을 마치고 다음 경기 시간을 시작해요.',
         confirmLabel: label,
         tone: 'default',
       };
@@ -282,9 +262,8 @@ export function commandConfirmCopy(
 }
 
 /**
- * 승부차기 시작 확인 — 아직 아무것도 서버에 보내지 않는다(패널을 여는
- * 로컬 상태 전환일 뿐). 그래도 사용자 결정("예외 없이 전부")에 따라 확인을
- * 거친다.
+ * 승부차기 시작 확인 — 아직 아무것도 서버에 보내지 않지만(패널을 여는 로컬 상태 전환)
+ * 진행 단계를 바꾸는 동작이라 확인을 거친다.
  */
 export function penaltyShootoutStartConfirmCopy(
   sides: readonly GameSide[],

@@ -176,7 +176,7 @@ Notes:
 | TOURN-014 | 대진표 조회 | tournament bracket API/surface | `USER_A` | bracket 로딩, 경기 상태, 빈 bracket, 충돌/보류 상태 |
 | TOURN-015 | 결과/순위 조회 | tournament players/bracket API | `USER_A` | 결과 반영, 순위표, 보류/이의 상태를 성공처럼 표시하지 않음 |
 | TOURN-016 | 관리자 대회 목록 | `/admin/tournaments` | `ADMIN` | list/filter/status, 일반 사용자 차단 |
-| TOURN-017 | 관리자 대회 생성 | `/admin/tournaments/new`, API admin create | `ADMIN` | 필수값, 날짜/정원/참가비 validation, 생성 후 상세 |
+| TOURN-017 | 관리자 대회 생성 | `/admin/tournaments/new`, API admin create | `ADMIN` | 필수값, 날짜/팀 수 validation, 생성 후 대회 개요로 이동 |
 | TOURN-018 | 관리자 대회 상세/수정 | `/admin/tournaments/[id]` | `ADMIN` | 상태 변경, 수정 persistence, 참가 신청 목록 진입 |
 | TOURN-019 | 관리자 신청 목록 | API `GET /admin/tournaments/:id/registrations` | `ADMIN` | status filter, cursor, payment/player count, 비관리자 차단 |
 | TOURN-020 | 입금 확인 | API `PATCH /admin/registrations/:id/confirm-payment` | `ADMIN` | awaiting_payment+ready만 허용, payment paid, registration payment_checking |

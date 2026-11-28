@@ -7,7 +7,7 @@ import { createCrossGroupRound12Fixture } from '@/test/msw/cross-group-round12-f
 import { crossGroupRecommendation } from '@/lib/cross-group-round12';
 import type { CrossGroupApplyInput } from '@/types/cross-group-round12';
 import { CrossGroupRound12Dialog } from './cross-group-round12-dialog';
-import { BracketListTemplateTools } from './bracket-list-template-tools';
+import { BracketTemplateDialog } from './bracket-template-dialog';
 
 const api = 'http://localhost/api/v1/admin/tournaments/test/bracket';
 const server = setupServer(http.get(`${api}/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2 })));
@@ -24,17 +24,15 @@ function mount(preview = createCrossGroupRound12Fixture()) {
   return { onClose, showToast, client };
 }
 describe('목록 12강 자동 배정 팝업 HTTP 계약', () => {
-  it('빈 목록의 전체 대진 만들기에서 20팀 프리셋을 실제 API로 저장한다', async () => {
+  it('전체 대진 만들기 대화상자에서 20팀 프리셋을 실제 API로 저장한다', async () => {
     let saved: unknown;
     server.use(http.post(`${api}/template`, async ({ request }) => {
       saved = await request.json(); return ok({ groups: 9, fixtures: 41, slots: 32, edges: 10 });
     }));
     const showToast = vi.fn();
     const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
-    render(<QueryClientProvider client={client}><BracketListTemplateTools tournamentId="test" format="group_knockout"
-      hasExistingBracket={false} groups={[]} slots={[]} registrations={[]} confirmedTeamCount={0}
-      confirmedTeamCountStatus="success" showToast={showToast} /></QueryClientProvider>);
-    fireEvent.click(screen.getByRole('button', { name: '전체 대진 만들기' }));
+    render(<QueryClientProvider client={client}><BracketTemplateDialog open tournamentId="test" format="group_knockout"
+      hasExistingBracket={false} confirmedTeamCount={0} confirmedTeamCountStatus="success" onClose={vi.fn()} showToast={showToast} /></QueryClientProvider>);
     fireEvent.change(await screen.findByLabelText('참가 팀 수'), { target: { value: '20' } });
     const preset = await screen.findByRole('radio', { name: '5개 조 × 4팀 → 12강' });
     expect(preset).toHaveAccessibleDescription(/조 1·2위 10팀과 3위 상위 2팀이 진출/);
@@ -45,13 +43,10 @@ describe('목록 12강 자동 배정 팝업 HTTP 계약', () => {
       legs: 1, thirdPlace: false, qualificationMode: 'cross_group_round12' });
   });
 
-  it('목록의 템플릿 다이얼로그가 12명의 확정 참가자에 맞춰 12팀 녹아웃을 기본 선택한다', async () => {
+  it('템플릿 대화상자가 12명의 확정 참가자에 맞춰 12팀 녹아웃을 기본 선택한다', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-    render(<QueryClientProvider client={client}><BracketListTemplateTools tournamentId="test" format="knockout"
-      hasExistingBracket={false} groups={[]} slots={[]} registrations={[]} confirmedTeamCount={12}
-      confirmedTeamCountStatus="success" showToast={vi.fn()} /></QueryClientProvider>);
-
-    fireEvent.click(screen.getByRole('button', { name: '전체 대진 만들기' }));
+    render(<QueryClientProvider client={client}><BracketTemplateDialog open tournamentId="test" format="knockout"
+      hasExistingBracket={false} confirmedTeamCount={12} confirmedTeamCountStatus="success" onClose={vi.fn()} showToast={vi.fn()} /></QueryClientProvider>);
 
     expect(await screen.findByLabelText('참가 팀 수')).toHaveValue('12');
     expect(screen.getByRole('radio', { name: '12팀 대진 틀' })).toBeChecked();

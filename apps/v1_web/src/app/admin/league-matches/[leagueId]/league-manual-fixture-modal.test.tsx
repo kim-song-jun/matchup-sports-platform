@@ -159,7 +159,7 @@ describe('LeagueManualFixtureModal (주차 단위 경기 추가, 2026-11-03 A안
   it('리그 피리어드 설정의 경기 시간을 미리 채우고, 지우면 안내가 사라지고 종료 시각 없이 만든다', async () => {
     const { onSubmit } = setup({ defaultDuration: { minutes: 40, label: '단판 40분' } });
     expect(screen.getByLabelText('경기 시간(분)')).toHaveValue('40');
-    expect(screen.getByText(/단판 40분/)).toBeInTheDocument();
+    expect(screen.getByText('이 리그의 경기 시간(단판 40분)에서 가져왔어요. 일정의 종료 시각에만 쓰여요.')).toBeInTheDocument();
     pickRow(1, 'team-a', 'team-b');
     fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '' } });
     expect(screen.queryByText(/단판 40분/)).toBeNull();

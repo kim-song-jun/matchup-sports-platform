@@ -28,7 +28,12 @@ export function useTournamentOpsRole(): V1TournamentStaffRole {
   return role;
 }
 
-/** 결과 검토·정정은 대회 운영자(디렉터)와 플랫폼 운영자만 한다 — 서버 정책과 같은 기준이다. */
+/** 결과 확정·고치기는 대회 운영자와 플랫폼 운영자만 한다 — 서버 정책과 같은 기준이다. */
 export function canManageTournamentResults(role: V1TournamentStaffRole): boolean {
+  return role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
+}
+
+/** 구장·구장 담당자 배정은 서버가 같은 두 역할에게만 허용한다 — 누르면 403 나는 컨트롤은 화면에서 감춘다. */
+export function canAssignOperations(role: V1TournamentStaffRole): boolean {
   return role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
 }

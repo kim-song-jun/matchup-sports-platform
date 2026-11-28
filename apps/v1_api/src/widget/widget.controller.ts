@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -19,6 +19,17 @@ export class WidgetGamesQueryDto {
 export class WidgetResponseDto {
   @IsIn(['GOING', 'MAYBE', 'NOT_GOING'])
   status!: 'GOING' | 'MAYBE' | 'NOT_GOING';
+}
+
+/** 실시간 카드가 받은 푸시 토큰(소문자 16진수, 앱이 그대로 보낸다). */
+export class WidgetLiveActivityTokenDto {
+  @IsString()
+  @MaxLength(64)
+  gameId!: string;
+
+  @IsString()
+  @Matches(/^[0-9a-f]{16,4096}$/)
+  pushToken!: string;
 }
 
 /** 앱이 로그인 쿠키로 위젯 토큰을 받는다(기기마다 하나). */
@@ -68,6 +79,19 @@ export class WidgetController {
   async games(@Headers('authorization') authorization: string | undefined, @Query() query: WidgetGamesQueryDto) {
     const { userId } = await this.widget.authenticate(authorization);
     return this.widget.games(userId, query.limit ?? WIDGET_DEFAULT_LIMIT);
+  }
+
+  @Put('live-activity-token')
+  @HttpCode(200)
+  async registerLiveActivity(@Headers('authorization') authorization: string | undefined, @Body() dto: WidgetLiveActivityTokenDto) {
+    const { userId, tokenId } = await this.widget.authenticate(authorization);
+    return this.widget.registerLiveActivity(userId, tokenId, dto.gameId, dto.pushToken);
+  }
+
+  @Delete('live-activity-token')
+  async unregisterLiveActivity(@Headers('authorization') authorization: string | undefined, @Body() dto: WidgetLiveActivityTokenDto) {
+    const { tokenId } = await this.widget.authenticate(authorization);
+    return this.widget.unregisterLiveActivity(tokenId, dto.gameId, dto.pushToken);
   }
 
   @Delete('token')

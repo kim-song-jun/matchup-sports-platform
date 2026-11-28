@@ -8,9 +8,7 @@ PR #2442에 최신 dev `886fd0b29`를 반영하고 다섯 결함을 추가 수�
 
 1. 같은 초안의 제출 요청 두 개가 겹치거나 잠금 대기 중 취소되면 후속 요청은409이고 결제·약관·알림을 덮어쓰지 않는다. 초안 재조회 뒤 취소된 경우에도 CAS409다.
 2. 대회·리그가 종료/취소되면 확정/대기 새 처리는 서버409·UI 비활성이다. 이미 목표 상태인 읽기 멱등 응답은 유지한다.
-3. 경기 시간 일부 저장 실패 후 새로고침하면 서버에 남은 시간을 확인하는 단계로 복원한다. 명시 저장 전 공개 확인은 잠겨 있고 새 POST를 만들지 않는다. 미저장 입력은 복원되지 않는다고 안내한다.
-4. 마감 후 접수 시작·재개·동일 open 요청은409다. 확인 모달 대기 중 마감이 지나도 공개하지 않는다.
-5. draftId 조회 로딩/오류에는 새 생성 폼이 없고 재시도로 같은 초안을 조회한다. 별도 시간 조회 실패에도 저장·공개를 막고 재시도를 제공한다.
+3. 마감 후 접수 시작·재개·동일 open 요청은409다. 확인 모달 대기 중 마감이 지나도 공개하지 않는다.
 
 로컬 회귀: 수정 전 서버9건 RED → 서버3 suites360 tests PASS. Web4 suites181 tests PASS(생성104·신청관리41·생성모델32·리그신청4). API/Web 타입 검사 PASS. API는 공유 의존성의 오래된 생성물로 발생한 타입 오류를 격리된 최신 schema 생성물과 임시 tsconfig paths로 재검증했으며 원본 의존성/DB를 바꾸지 않았다. DB 통합은 로컬 Docker/DB 런타임 미제공으로 미실행하며 동시 트랜잭션 실측은 CI/Alpha에서 확인한다.
 Alpha manual QA 대기: 기존4 routes + `/admin/tournaments/:id/registrations`, `/admin/league-matches/:leagueId/registrations` = 6 routes × 390/768/1440 **0/18**. 사용자 요청은 PR 갱신까지이며 미머지 head의 alpha 화면 증거는 없다. 관리자 owner/ops + 신청팀 manager, 실제 오류/network·console·viewport별 before/after와 cleanup을 배포 후 기록한다. 로컬 Next/DB/브라우저를 기동하지 않는다.
@@ -93,7 +91,7 @@ Alpha manual QA: `/admin/tournaments/new`, `/admin/tournaments/new-staged`, `/ad
 Task: [20261130](../../.github/tasks/20261130-competition-stage-composition.md)
 
 ## 범위와 진입
-플랫폼 운영자: 기존 `/admin/tournaments/new` 유지. 새 버튼 `/admin/tournaments/new-staged`에서 기본 정보·단계/편성·일정·참가조건·공개 확인을 거쳐 실제 초안을 저장한다.
+플랫폼 운영자: `/admin/tournaments/new`에서 진행 방식 「여러 단계」를 고르면 팀 수에 맞춘 기본 예선 구성으로 초안을 만든다(옛 `/new-staged`는 `/new?format=staged`로 이동). 단계·편성은 초안 뒤 대진 탭에서 고친다.
 관리자는 대진 관리에서 미정 대진을 생성하고 편성별 참가팀을 확정하며, 경기 운영은 기존 보드/콘솔을 쓴다.
 공개 사용자는 같은 대회의 대진/결과에서 단계를 골라 독립 순위를 확인한다.
 

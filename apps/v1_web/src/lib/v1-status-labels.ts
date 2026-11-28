@@ -7,7 +7,7 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
-import type { V1InquiryReportReason, V1PlayerEligibilityMethod, V1PlayerEligibilityStatus, V1RegistrationCancelOutcome, V1TournamentRegistrationStatus } from '@/types/api';
+import type { V1InquiryReportReason, V1PlayerEligibilityMethod, V1PlayerEligibilityStatus, V1RegistrationCancelOutcome, V1TournamentRegistrationStatus, V1TournamentStatus } from '@/types/api';
 
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
@@ -324,6 +324,20 @@ export function gameRosterStatusLabel(status: string, remainingMatches?: number 
 // ── Task 180 G13 상태 모델 — 리그·경기·종류 ─────────────────────────────────────
 // 문구만 여기 둔다. 칩 톤·아이콘·노출 조건은 `lib/competition-status.ts` 가 이 라벨로 만든다.
 
+const TOURNAMENT_STATUS_LABEL: Record<V1TournamentStatus, string> = {
+  draft: '초안',
+  open: '접수 중',
+  closed: '접수 마감',
+  in_progress: '진행 중',
+  completed: '완료',
+  cancelled: '취소됨',
+};
+
+/** 대회 상태 이름 — 어드민 대회 상세 머리의 칩·진행 막대, 대회 정보, 목록이 모두 이 이름을 쓴다. */
+export function tournamentStatusLabel(status: V1TournamentStatus): string {
+  return TOURNAMENT_STATUS_LABEL[status];
+}
+
 export type LeagueStateKey = 'draft' | 'active' | 'completed' | 'on_hold';
 
 // `draft` 는 시작 전 단계(초안·접수 중·마감)를 한데 묶은 값이다. 단계를 구분할 수 있으면 `leagueLifecycleLabel` 을 쓴다.
@@ -340,10 +354,11 @@ export function leagueStateLabel(state: LeagueStateKey): string {
   return LEAGUE_STATE_LABEL[state];
 }
 
-// 리그 저장 상태의 어드민 이름 — 대회 어드민(초안·접수 중·마감)과 같은 말에 리그 말(시즌 진행 중·보류)을 더한다(2026-10-27).
+// 리그 저장 상태의 어드민 이름 — 대회 상태 이름(초안·접수 중)에 리그 말(시즌 진행 중·보류)을 더한다(2026-10-27).
+// 접수 마감은 리그 화면이 예전부터 쓰는 짧은 「마감」 이다.
 const LEAGUE_LIFECYCLE_LABEL: Record<string, string> = {
-  draft: '초안',
-  open: '접수 중',
+  draft: tournamentStatusLabel('draft'),
+  open: tournamentStatusLabel('open'),
   closed: '마감',
   in_progress: LEAGUE_STATE_LABEL.active,
   completed: LEAGUE_STATE_LABEL.completed,
@@ -471,6 +486,27 @@ const REGISTRATION_STATUS: Record<V1TournamentRegistrationStatus, { tone: Regist
 /** 어드민이 취소 처리한 신청의 상태 이름 — 일반 "취소" 와 달리 누가 끝냈는지가 드러난다. */
 export function registrationCancelOutcomeLabel(outcome: V1RegistrationCancelOutcome): string {
   return outcome === 'approved' ? '취소 승인됨' : '거부됨';
+}
+
+/** 무료 대회에는 확인할 입금이 없다 — 입금 말이 든 세 상태를 신청 말로 부른다. */
+const FREE_ENTRY_REGISTRATION_LABEL: Partial<Record<V1TournamentRegistrationStatus, string>> = {
+  awaiting_payment: '신청 작성 중',
+  payment_checking: '신청 확인 중',
+  paid: '신청 완료',
+};
+
+/**
+ * 어드민 신청 알약의 라벨 덮어쓰기. `undefined` 면 알약 기본 라벨을 쓴다.
+ * 기본 「초안」은 대회 초안을 뜻해 임시저장 신청에는 맞지 않아 신청 상태 정본의 말을 쓴다.
+ */
+export function adminRegistrationStatusLabel(
+  status: V1TournamentRegistrationStatus,
+  isFreeEntry: boolean,
+  cancelOutcome: V1RegistrationCancelOutcome | null,
+): string | undefined {
+  if (status === 'cancelled' && cancelOutcome) return registrationCancelOutcomeLabel(cancelOutcome);
+  if (status === 'draft') return REGISTRATION_STATUS.draft.label;
+  return isFreeEntry ? FREE_ENTRY_REGISTRATION_LABEL[status] : undefined;
 }
 
 /**

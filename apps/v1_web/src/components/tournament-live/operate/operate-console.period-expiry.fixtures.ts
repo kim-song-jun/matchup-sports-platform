@@ -76,7 +76,7 @@ export function createFixture(server: SetupServerApi) {
     http.post(`${API}/games/game-expiry/commands/:command`, async ({ params, request }) => {
       const body: unknown = await request.json();
       commands.push({ command: String(params.command), body });
-      if (request.headers.get('x-v1-user-id') !== 'operator-expiry' || typeof body !== 'object' || body === null || !('takeoverToken' in body) || body.takeoverToken !== 'expiry-lease' || !('clientCommandId' in body) || body.clientCommandId !== request.headers.get('Idempotency-Key')) return failure(403, '운영 권한이 없어요.');
+      if (request.headers.get('x-v1-user-id') !== 'operator-expiry' || typeof body !== 'object' || body === null || !('takeoverToken' in body) || body.takeoverToken !== 'expiry-lease' || !('clientCommandId' in body) || body.clientCommandId !== request.headers.get('Idempotency-Key')) return failure(403, '기록 권한이 없어요.');
       if (!('expectedVersion' in body) || body.expectedVersion !== game.version) return failure(409, '경기 버전이 달라요.');
       if (commandError) return failure(503, '종료 요청의 응답을 확인하지 못했어요.');
       if (params.command === 'end-period') endPeriod();

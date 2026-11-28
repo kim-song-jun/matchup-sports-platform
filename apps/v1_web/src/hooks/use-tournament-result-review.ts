@@ -5,6 +5,7 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
+import { OPERATIONS_BOARD_PAGE_LIMIT, readOperationsBoardPages } from '@/lib/operations-board-pages';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameActorRole as FullGameActorRole, GamePeriod, GamePeriodDuration } from '@/types/game-operations';
@@ -181,6 +182,8 @@ export type TournamentOperationsBoardItem = {
   awayRegistrationId: string | null;
   scheduledAt: string | null;
   currentScore: GameResultScore | null;
+  /** 공식 결과 포인터의 상태(`OFFICIAL`·`VOID`). 확정 결과가 없으면 `null`. */
+  currentRevisionState?: string | null;
   warnings: TournamentOperationsBoardWarning[];
   version: number | null;
   revisionId: string | null;
@@ -213,37 +216,33 @@ export const resultReviewKeys = {
  */
 async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOperationsBoardResponse> {
   const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
-  const items: TournamentOperationsBoardItem[] = [];
-  const liveWarnings: TournamentOperationsBoardResponse['liveWarnings'] = [];
-  let cursor: string | null = null;
-  let page: TournamentOperationsBoardResponse;
-  do {
-    page = await v1Get<TournamentOperationsBoardResponse>(path, {
+  const pages = await readOperationsBoardPages((cursor) =>
+    v1Get<TournamentOperationsBoardResponse>(path, {
       status: 'ENDED',
-      limit: 100,
+      limit: OPERATIONS_BOARD_PAGE_LIMIT,
       ...(cursor === null ? {} : { cursor }),
-    });
-    items.push(...page.items);
-    liveWarnings.push(...page.liveWarnings);
-    cursor = page.nextCursor;
-  } while (cursor !== null);
-  return { ...page, items, liveWarnings, nextCursor: null };
+    }),
+  );
+  return {
+    ...pages[pages.length - 1],
+    items: pages.flatMap((page) => page.items),
+    liveWarnings: pages.flatMap((page) => page.liveWarnings),
+    nextCursor: null,
+  };
 }
 
 /**
  * Ended fixtures for a tournament, via the Task 18 operations board
  * (`GET /tournament-ops/tournaments/:tournamentId/operations?status=ENDED`).
- * A "review" candidate is `gameState === 'ENDED' && revisionId === null`
- * (nothing officialized yet) or carries `RESULT_REVIEW_OVERDUE`; a
- * "correction" candidate is `revisionId !== null` (has an official result).
- * Pages filter this same list for their own purpose -- see
- * `components/tournament-result-review/fixture-picker-list.tsx`.
+ * A "pending" candidate is `gameState === 'ENDED' && revisionId === null`
+ * (nothing officialized yet) or carries `RESULT_REVIEW_OVERDUE`; the rest with
+ * `revisionId !== null` are confirmed. See `components/tournament-ops/result-partition.ts`.
  */
-export function useTournamentEndedFixtures(tournamentId: string) {
+export function useTournamentEndedFixtures(tournamentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: resultReviewKeys.board(tournamentId, 'ENDED'),
     queryFn: () => fetchAllEndedFixtures(tournamentId),
-    enabled: Boolean(tournamentId),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
     staleTime: 15_000,
   });
 }

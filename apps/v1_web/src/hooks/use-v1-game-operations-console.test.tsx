@@ -170,7 +170,7 @@ describe('useV1GameOperationsConsole — correctEventTime (MD-QA #187)', () => {
     await act(async () => {
       await expect(
         result.current.correctEventTime({ eventId: 'event-1', clockMs: 1000, reason: '사유' }),
-      ).rejects.toThrow('경기 운영 권한이 없어 시각을 정정할 수 없어요.');
+      ).rejects.toThrow('경기 기록 권한이 없어 시각을 고칠 수 없어요.');
     });
     expect(mockV1Post).not.toHaveBeenCalled();
     unmount();

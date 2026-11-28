@@ -159,7 +159,7 @@ describe('selectMyFixtures', () => {
     expect(selectMyFixtures(entries.map(fixtureFromEntry), [assignment({ fieldId: 'f-1', fieldName: 'A구장' })])).toEqual([]);
   });
 
-  it('필드 담당자 배정이 없으면 아무것도 고르지 않는다', () => {
+  it('구장 담당자 배정이 없으면 아무것도 고르지 않는다', () => {
     const entries = [entry({ fixtureId: 'fx-1' })];
     expect(selectMyFixtures(entries.map(fixtureFromEntry), [assignment({ role: 'TOURNAMENT_DIRECTOR' })])).toEqual([]);
   });
@@ -200,7 +200,7 @@ describe('MyStaffFixturesPageClient', () => {
     ['LIVE', '진행 중'],
     ['PAUSED', '일시중지'],
     ['paused', '일시중지'],
-    ['completed', '종료'],
+    ['completed', '끝남'],
     ['cancelled', '취소됨'],
     ['unexpected', '상태 확인 필요'],
   ])('%s 경기 상태를 색상 외 아이콘과 텍스트로 함께 표시한다', (status, label) => {

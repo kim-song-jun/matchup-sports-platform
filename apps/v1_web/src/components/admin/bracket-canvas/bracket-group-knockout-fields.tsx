@@ -133,7 +133,7 @@ export function GroupKnockoutFields({
             onChange={(e) => onChange(applyGroupKnockoutChange(value, { legs: Number(e.target.value) as 1 | 2 }))}
           >
             <option value={1}>한 번씩</option>
-            <option value={2}>홈·어웨이 두 번씩</option>
+            <option value={2}>홈·원정 두 번씩</option>
           </select>
         </div>
       </div>

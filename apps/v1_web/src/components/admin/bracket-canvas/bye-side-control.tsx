@@ -62,9 +62,9 @@ function ConnectedByeSideControl({ tournamentId, fixture, slot, fixtures, slots,
           });
         }}>
         <option disabled={current !== 'HOME' && fixture.bracketSources?.length !== 1} value="HOME">홈 · 위</option>
-        <option disabled={current !== 'AWAY' && fixture.bracketSources?.length !== 1} value="AWAY">어웨이 · 아래</option>
+        <option disabled={current !== 'AWAY' && fixture.bracketSources?.length !== 1} value="AWAY">원정 · 아래</option>
         {destinations.map(choice => <option key={choice.value} value={choice.value}>
-          {choice.row.fixtureNumber}번 경기 · {choice.side === 'HOME' ? '홈' : '어웨이'}와 교환
+          {choice.row.fixtureNumber}번 경기 · {choice.side === 'HOME' ? '홈' : '원정'}과 교환
         </option>)}
       </select>
       <span className="tm-text-caption text-[var(--text-muted)]" role={mutation.isPending ? 'status' : undefined}>

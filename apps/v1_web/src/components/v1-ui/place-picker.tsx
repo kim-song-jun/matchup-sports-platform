@@ -66,6 +66,11 @@ export type PlacePickerProps = {
   className?: string;
   /** 직접 입력 이름 길이. 화면이 보내는 DTO 의 한도(`PLACE_NAME_MAX_LENGTH`)를 넘긴다. */
   maxLength: number;
+  /**
+   * 검색 칸에 쳐 두었지만 고르지도 「이름만 직접 입력」으로 확정하지도 않은 글(앞뒤 공백 제외).
+   * 고르거나 확정하거나 지우면 빈 문자열이다 — 저장 화면이 그 글을 조용히 버리지 않게 알리는 용도.
+   */
+  onPendingTextChange?: (text: string) => void;
 };
 
 export function PlacePicker({
@@ -79,6 +84,7 @@ export function PlacePicker({
   placeholder = '장소 이름이나 주소를 검색해요',
   className,
   maxLength,
+  onPendingTextChange,
 }: PlacePickerProps) {
   const autoId = useId();
   const inputId = id ?? `${autoId}-input`;
@@ -98,6 +104,13 @@ export function PlacePicker({
   const [focusChangeNext, setFocusChangeNext] = useState(false);
   // 고른 직후에만 지도를 화면 안으로 끌어온다 — 값이 채워진 채 열린 수정 폼은 스크롤하지 않는다.
   const [justPicked, setJustPicked] = useState(false);
+
+  const pendingText = mode === 'search' && value === null ? query.trim() : '';
+  const onPendingTextChangeRef = useRef(onPendingTextChange);
+  onPendingTextChangeRef.current = onPendingTextChange;
+  useEffect(() => {
+    onPendingTextChangeRef.current?.(pendingText);
+  }, [pendingText]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);

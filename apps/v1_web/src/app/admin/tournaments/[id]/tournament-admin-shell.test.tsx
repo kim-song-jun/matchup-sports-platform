@@ -182,23 +182,34 @@ describe('머리', () => {
     expect(screen.getByText('장소 미정 · 일정 미정 · 8팀')).toBeInTheDocument();
   });
 
-  it.each([
-    ['draft', '접수 시작하기'],
-    ['open', '접수 마감하기'],
-    ['closed', '대회 시작하기'],
-    ['in_progress', '대회 완료하기'],
-  ])('%s 의 주 버튼은 「%s」 하나뿐이다', (status, label) => {
-    setTournament({ status });
-    renderPlatform();
-    expect(screen.getAllByRole('button', { name: label })).toHaveLength(1);
-  });
+  // 다음 단계 주 버튼은 데스크톱 셸 폭에서만 머리에 있다(폰·태블릿은 개요 카드 — tournament-status-advance.test.tsx).
+  describe('다음 단계 주 버튼 (데스크톱 셸 폭)', () => {
+    beforeEach(() => media.setWidth(1440));
 
-  it.each(['completed', 'cancelled'])('%s 에는 주 버튼이 없다', (status) => {
-    setTournament({ status });
-    renderPlatform();
-    for (const label of ['접수 시작하기', '접수 마감하기', '대회 시작하기', '대회 완료하기']) {
-      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
-    }
+    it.each([
+      ['draft', '접수 시작하기'],
+      ['open', '접수 마감하기'],
+      ['closed', '대회 시작하기'],
+      ['in_progress', '대회 완료하기'],
+    ])('%s 의 주 버튼은 「%s」 하나뿐이다', (status, label) => {
+      setTournament({ status });
+      renderPlatform();
+      expect(screen.getAllByRole('button', { name: label })).toHaveLength(1);
+    });
+
+    it.each(['completed', 'cancelled'])('%s 에는 주 버튼이 없다', (status) => {
+      setTournament({ status });
+      renderPlatform();
+      for (const label of ['접수 시작하기', '접수 마감하기', '대회 시작하기', '대회 완료하기']) {
+        expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
+      }
+    });
+
+    it('조회 전용 관리자에게는 주 버튼이 없다', () => {
+      h.adminRole = 'support';
+      renderPlatform();
+      expect(screen.queryByRole('button', { name: '접수 마감하기' })).not.toBeInTheDocument();
+    });
   });
 
   it('공개 설정 카드·스태프 배정 콘솔·운영 보드 칩·되돌리기 버튼 줄이 없고, 같은 기능은 칩 메뉴·⋯ 메뉴에서 닿는다', () => {
@@ -413,6 +424,8 @@ describe('권한', () => {
 });
 
 describe('상태 확인 창', () => {
+  beforeEach(() => media.setWidth(1440));
+
   const FORWARD: [string, string, string, string][] = [
     ['draft', '접수 시작하기', '접수를 시작할까요?', 'open'],
     ['open', '접수 마감하기', '접수를 마감할까요?', 'closed'],

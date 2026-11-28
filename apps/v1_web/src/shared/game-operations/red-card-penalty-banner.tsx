@@ -80,17 +80,15 @@ export function RedCardPenaltyBanner({
   const stoppedNote = anchor.kind === 'frozen' ? '하프타임' : anchor.pausedAtMs !== null ? '일시 중지 중' : null;
 
   return (
-    <div className="px-4 pt-2">
-      <RedCardPenaltyRows
-        rows={penalties.map((penalty) => ({
-          key: penalty.key,
-          remainingMs: penalty.remainingMs,
-          label: `${sideLabel(penalty.sideId, sides)}${
-            penalty.participantId === null ? '' : ` · ${playerLabel(penalty.participantId, lineups)}`
-          } 퇴장`,
-          stoppedNote,
-        }))}
-      />
-    </div>
+    <RedCardPenaltyRows
+      rows={penalties.map((penalty) => ({
+        key: penalty.key,
+        remainingMs: penalty.remainingMs,
+        label: `${sideLabel(penalty.sideId, sides)}${
+          penalty.participantId === null ? '' : ` · ${playerLabel(penalty.participantId, lineups)}`
+        } 퇴장`,
+        stoppedNote,
+      }))}
+    />
   );
 }

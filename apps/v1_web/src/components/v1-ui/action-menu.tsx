@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { ActionMenuPopover } from './action-menu-popover';
@@ -51,7 +52,16 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
     setOpen(false);
   }
 
-  const shown = open && actions.length > 0;
+  // 링크 항목은 `overlayLinkClick` 이 이동만 하고 닫지 않는다 — 호스트가 이동 뒤에도 살아 있으면(탭 줄) 주소가
+  // 바뀔 때 닫아야 한다. 항목이 비는 동안에도 닫아 둬야 항목이 돌아왔을 때 저절로 다시 열리지 않는다.
+  const pathname = usePathname();
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
+    setOpen(false);
+  }
+  if (open && actions.length === 0) setOpen(false);
+
   const onToggle = () => {
     if (actions.length > 0) setOpen((value) => !value);
   };
@@ -60,9 +70,9 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
   return (
     <>
       <span ref={anchorRef} className="inline-flex">
-        {trigger({ open: shown, onToggle, 'aria-expanded': shown, 'aria-haspopup': 'menu' })}
+        {trigger({ open, onToggle, 'aria-expanded': open, 'aria-haspopup': 'menu' })}
       </span>
-      {shown && desktop ? (
+      {open && desktop ? (
         <ActionMenuPopover
           label={label}
           subtitle={subtitle}
@@ -74,7 +84,7 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
           onClose={close}
         />
       ) : null}
-      {shown && !desktop ? (
+      {open && !desktop ? (
         <ActionSheet open title={label} subtitle={subtitle} header={header} actions={wrapped} onClose={close} />
       ) : null}
     </>

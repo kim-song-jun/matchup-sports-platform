@@ -47,6 +47,11 @@ function consoleTree(fixtureId = 'f-expiry') {
   return <QueryClientProvider client={queryClient}><TournamentOpsRoleProvider role="TOURNAMENT_DIRECTOR"><OperateConsole tournamentId="t-expiry" fixtureId={fixtureId} /></TournamentOpsRoleProvider></QueryClientProvider>;
 }
 
+/** 단계 줄이 가리키는 지금 단계. 하프타임으로 되돌아갔다면 여기가 「하프타임」이 된다. 단계 줄이 없으면 null. */
+function currentStage() {
+  return screen.queryByRole('list', { name: '경기 진행 단계' })?.querySelector('[aria-current="step"]')?.textContent ?? null;
+}
+
 async function openConsole(label = '정규 시간 종료') {
   const view = render(consoleTree());
   await waitFor(() => expect(screen.getByRole('button', { name: label })).toBeEnabled());
@@ -122,7 +127,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     const held = await holdWorkerRead(timing === 'with-response' ? () => fixture.startNextPeriod() : undefined);
     if (timing === 'after-push') act(() => fixture.startNextPeriod());
     await releaseRead(held);
-    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    expect(currentStage()).not.toBe('하프타임');
     expect(screen.getByLabelText(/경과 시간/)).toBeInTheDocument();
     await tick(5_000);
     expect(await screen.findByLabelText('후반 경과 시간 00:05')).toBeInTheDocument();
@@ -145,7 +150,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     }
     await releaseRead(held);
     expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.periods[0]?.state).toBe('LIVE');
-    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    expect(currentStage()).not.toBe('하프타임');
     if (change === 'pause') await waitFor(() => expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.version).toBe(8));
     const readsAfterRecovery = fixture.reads;
     await tick(10_000);
@@ -162,7 +167,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     expect(await screen.findByLabelText('후반 경과 시간 00:00')).toBeInTheDocument();
     await releaseRead(held);
     expect(screen.getByLabelText('후반 경과 시간 00:00')).toBeInTheDocument();
-    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    expect(currentStage()).toBe('후반');
     expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.version).toBe(7);
     expect(fixture.commands).toEqual([]);
   });
@@ -183,7 +188,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
       await releaseRead(held);
       await act(async () => { await metadataRead; });
     }
-    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    expect(currentStage()).toBe('후반');
     expect(await screen.findByLabelText('후반 경과 시간 00:05')).toBeInTheDocument();
     expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.version).toBe(7);
     expect(fixture.commands).toEqual([]);
@@ -196,7 +201,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     closeStatusSheet();
     expect(fixture.commands).toEqual([]);
     await requestManualEnd();
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeInTheDocument();
     expect(fixture.commands.map(({ command }) => command)).toEqual(['end-period']);
     expect(screen.queryByLabelText(/경과 시간/)).toBeNull();
   });
@@ -205,7 +210,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await openConsole();
     fixture.endPeriod();
     await tick(5_000);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/경과 시간/)).toBeNull();
     expect(screen.getByRole('button', { name: '경기 종료' })).toBeEnabled();
     expect(screen.queryByText('결과 확정')).toBeNull();
@@ -225,7 +230,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await openConsole();
     fixture.endPeriod();
     await tick(5_000);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeInTheDocument();
     for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
@@ -247,7 +252,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await waitFor(() => fixture.waitForReads(2));
     fixture.endPeriod();
     await releaseRead(held);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/경과 시간/)).toBeNull();
     expect(fixture.commands).toEqual([]);
     expect(fixture.resultRevisions).toEqual([]);
@@ -282,7 +287,7 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     fixture.setReadError(false);
     fixture.endPeriod();
     fireEvent.click(screen.getByRole('button', { name: '종료 상태 다시 확인' }));
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeInTheDocument();
     expect(fixture.commands).toEqual([]);
   });
 
@@ -293,10 +298,10 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     await requestManualEnd();
     const retry = await screen.findByRole('button', { name: '같은 요청 재시도' });
     expect(screen.getByText(/정규 시간 종료 요청의 응답을 받지 못했어요/)).toBeInTheDocument();
-    expect(screen.queryByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeNull();
+    expect(screen.queryByText('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeNull();
     fixture.setCommandError(false);
     fireEvent.click(retry);
-    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러 주세요.')).toBeInTheDocument();
+    expect(await screen.findByText('기록을 확인한 뒤 경기를 끝내 주세요.')).toBeInTheDocument();
     expect(fixture.commands.map(({ command }) => command)).toEqual(['end-period', 'end-period']);
     expect(fixture.commands[1]?.body).toEqual(fixture.commands[0]?.body);
   });

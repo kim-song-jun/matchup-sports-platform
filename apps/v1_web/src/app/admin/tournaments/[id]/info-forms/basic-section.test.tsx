@@ -8,6 +8,10 @@ import { basicSection } from './basic-section';
 
 const start = setupTournamentInfoBackend();
 
+// API 가 대진·조가 있을 때 돌려주는 사유와, 화면이 그 자리에 보이는 안내.
+const SERVER_BRACKET_LOCK = '조나 대진이 만들어져 있어 대회 형식을 변경할 수 없어요. 대진표에서 경기와 조를 모두 삭제한 뒤 변경해 주세요.';
+const BRACKET_LOCK_NOTE = '대진이 있어서 진행 방식을 바꿀 수 없어요. 바꾸려면 「대진」에서 경기와 조를 모두 지워 주세요.';
+
 describe('기본 섹션 시트', () => {
   it('채워진 채로 열린다', async () => {
     const backend = start({ genderCategory: 'female' });
@@ -89,13 +93,13 @@ describe('기본 섹션 시트', () => {
     expect(view.onClose).not.toHaveBeenCalled();
   });
 
-  it('대진이 있어 잠긴 진행 방식은 꺼지고 서버가 준 사유가 보이며, 다른 칸 저장은 막지 않는다', async () => {
-    const reason = '조나 대진이 만들어져 있어요. 경기와 조를 모두 삭제한 뒤 변경해 주세요.';
-    const backend = start({ formatChangeBlockedReason: reason });
+  it('대진이 있어 잠긴 진행 방식은 꺼지고 「진행 방식」·「대진」 말로 쓴 사유가 보이며, 다른 칸 저장은 막지 않는다', async () => {
+    const backend = start({ formatChangeBlockedReason: SERVER_BRACKET_LOCK });
     const view = renderInfoSheet(basicSection, backend);
 
     expect(view.inSheet().getByLabelText('진행 방식')).toBeDisabled();
-    expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription(reason);
+    expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription(BRACKET_LOCK_NOTE);
+    expect(view.inSheet().queryByText(SERVER_BRACKET_LOCK)).not.toBeInTheDocument();
     fireEvent.change(view.inSheet().getByLabelText(/^대회명/), { target: { value: '바꾼 이름' } });
     view.save();
     await view.saved();
@@ -110,6 +114,12 @@ describe('기본 섹션 시트', () => {
     expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription('대회가 시작된 뒤에는 진행 방식을 바꿀 수 없어요.');
   });
 
+  it('시작된 대회는 서버가 사유를 함께 보내도 「진행 방식」 말로 쓴 안내를 보인다', () => {
+    const view = renderInfoSheet(basicSection, start({ status: 'in_progress', formatChangeBlockedReason: '대회가 시작된 뒤에는 대회 형식을 변경할 수 없어요.' }));
+
+    expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription('대회가 시작된 뒤에는 진행 방식을 바꿀 수 없어요.');
+  });
+
   it('여러 단계 대회는 진행 방식을 잠근다', () => {
     const view = renderInfoSheet(basicSection, start({
       format: 'league_knockouts',
@@ -120,11 +130,39 @@ describe('기본 섹션 시트', () => {
     expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription('여러 단계 대회는 진행 방식을 바꿀 수 없어요.');
   });
 
+  it('여러 단계는 새 대회를 만들 때만 고를 수 있어서 선택지에 없고 한 줄로 알린다', () => {
+    const view = renderInfoSheet(basicSection, start());
+    const select = view.inSheet().getByLabelText('진행 방식');
+
+    expect(within(select).queryByRole('option', { name: /여러 단계/ })).toBeNull();
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      '조별리그 → 토너먼트',
+      '토너먼트만',
+      '리그전',
+    ]);
+    expect(select).toHaveAccessibleDescription('조나 대진을 만들기 전까지 바꿀 수 있어요. 여러 단계는 새 대회를 만들 때 고를 수 있어요.');
+  });
+
+  it('이미 「여러 단계」인 대회(단계 편성이 없는 옛 대회)는 그 선택지를 그대로 보이고 안내 줄은 없다', () => {
+    const view = renderInfoSheet(basicSection, start({ format: 'league_knockouts' }));
+    const select = view.inSheet().getByLabelText('진행 방식');
+
+    expect(select).toHaveValue('league_knockouts');
+    expect(within(select).getByRole('option', { name: '여러 단계(예선 → 결선 여러 개)' })).toBeInTheDocument();
+    expect(select).toHaveAccessibleDescription('조나 대진을 만들기 전까지 바꿀 수 있어요.');
+  });
+
+  it('대회명 칸은 서버와 같은 120자까지 받는다', () => {
+    const view = renderInfoSheet(basicSection, start());
+
+    expect(view.inSheet().getByLabelText(/^대회명/)).toHaveAttribute('maxlength', '120');
+  });
+
   it('잠기지 않은 진행 방식을 바꾸면 format 만 보낸다', async () => {
     const backend = start();
     const view = renderInfoSheet(basicSection, backend);
 
-    expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription('조나 대진을 만들기 전까지 바꿀 수 있어요.');
+    expect(view.inSheet().getByLabelText('진행 방식')).toHaveAccessibleDescription(/^조나 대진을 만들기 전까지 바꿀 수 있어요\./);
     fireEvent.change(view.inSheet().getByLabelText('진행 방식'), { target: { value: 'knockout' } });
     view.save();
     await view.saved();
@@ -184,6 +222,26 @@ describe('기본 섹션 시트', () => {
     await waitFor(() => expect(view.onClose).toHaveBeenCalledTimes(1));
   });
 
+  it('저장하는 동안에는 닫기·취소·ESC 가 막히고 「저장되지 않아요」 확인도 뜨지 않으며, 저장은 끝까지 간다', async () => {
+    const backend = start();
+    backend.state.tournamentPatchDelayMs = 80;
+    const view = renderInfoSheet(basicSection, backend);
+    fireEvent.change(view.inSheet().getByLabelText(/^대회명/), { target: { value: '저장 중인 이름' } });
+
+    view.save();
+
+    expect(await view.inSheet().findByRole('button', { name: '저장 중…' })).toBeDisabled();
+    expect(view.inSheet().getByRole('button', { name: '닫기' })).toBeDisabled();
+    expect(view.inSheet().getByRole('button', { name: '취소' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: SIDE_SHEET_DISCARD_CONFIRM.title })).toBeNull();
+    expect(view.onClose).not.toHaveBeenCalled();
+
+    await view.saved();
+    expect(view.onSaved).toHaveBeenCalledWith('기본 설정을 저장했어요.');
+    expect(backend.state.patches).toHaveLength(1);
+  });
+
   it.each(['닫기', '취소'])('안 바꾼 채 %s 를 누르면 묻지 않고 닫는다', async (closeButton) => {
     const view = renderInfoSheet(basicSection, start());
 
@@ -209,10 +267,10 @@ describe('기본 섹션 요약 카드', () => {
   });
 
   it('잠긴 진행 방식은 요약 줄에도 사유가 붙는다', () => {
-    const reason = '조나 대진이 만들어져 있어요. 경기와 조를 모두 삭제한 뒤 변경해 주세요.';
-    render(<InfoSummaryCard definition={basicSection} context={context({ formatChangeBlockedReason: reason })} canWrite onEdit={vi.fn()} />);
+    render(<InfoSummaryCard definition={basicSection} context={context({ formatChangeBlockedReason: SERVER_BRACKET_LOCK })} canWrite onEdit={vi.fn()} />);
 
-    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.getByText(BRACKET_LOCK_NOTE)).toBeInTheDocument();
+    expect(screen.queryByText(SERVER_BRACKET_LOCK)).not.toBeInTheDocument();
   });
 
   it('수정 버튼은 쓸 수 있는 역할에게만 있고, 누르면 그 섹션 키를 알린다', () => {

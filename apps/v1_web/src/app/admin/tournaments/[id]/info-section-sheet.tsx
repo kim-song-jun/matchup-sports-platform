@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
 import { SIDE_SHEET_DISCARD_CONFIRM, SideSheet } from '@/components/v1-ui/side-sheet';
 import { useTournamentSaveContext } from '@/hooks/use-tournament-save-context';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { replaceInApp } from '@/lib/navigation-history';
+import { waitForOverlayHistory } from '@/lib/overlay-history';
 import { runSaveSteps, type SavedSteps, type SaveStep } from '@/lib/sequential-save';
 import type { V1Tournament } from '@/types/api';
 import { infoFieldId } from './info-forms/form-kit';
@@ -50,8 +52,8 @@ export function InfoSectionSheet({
   const [message, setMessage] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
   const Form = definition.Form;
-  // 올리는 중인 이미지와 보내는 중인 저장도 닫으면 사라지는 작업이라 바뀐 칸과 같이 센다.
-  const unsaved = dirty || saving || busy;
+  // 올리는 중인 이미지도 닫으면 사라지는 작업이라 바뀐 칸과 같이 센다. 저장을 보내는 동안은 `pending` 이 닫기를 막는다.
+  const unsaved = dirty || busy;
 
   useEffect(() => {
     if (focusField) document.getElementById(infoFieldId(focusField))?.focus();
@@ -82,6 +84,17 @@ export function InfoSectionSheet({
     onClose();
   };
 
+  // 이동은 시트의 뒤로가기 표식 항목을 목적지로 갈아 끼운다 — 표식이 새 화면 뒤에 죽은 정류장으로 남지 않는다.
+  const leaveLinkClick = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    void (async () => {
+      if (dirty && !(await confirm(SIDE_SHEET_DISCARD_CONFIRM))) return;
+      await waitForOverlayHistory();
+      replaceInApp(href);
+    })();
+  };
+
   const cancel = async () => {
     if (!unsaved || (await confirm(SIDE_SHEET_DISCARD_CONFIRM))) onClose();
   };
@@ -93,13 +106,14 @@ export function InfoSectionSheet({
         title={title}
         onClose={onClose}
         dirty={unsaved}
+        pending={saving}
         footer={
           <div className="flex flex-col gap-2">
             {message ? (
               <p role="alert" className="text-[length:var(--font-size-label)] text-[var(--red700)]">{message}</p>
             ) : null}
             <div className="flex gap-2">
-              <Button type="button" variant="neutral" className="flex-1" onClick={() => void cancel()}>
+              <Button type="button" variant="neutral" className="flex-1" disabled={saving} onClick={() => void cancel()}>
                 취소
               </Button>
               <Button type="button" variant="primary" className="flex-1" disabled={saving || busy} onClick={() => void save()}>
@@ -110,7 +124,14 @@ export function InfoSectionSheet({
         }
       >
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">{description}</p>
-        <Form ref={formRef} base={base} disabled={saving} onDirtyChange={setDirty} onBusyChange={setBusy} />
+        <Form
+          ref={formRef}
+          base={base}
+          disabled={saving}
+          onDirtyChange={setDirty}
+          onBusyChange={setBusy}
+          leaveLinkClick={leaveLinkClick}
+        />
       </SideSheet>
       {ConfirmModal}
     </>

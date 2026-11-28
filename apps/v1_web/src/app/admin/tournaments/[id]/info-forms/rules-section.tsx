@@ -72,8 +72,8 @@ const toDraft = (tournament: V1Tournament): RulesDraft => ({
 
 const noteCls = 'text-[length:var(--font-size-caption)] text-[var(--text-muted)]';
 
-function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps) {
-  const { showToast } = useTournamentAdmin();
+function RulesForm({ base, disabled, ref, onDirtyChange, leaveLinkClick }: InfoSectionFormProps) {
+  const { showToast, basePath } = useTournamentAdmin();
   const { data: bracket } = useV1AdminBracket(base.id);
   const stagePhases = useMemo(() => {
     const inBracket = new Set(bracket?.groups.map((group) => group.phase));
@@ -178,7 +178,7 @@ function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
 
   return (
     <div>
-      <FormGroup title="출전 인원" badge={lineupIsDefault ? SPORT_DEFAULT_BADGE : undefined} hint="한 경기에 경기장에 서는 인원이에요(골키퍼 포함).">
+      <FormGroup title="출전 인원" badge={lineupIsDefault ? SPORT_DEFAULT_BADGE : undefined} hint="한 경기에 동시에 뛰는 인원이에요(골키퍼 포함).">
         {lineupNote ? (
           <p className={`text-[length:var(--font-size-caption)] ${noteToneCls[lineupNote.tone]}`}>{lineupNote.text}</p>
         ) : (
@@ -193,7 +193,12 @@ function RulesForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
       </FormGroup>
 
       <FormGroup title="경기 시간">
-        <PeriodSettingsFields draft={periods} disabled={disabled} stagePlan={base.stagePlan} />
+        <PeriodSettingsFields
+          draft={periods}
+          disabled={disabled}
+          stagePlan={base.stagePlan}
+          compositionLink={basePath ? { href: `${basePath}/bracket`, onClick: leaveLinkClick(`${basePath}/bracket`) } : undefined}
+        />
       </FormGroup>
 
       <FormGroup title="교체" hint="자유 교체는 나간 선수도 다시 들어갈 수 있어요.">

@@ -169,9 +169,9 @@ describe('RevisionTimeline — 처리한 사람', () => {
       />,
     );
 
-    expect(screen.getByText('김스태프 처리 · 리비전 #3')).toBeInTheDocument();
-    expect(screen.getByText('담당자 처리 · 리비전 #2')).toBeInTheDocument();
-    expect(screen.getByText('자동 처리(GAME_END_DERIVER) · 리비전 #1')).toBeInTheDocument();
+    expect(screen.getByText('김스태프 처리 · 3번째 결과')).toBeInTheDocument();
+    expect(screen.getByText('담당자 처리 · 2번째 결과')).toBeInTheDocument();
+    expect(screen.getByText('자동 처리(GAME_END_DERIVER) · 1번째 결과')).toBeInTheDocument();
   });
 
   // MD-QA #169: 필드 담당자가 제출하고 어드민이 확정했는데 "공식 확정" 줄에 제출자만 보였다.
@@ -185,8 +185,8 @@ describe('RevisionTimeline — 처리한 사람', () => {
       />,
     );
 
-    expect(screen.getByText('제출 김스태프 · 확정 박어드민 · 리비전 #2')).toBeInTheDocument();
-    expect(screen.getByText('김스태프 처리 · 리비전 #1')).toBeInTheDocument();
+    expect(screen.getByText('제출 김스태프 · 확정 박어드민 · 2번째 결과')).toBeInTheDocument();
+    expect(screen.getByText('김스태프 처리 · 1번째 결과')).toBeInTheDocument();
   });
 });
 

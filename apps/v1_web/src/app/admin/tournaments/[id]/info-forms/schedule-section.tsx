@@ -1,6 +1,6 @@
 'use client';
 
-import { useImperativeHandle } from 'react';
+import { useImperativeHandle, useState } from 'react';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
@@ -49,8 +49,12 @@ function isPast(value: string | null): boolean {
   return !Number.isNaN(at) && at <= Date.now();
 }
 
+const PENDING_VENUE_MESSAGE = '목록에서 장소를 고르거나 「이름만 직접 입력」을 눌러 주세요.';
+
 function ScheduleForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps) {
-  const { draft, initial, set, fail, errorFor } = useSectionDraft(base, toDraft, onDirtyChange);
+  // 장소 검색 칸에 친 글은 draft 값이 아니다 — 남아 있으면 바뀐 것으로 세고, 저장은 그 글을 버리지 않고 막는다.
+  const [pendingVenueText, setPendingVenueText] = useState('');
+  const { draft, initial, set, fail, errorFor } = useSectionDraft(base, toDraft, onDirtyChange, pendingVenueText !== '');
   const ids = {
     scheduledAt: infoFieldId('scheduledAt'),
     scheduledEndAt: infoFieldId('scheduledEndAt'),
@@ -72,6 +76,8 @@ function ScheduleForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormPro
       if (deadlineTouched && draft.registrationDeadlineAt && draft.rosterDeadlineAt && draft.rosterDeadlineAt < draft.registrationDeadlineAt) {
         return fail(ids.rosterDeadlineAt, '명단 제출 마감은 신청 마감과 같거나 그 뒤여야 해요.');
       }
+
+      if (pendingVenueText) return fail(ids.venue, PENDING_VENUE_MESSAGE);
 
       const changes: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
       for (const field of DATE_FIELDS) {
@@ -136,6 +142,8 @@ function ScheduleForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormPro
             maxLength={PLACE_NAME_MAX_LENGTH.tournament}
             value={draft.venue}
             onChange={(value) => set('venue', value)}
+            onPendingTextChange={setPendingVenueText}
+            error={pendingVenueText === '' && errorFor(ids.venue) === PENDING_VENUE_MESSAGE ? undefined : errorFor(ids.venue)}
             disabled={disabled}
           />
           <Field id={ids.parkingInfo} label="주차 안내" hint="장소 아래에 보여요. 비우면 숨겨요.">

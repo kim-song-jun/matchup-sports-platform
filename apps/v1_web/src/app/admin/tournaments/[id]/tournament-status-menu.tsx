@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { AdminStatusPill } from '@/components/admin';
 import { tournamentVisibilityAction } from '@/components/admin/tournaments/tournament-visibility-control';
 import { ActionMenu } from '@/components/v1-ui/action-menu';
@@ -47,7 +47,9 @@ function StageProgress({ status }: { status: V1TournamentStatus }) {
                   index === current ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-muted)]',
                 ].join(' ')}
               >
+                {index < current ? <Check size={10} aria-hidden="true" className="mr-0.5 inline align-[-1px]" /> : null}
                 {tournamentStatusLabel(stage)}
+                {index < current ? <span className="sr-only"> (지난 단계)</span> : null}
               </span>
             </li>
           ))}
@@ -100,7 +102,7 @@ export function TournamentStatusMenu({
   if (actions.length === 0) {
     return (
       <span className="inline-flex min-h-[44px] items-center gap-2 px-1 text-[length:var(--font-size-label)] font-medium text-[var(--text-strong)]">
-        <AdminStatusPill status={status} label={chipLabel} />
+        <AdminStatusPill status={status} label={chipLabel} hideIconOnPhone />
         {visibilityLabel ? <span>· {visibilityLabel}</span> : null}
       </span>
     );
@@ -118,9 +120,9 @@ export function TournamentStatusMenu({
           aria-haspopup={haspopup}
           aria-label={visibilityLabel ? `${chipLabel} · ${visibilityLabel}` : chipLabel}
           onClick={onToggle}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-2 text-[length:var(--font-size-label)] font-medium text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--surface-soft)] px-2 text-[length:var(--font-size-label)] font-medium text-[var(--text-strong)] transition-colors hover:bg-[var(--border)] lg:border lg:border-[var(--border-strong)] lg:bg-[var(--card-surface)] lg:hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
-          <AdminStatusPill status={status} label={chipLabel} />
+          <AdminStatusPill status={status} label={chipLabel} hideIconOnPhone />
           {visibilityLabel ? <span aria-hidden="true">· {visibilityLabel}</span> : null}
           <ChevronDown size={14} aria-hidden="true" />
         </button>

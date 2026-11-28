@@ -302,10 +302,20 @@ function EventsSection({
   }
   const periodNumbers = Array.from(byPeriod.keys()).sort((a, b) => a - b);
 
-  // 단판은 구간이 하나다 — 시간대 없는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
+  // 단판은 정규 구간이 하나다 — 시간대 없는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
   // 가를 구간이 없으니 머리말 글자는 그리지 않고 선만 둔다(`hideLabel`) — 이름은 스크린리더용 그룹 이름으로만 남는다.
+  // 연장 구간(둘째 이후)은 정규 구간과 가를 이유가 있으니 이름을 단 구간으로 따로 둔다.
+  const singleRegularEvents = [...periodNumbers.filter((period) => period < 2).flatMap((period) => byPeriod.get(period)!), ...unknownPeriodEvents];
+  const singleExtraGroups = periodNumbers
+    .filter((period) => period >= 2)
+    .map((period) => ({ id: `match-events-period-${period}`, label: periodLabel(period, periodCount), events: byPeriod.get(period)! }));
   const groups: Array<{ id: string; label: string; hideLabel?: boolean; events: readonly PublicMatchEvent[] }> = isSinglePeriod(periodCount)
-    ? [{ id: 'match-events-single', label: SINGLE_PERIOD_HEADING, hideLabel: true, events: [...periodNumbers.flatMap((period) => byPeriod.get(period)!), ...unknownPeriodEvents] }]
+    ? [
+        ...(singleRegularEvents.length > 0 || singleExtraGroups.length === 0
+          ? [{ id: 'match-events-single', label: SINGLE_PERIOD_HEADING, hideLabel: true, events: singleRegularEvents }]
+          : []),
+        ...singleExtraGroups,
+      ]
     : [
         ...periodNumbers.map((period) => ({ id: `match-events-period-${period}`, label: periodLabel(period), events: byPeriod.get(period)! })),
         ...(unknownPeriodEvents.length > 0 ? [{ id: 'match-events-period-unknown', label: '기타', events: unknownPeriodEvents }] : []),

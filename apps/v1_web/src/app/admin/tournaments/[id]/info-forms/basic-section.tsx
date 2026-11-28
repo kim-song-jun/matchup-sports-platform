@@ -8,22 +8,36 @@ import {
 } from '@/components/admin/tournaments/tournament-gender-choice-field';
 import { useV1MasterSports } from '@/hooks/use-v1-api';
 import { TOURNAMENT_FORMAT_NAMES } from '@/lib/tournament-format-labels';
+import { TOURNAMENT_TITLE_MAX_LENGTH } from '@/lib/tournament-limits';
 import { saveStep } from '@/lib/sequential-save';
 import type { V1Tournament, V1TournamentFormat, V1UpdateTournamentPayload } from '@/types/api';
 import { Field, FormGroup, TextField, fieldBorderCls, fieldInputCls, infoFieldId, useSectionDraft } from './form-kit';
 import type { InfoSectionDefinition, InfoSectionFormProps } from './types';
 
-const TITLE_MAX_LENGTH = 100;
 const FORMAT_FREE_HINT = '조나 대진을 만들기 전까지 바꿀 수 있어요.';
+const STAGED_FORMAT_HINT = '여러 단계는 새 대회를 만들 때 고를 수 있어요.';
 
-/** 진행 방식을 바꿀 수 없는 이유 — 바꿀 수 있으면 null. */
+const FORMAT_LOCKED_BY_BRACKET = '대진이 있어서 진행 방식을 바꿀 수 없어요. 바꾸려면 「대진」에서 경기와 조를 모두 지워 주세요.';
+
+/**
+ * 진행 방식을 바꿀 수 없는 이유 — 바꿀 수 있으면 null.
+ * 서버 사유는 시작된 뒤와 대진·조가 있을 때 둘뿐이라, 시작 여부를 먼저 걸러 내면 남은 서버 사유는 대진·조 때문이다.
+ */
 function formatLockReason(tournament: V1Tournament): string | null {
   if (tournament.stagePlan) return '여러 단계 대회는 진행 방식을 바꿀 수 없어요.';
-  if (tournament.formatChangeBlockedReason) return tournament.formatChangeBlockedReason;
   if (tournament.status === 'in_progress' || tournament.status === 'completed') {
     return '대회가 시작된 뒤에는 진행 방식을 바꿀 수 없어요.';
   }
-  return null;
+  return tournament.formatChangeBlockedReason ? FORMAT_LOCKED_BY_BRACKET : null;
+}
+
+/** 여러 단계는 단계 편성과 함께 만들 때만 의미가 있어(서버가 기존 대회에 편성을 붙이는 것을 막는다) 이미 그 형식인 대회에서만 고르게 둔다. */
+const canPickStagedFormat = (current: V1TournamentFormat) => current === 'league_knockouts';
+
+function selectableFormats(current: V1TournamentFormat): V1TournamentFormat[] {
+  return (Object.keys(TOURNAMENT_FORMAT_NAMES) as V1TournamentFormat[]).filter(
+    (format) => format !== 'league_knockouts' || canPickStagedFormat(current),
+  );
 }
 
 const genderLabel = (choice: GenderChoice) => GENDER_CHOICE_OPTIONS.find(([value]) => value === choice)?.[1] ?? '구분 없음';
@@ -46,6 +60,8 @@ function BasicForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
   const { draft, initial, set, fail, errorFor } = useSectionDraft(base, toDraft, onDirtyChange);
   const { data: sports } = useV1MasterSports();
   const lockReason = formatLockReason(base);
+  const formats = selectableFormats(base.format);
+  const formatHint = lockReason ?? (canPickStagedFormat(base.format) ? FORMAT_FREE_HINT : `${FORMAT_FREE_HINT} ${STAGED_FORMAT_HINT}`);
   const titleId = infoFieldId('title');
 
   useImperativeHandle(ref, () => ({
@@ -89,9 +105,9 @@ function BasicForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
             onChange={(value) => set('title', value)}
             error={errorFor(titleId)}
             disabled={disabled}
-            maxLength={TITLE_MAX_LENGTH}
+            maxLength={TOURNAMENT_TITLE_MAX_LENGTH}
           />
-          <Field id={infoFieldId('format')} label="진행 방식" hint={lockReason ?? FORMAT_FREE_HINT}>
+          <Field id={infoFieldId('format')} label="진행 방식" hint={formatHint}>
             {(control) => (
               <select
                 {...control}
@@ -100,7 +116,7 @@ function BasicForm({ base, disabled, ref, onDirtyChange }: InfoSectionFormProps)
                 disabled={disabled || lockReason !== null}
                 className={`${fieldInputCls} ${fieldBorderCls(false)}`}
               >
-                {(Object.keys(TOURNAMENT_FORMAT_NAMES) as V1TournamentFormat[]).map((format) => (
+                {formats.map((format) => (
                   <option key={format} value={format}>{TOURNAMENT_FORMAT_NAMES[format]}</option>
                 ))}
               </select>

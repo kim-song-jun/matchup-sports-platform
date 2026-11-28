@@ -11,6 +11,7 @@ import { AdminTabNav } from '@/components/admin/admin-tab-nav';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import type { ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { LG_UP_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import {
   useV1AdminMe,
   useV1AdminTournament,
@@ -20,7 +21,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { canWriteTournamentAdmin, deriveTournamentAdminRole, type TournamentAdminRole } from '@/lib/admin-tournament-role';
 import { useTournamentOpsAccess } from './tournament-ops-quick-links';
-import { TournamentAdminProvider } from './tournament-admin-context';
+import { TournamentAdminProvider, type TournamentStatusAdvance } from './tournament-admin-context';
 import { REVERT_COPY, formatDateRange, revertTargetStatus } from './tournament-admin-shared';
 import { TournamentDetailHeader } from './tournament-detail-header';
 import { buildTournamentNav } from './tournament-nav-model';
@@ -52,6 +53,8 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
   const opsAccess = useTournamentOpsAccess({ tournamentId: id, staffSurface, basePath: navigation?.operationsBasePath });
   const [revertOpen, setRevertOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  // 데스크톱 셸 폭에서는 다음 단계 주 버튼이 머리에, 그보다 좁으면 개요 카드에 있다 — 한 곳에만 둔다.
+  const advanceInHeader = useMediaQuery(LG_UP_MEDIA_QUERY);
   const { toasts, showToast } = useAdminToast();
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
   const pathname = usePathname();
@@ -144,6 +147,16 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
   };
 
   const primary = canWrite ? primaryStatusAction(tournament.status, { canRevertStart }) : null;
+  const advance: TournamentStatusAdvance | null = primary
+    ? {
+        label: primary.label,
+        hint: primary.hint,
+        // 초안에서 채워야 할 필요 설정이 남았으면 흰 버튼 — 막지는 않고 확인 창이 항목을 경고한다.
+        emphasis: tournament.status === 'draft' && requiredLabels.length > 0 ? 'secondary' : 'primary',
+        busy: changeStatus.isPending,
+        onClick: () => void handleStatusAction(primary),
+      }
+    : null;
 
   // 경기가 생기기 전에는 현장 운영이 머리에 없고 ⋯ 메뉴 안에 있다. 접근 판정은 스태프 배정 조회 하나라 둘이 같이 잠긴다.
   const showLiveOpsInHeader = (counts?.fixtures ?? 0) > 0;
@@ -172,7 +185,9 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
   ].join(' · ');
 
   return (
-    <TournamentAdminProvider value={{ tournamentId: id, basePath, role, canWrite, showToast }}>
+    <TournamentAdminProvider
+      value={{ tournamentId: id, basePath, role, canWrite, showToast, overviewAdvance: advanceInHeader ? null : advance }}
+    >
       <TournamentDetailHeader
         title={tournament.title}
         meta={meta}
@@ -189,17 +204,7 @@ export function TournamentManagementContent({ id, role, staffSurface = false, na
             onToggleVisibility={handleToggleVisibility}
           />
         }
-        primaryAction={
-          primary
-            ? {
-                label: primary.label,
-                // 초안에서 채워야 할 필요 설정이 남았으면 흰 버튼 — 막지는 않고 확인 창이 항목을 경고한다.
-                emphasis: tournament.status === 'draft' && requiredLabels.length > 0 ? 'secondary' : 'primary',
-                busy: changeStatus.isPending,
-                onClick: () => void handleStatusAction(primary),
-              }
-            : undefined
-        }
+        primaryAction={advanceInHeader && advance ? advance : undefined}
         liveOps={showLiveOpsInHeader ? { href: `${opsAccess.base}/operations`, reasonLabel: opsAccess.reasonLabel } : undefined}
         moreActions={moreActions}
       />

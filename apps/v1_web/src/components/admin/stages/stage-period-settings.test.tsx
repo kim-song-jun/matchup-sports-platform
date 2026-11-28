@@ -33,10 +33,10 @@ beforeEach(() => {
 describe('단계·편성별 경기 시간', () => {
   it('조회 갱신으로 편집 기준 버전이 바뀌면 입력을 보존하고 저장을 막는다', () => {
     const view = render(<StagePeriodSettings {...props} />);
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value: '15 / 15' } });
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value: '15 / 15' } });
     state.settings = { ...state.settings!, expectedVersion: 'v-2' };
     view.rerender(<StagePeriodSettings {...props} />);
-    expect(screen.getByLabelText('피리어드 시간 · 분')).toHaveValue('15 / 15');
+    expect(screen.getByLabelText('경기 시간 · 분')).toHaveValue('15 / 15');
     expect(screen.getByRole('button', { name: '경기 시간 저장' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '경기 시간 저장' }));
     expect(state.mutate).not.toHaveBeenCalled();
@@ -46,7 +46,7 @@ describe('단계·편성별 경기 시간', () => {
   it('409 뒤 자동 재조회가 새 버전을 받아도 명시 확인 전에는 다시 저장하지 않는다', async () => {
     state.mutate.mockRejectedValueOnce({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT', message: '다른 곳에서 수정했어요.' } } });
     const view = render(<StagePeriodSettings {...props} />);
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value: '15' } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '경기 시간 저장' })));
     expect(state.mutate).toHaveBeenCalledWith({ expectedVersion: 'v-1', stageKey: 'pre', inheritDefault: false, periods: [{ durationMinutes: 15 }] });
     state.settings = { ...state.settings!, expectedVersion: 'v-2' };
@@ -55,11 +55,11 @@ describe('단계·편성별 경기 시간', () => {
     state.confirm.mockResolvedValueOnce(false);
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '최신 경기 시간 다시 불러오기' })));
     expect(state.refetch).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('피리어드 시간 · 분')).toHaveValue('15');
+    expect(screen.getByLabelText('경기 시간 · 분')).toHaveValue('15');
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '최신 경기 시간 다시 불러오기' })));
     expect(state.confirm).toHaveBeenCalled();
-    expect(screen.getByLabelText('피리어드 시간 · 분')).toHaveValue('');
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value: '25' } });
+    expect(screen.getByLabelText('경기 시간 · 분')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value: '25' } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '경기 시간 저장' })));
     expect(state.mutate).toHaveBeenLastCalledWith({ expectedVersion: 'v-2', stageKey: 'pre', inheritDefault: false, periods: [{ durationMinutes: 25 }] });
   });
@@ -67,11 +67,11 @@ describe('단계·편성별 경기 시간', () => {
   it('최신 조회 실패 시 입력과 충돌 차단을 유지한다', async () => {
     state.refetch.mockResolvedValue({ isError: true, error: new Error('조회 실패') });
     const view = render(<StagePeriodSettings {...props} />);
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value: '15' } });
     state.settings = { ...state.settings!, expectedVersion: 'v-2' };
     view.rerender(<StagePeriodSettings {...props} />);
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '최신 경기 시간 다시 불러오기' })));
-    expect(screen.getByLabelText('피리어드 시간 · 분')).toHaveValue('15');
+    expect(screen.getByLabelText('경기 시간 · 분')).toHaveValue('15');
     expect(screen.getByRole('button', { name: '경기 시간 저장' })).toBeDisabled();
     expect(screen.getByText('조회 실패')).toBeInTheDocument();
   });
@@ -85,10 +85,10 @@ describe('단계·편성별 경기 시간', () => {
   it('작성 중 범위 변경을 취소하면 선택 범위와 입력을 유지한다', async () => {
     state.confirm.mockResolvedValueOnce(false);
     render(<StagePeriodSettings {...props} />);
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value: '15' } });
     await act(async () => fireEvent.change(screen.getByLabelText('적용 범위'), { target: { value: 'pool:pool-a' } }));
     expect(screen.getByLabelText('적용 범위')).toHaveValue('stage:pre');
-    expect(screen.getByLabelText('피리어드 시간 · 분')).toHaveValue('15');
+    expect(screen.getByLabelText('경기 시간 · 분')).toHaveValue('15');
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '경기 시간 저장' })));
     expect(state.mutate).toHaveBeenCalledWith({ expectedVersion: 'v-1', stageKey: 'pre', inheritDefault: false, periods: [{ durationMinutes: 15 }] });
   });
@@ -96,10 +96,10 @@ describe('단계·편성별 경기 시간', () => {
   it('서버에서 편성이 제거되면 옛 입력을 다른 범위로 저장하지 않는다', () => {
     const view = render(<StagePeriodSettings {...props} />);
     fireEvent.change(screen.getByLabelText('적용 범위'), { target: { value: 'pool:pool-a' } });
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value: '15' } });
     const nextPlan: StagePlan = { version: 1, stages: [{ ...plan.stages[0], pools: [{ ...plan.stages[0].pools[0], key: 'pool-b', name: 'B조' }] }] };
     view.rerender(<StagePeriodSettings {...props} plan={nextPlan} />);
-    expect(screen.getByLabelText('피리어드 시간 · 분')).toHaveValue('15');
+    expect(screen.getByLabelText('경기 시간 · 분')).toHaveValue('15');
     expect(screen.getByRole('button', { name: '경기 시간 저장' })).toBeDisabled();
     expect(state.mutate).not.toHaveBeenCalled();
   });
@@ -109,18 +109,18 @@ describe('단계·편성별 경기 시간', () => {
     expect(screen.queryByRole('button', { name: '경기 시간 저장' })).toBeNull();
   });
 
-  it('서버 계약에 맞춰 240분 초과와 10개 초과 피리어드도 편성 범위에 저장한다', async () => {
+  it('서버 계약에 맞춰 240분 초과와 10개 초과 경기 시간 구간도 편성 범위에 저장한다', async () => {
     render(<StagePeriodSettings {...props} />);
     fireEvent.change(screen.getByLabelText('적용 범위'), { target: { value: 'pool:pool-a' } });
     const durations = Array.from({ length: 11 }, () => 241);
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value: durations.join(' / ') } });
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value: durations.join(' / ') } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '경기 시간 저장' })));
     expect(state.mutate).toHaveBeenCalledWith({ expectedVersion: 'v-1', poolKey: 'pool-a', inheritDefault: false, periods: durations.map(durationMinutes => ({ durationMinutes })) });
   });
 
   it.each(['0', '-1', '1.5', '15 / ', 'Infinity'])('잘못된 시간 %s는 저장하지 않는다', async value => {
     render(<StagePeriodSettings {...props} />);
-    fireEvent.change(screen.getByLabelText('피리어드 시간 · 분'), { target: { value } });
+    fireEvent.change(screen.getByLabelText('경기 시간 · 분'), { target: { value } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '경기 시간 저장' })));
     expect(state.mutate).not.toHaveBeenCalled();
     expect(screen.getByText(/1분 이상/)).toBeInTheDocument();

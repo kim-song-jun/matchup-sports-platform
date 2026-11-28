@@ -139,7 +139,7 @@ async function openRoster(user: ReturnType<typeof userEvent.setup>) {
   const card = (await screen.findByText(registration.teamName ?? '')).closest('li');
   if (!card) throw new Error('실제 신청 카드가 없어요.');
   await user.click(within(card).getByRole('button', { name: '명단 보기' }));
-  return screen.findByRole('dialog', { name: `명단 검토 — ${registration.teamName}` });
+  return screen.findByRole('dialog', { name: `명단 보기 — ${registration.teamName}` });
 }
 
 describe('MD-QA #140 실제 대회 셸의 오류·재시도와 명단 요청 수명', () => {

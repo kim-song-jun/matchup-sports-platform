@@ -218,8 +218,8 @@ export function LeagueTemplateDialog({
               onChange={() => setLegs(1)} graphic="league-single" title="단일 리그"
               description="모든 팀이 서로 한 번씩 경기해요." meta={teamCountInRange ? `${singleRounds}라운드 · ${plannedGameCount(teamCount, singleRounds)}경기` : '팀 수 3~20팀'} />
             <CompetitionTemplateCard mode="radio" name="league-template-legs" value="2" checked={legs === 2}
-              onChange={() => setLegs(2)} graphic="league-double" title="홈·어웨이 리그"
-              description="모든 팀이 서로 홈과 어웨이로 두 번 경기해요." meta={teamCountInRange ? `${doubleRounds}라운드 · ${plannedGameCount(teamCount, doubleRounds)}경기` : '팀 수 3~20팀'} />
+              onChange={() => setLegs(2)} graphic="league-double" title="홈·원정 리그"
+              description="모든 팀이 서로 홈과 원정으로 두 번 경기해요." meta={teamCountInRange ? `${doubleRounds}라운드 · ${plannedGameCount(teamCount, doubleRounds)}경기` : '팀 수 3~20팀'} />
           </div>
         </fieldset>
         {teamCountInRange ? (

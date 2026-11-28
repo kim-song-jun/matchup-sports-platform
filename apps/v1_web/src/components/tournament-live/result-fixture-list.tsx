@@ -1,9 +1,10 @@
 import { useId } from 'react';
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
-import { ResultListBadge } from '@/components/tournament-ops/badges';
+import { ResultListBadge, WarningBadge } from '@/components/tournament-ops/badges';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 import { kstTimeLabel } from './ops-board-model';
 import type { TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
+import type { V1TournamentOperationsWarningCode } from '@/types/api';
 
 export type ResultListItem = TournamentOperationsBoardItem & { gameId: string };
 
@@ -16,6 +17,8 @@ interface ResultFixtureListProps {
   onSelect: (item: ResultListItem) => void;
   titleFor: (item: ResultListItem) => string;
   boardHref: string;
+  /** 검토 기한을 넘긴 경기. 시계에 따라 달라져 보드의 안정 경고가 아니라 따로 온다. */
+  overdueFixtureIds: ReadonlySet<string>;
 }
 
 function metaOf(item: ResultListItem): string {
@@ -28,7 +31,16 @@ function metaOf(item: ResultListItem): string {
     .join(' · ');
 }
 
-function Row({ item, kind, selected, onSelect, title }: { item: ResultListItem; kind: 'pending' | 'confirmed' | 'void'; selected: boolean; onSelect: (item: ResultListItem) => void; title: string }) {
+/** 확정 대기 줄에서 처리 전에 알아야 하는 경고만 모은다. */
+function pendingWarnings(item: ResultListItem, overdue: boolean): V1TournamentOperationsWarningCode[] {
+  const codes: V1TournamentOperationsWarningCode[] = [];
+  if (item.warnings.includes('MISSING_SCORER')) codes.push('MISSING_SCORER');
+  if (overdue) codes.push('RESULT_REVIEW_OVERDUE');
+  return codes;
+}
+
+function Row({ item, kind, selected, onSelect, title, overdue }: { item: ResultListItem; kind: 'pending' | 'confirmed' | 'void'; selected: boolean; onSelect: (item: ResultListItem) => void; title: string; overdue: boolean }) {
+  const warnings = kind === 'pending' ? pendingWarnings(item, overdue) : [];
   const score = kind === 'confirmed' && readGameResultScore(item.currentScore) !== null ? formatGameResultScoreWithPenalties(item.currentScore) : null;
   const meta = metaOf(item);
   return (
@@ -44,6 +56,13 @@ function Row({ item, kind, selected, onSelect, title }: { item: ResultListItem; 
         <span className="min-w-0">
           <span className="block break-words font-semibold text-[var(--text-strong)]">{title}</span>
           {meta ? <span className="mt-0.5 block text-[length:var(--font-size-caption)] tabular-nums text-[var(--text-muted)]">{meta}</span> : null}
+          {warnings.length > 0 ? (
+            <span className="mt-1 flex flex-wrap gap-1">
+              {warnings.map((code) => (
+                <WarningBadge key={code} code={code} />
+              ))}
+            </span>
+          ) : null}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           <ResultListBadge kind={kind} />
@@ -55,7 +74,7 @@ function Row({ item, kind, selected, onSelect, title }: { item: ResultListItem; 
 }
 
 /** 끝난 경기를 확정 대기와 확정됨 두 묶음으로 보여 준다. 대기 줄의 점수는 패널에서 본다. */
-export function ResultFixtureList({ pending, confirmed, voided, selectedFixtureId, onSelect, titleFor, boardHref }: ResultFixtureListProps) {
+export function ResultFixtureList({ pending, confirmed, voided, selectedFixtureId, onSelect, titleFor, boardHref, overdueFixtureIds }: ResultFixtureListProps) {
   const pendingId = useId();
   const confirmedId = useId();
   const voidedId = useId();
@@ -75,7 +94,7 @@ export function ResultFixtureList({ pending, confirmed, voided, selectedFixtureI
         ) : (
           <ul className="flex flex-col gap-2" role="list">
             {pending.map((item) => (
-              <Row key={item.fixtureId} item={item} kind="pending" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
+              <Row key={item.fixtureId} item={item} kind="pending" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} overdue={overdueFixtureIds.has(item.fixtureId)} />
             ))}
           </ul>
         )}
@@ -89,7 +108,7 @@ export function ResultFixtureList({ pending, confirmed, voided, selectedFixtureI
         ) : (
           <ul className="flex flex-col gap-2" role="list">
             {confirmed.map((item) => (
-              <Row key={item.fixtureId} item={item} kind="confirmed" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
+              <Row key={item.fixtureId} item={item} kind="confirmed" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} overdue={false} />
             ))}
           </ul>
         )}
@@ -101,7 +120,7 @@ export function ResultFixtureList({ pending, confirmed, voided, selectedFixtureI
           </h2>
           <ul className="flex flex-col gap-2" role="list">
             {voided.map((item) => (
-              <Row key={item.fixtureId} item={item} kind="void" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} />
+              <Row key={item.fixtureId} item={item} kind="void" selected={item.fixtureId === selectedFixtureId} onSelect={onSelect} title={titleFor(item)} overdue={false} />
             ))}
           </ul>
         </section>

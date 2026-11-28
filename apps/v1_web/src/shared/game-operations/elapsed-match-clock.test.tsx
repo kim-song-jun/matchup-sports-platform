@@ -132,7 +132,7 @@ describe('ElapsedMatchClock — 경과 시간 표시', () => {
     expect(screen.queryByText('일시 중지')).toBeNull();
   });
 
-  it('단판이면 시계 옆 "전반" 라벨과 aria-label 의 피리어드명이 없다 (2피리어드는 그대로)', () => {
+  it('시계 옆에 구간 글자가 없고 구간 이름은 aria-label 에만 있다 (단판이면 그것도 없다)', () => {
     const props = {
       periodNumber: 1,
       periodStartedAtMs: new Date('2026-08-08T00:00:00.000Z').getTime(),
@@ -145,7 +145,21 @@ describe('ElapsedMatchClock — 경과 시간 표시', () => {
     expect(screen.getByLabelText('경과 시간 10:00')).toBeInTheDocument();
 
     rerender(<ElapsedMatchClock {...props} periodCount={2} />);
-    expect(screen.getByText('전반')).toBeInTheDocument();
+    expect(screen.queryByText('전반')).toBeNull();
     expect(screen.getByLabelText('전반 경과 시간 10:00')).toBeInTheDocument();
+  });
+
+  it('단판에 붙은 연장 구간의 시계는 구간 이름을 aria-label 에 말한다', () => {
+    render(
+      <ElapsedMatchClock
+        periodNumber={2}
+        periodCount={1}
+        periodStartedAtMs={new Date('2026-08-08T00:00:00.000Z').getTime()}
+        offsetMs={0}
+        pausedTotalMs={0}
+        pausedAtMs={null}
+      />,
+    );
+    expect(screen.getByLabelText('연장 전반 경과 시간 10:00')).toBeInTheDocument();
   });
 });

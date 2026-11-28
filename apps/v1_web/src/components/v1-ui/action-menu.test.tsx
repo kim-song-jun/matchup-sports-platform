@@ -1,21 +1,39 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { useEffect, useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { bindSoftNavigator } from '@/lib/navigation-history';
 import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
 import { installMatchMedia } from '@/test/match-media';
 import { ActionMenu, type ActionMenuProps } from './action-menu';
 import { useConfirm } from './confirm-modal';
 import { SideSheet } from './side-sheet';
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/admin/tournaments/t-1' }));
+const nav = vi.hoisted(() => ({ pathname: '/admin/tournaments/t-1' }));
+vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }));
 
 let media: ReturnType<typeof installMatchMedia>;
 
 afterEach(() => {
   media?.restore();
+  nav.pathname = '/admin/tournaments/t-1';
   __resetOverlayHistoryForTests();
 });
+
+/** 이동해도 언마운트되지 않는 호스트 — 탭 줄처럼 라우트 레이아웃 안에서 살아남는 소비처의 모양. */
+function PersistentHost({ actions }: { actions: ActionMenuProps['actions'] }) {
+  const [, setPathname] = useState(nav.pathname);
+  useEffect(
+    () =>
+      bindSoftNavigator((url) => {
+        nav.pathname = url;
+        setPathname(url);
+      }),
+    [],
+  );
+  return <ActionMenu label="더보기" trigger={trigger} actions={actions} />;
+}
 
 const trigger: ActionMenuProps['trigger'] = ({ onToggle, ...aria }) => (
   <button type="button" {...aria} onClick={onToggle}>
@@ -163,6 +181,31 @@ describe('ActionMenu 폰', () => {
     expect(screen.getByText('대회 취소').className).toContain('text-[var(--red700)]');
   });
 
+  it('링크 항목으로 이동하면 호스트가 살아 있어도 시트가 닫힌다', () => {
+    render(<PersistentHost actions={[{ key: 'sponsors', label: '협찬', href: '/admin/tournaments/t-1/sponsors' }]} />);
+    fireEvent.click(screen.getByRole('button', { name: '상태' }));
+
+    fireEvent.click(within(screen.getByRole('dialog', { name: '더보기' })).getByRole('link', { name: '협찬' }));
+
+    expect(nav.pathname).toBe('/admin/tournaments/t-1/sponsors');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: '상태' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('항목이 잠깐 비었다 돌아와도 닫혀 있던 메뉴가 저절로 다시 열리지 않는다', () => {
+    const items = [{ key: 'a', label: '접수 마감', onSelect: vi.fn() }];
+    const { rerender } = renderMenu({ actions: items });
+    fireEvent.click(screen.getByRole('button', { name: '상태' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    rerender(<ActionMenu label="대회 상태" trigger={trigger} actions={[]} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    rerender(<ActionMenu label="대회 상태" trigger={trigger} actions={items} />);
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: '상태' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('열린 채 폭이 768 이상이 되면 시트를 닫는다', () => {
     renderMenu({ actions: [{ key: 'a', label: '접수 마감', onSelect: vi.fn() }] });
     fireEvent.click(screen.getByRole('button', { name: '상태' }));
@@ -234,7 +277,7 @@ describe('ActionMenu 데스크톱', () => {
     expect(panelOf(menu).style.position).toBe('fixed');
   });
 
-  it('열면 첫 활성 항목에 포커스가 가고 ArrowDown/ArrowUp/Home/End 가 비활성 항목을 건너뛰며 돈다', () => {
+  it('열면 첫 활성 항목에 포커스가 가고 ArrowDown/ArrowUp/Home/End 가 비활성 항목에도 닿으며 돈다', () => {
     renderMenu({
       actions: [
         { key: 'a', label: '첫째', onSelect: vi.fn() },
@@ -245,6 +288,8 @@ describe('ActionMenu 데스크톱', () => {
     const menu = openMenu();
     expect(focusedLabel()).toBe('첫째');
 
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(focusedLabel()).toBe('둘째');
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
     expect(focusedLabel()).toBe('셋째');
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
@@ -397,7 +442,11 @@ describe('ActionMenu 데스크톱', () => {
     const menu = openMenu();
 
     const item = within(menu).getByRole('menuitem', { name: /^접수 마감/ });
-    expect(item).toBeDisabled();
+    // `disabled` 가 아니라 aria-disabled — 키보드로 닿아 사유를 읽을 수 있다.
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(item).not.toHaveAttribute('disabled');
+    item.focus();
+    expect(item).toHaveFocus();
     expect(item).toHaveTextContent('이미 마감했어요.');
     expect(item).not.toHaveTextContent('신청을 막아요');
     fireEvent.click(item);

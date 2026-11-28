@@ -100,6 +100,15 @@ describe('tournamentInfoNeeds', () => {
     expect(keys(tournament({ scheduledAt: null }))).toEqual(['scheduled-at']);
   });
 
+  it('신청 마감은 아직 신청을 받는 초안·접수 중에만 필요하다 — 접수가 끝난 뒤에는 정할 일이 없다', () => {
+    const noDeadline = (status: V1Tournament['status']) => keys(tournament({ status, registrationDeadlineAt: null }));
+
+    expect(noDeadline('open')).toEqual(['registration-deadline']);
+    expect(noDeadline('draft')).toContain('registration-deadline');
+    expect(noDeadline('closed')).toEqual([]);
+    expect(noDeadline('in_progress')).toEqual([]);
+  });
+
   it('정산 계좌는 참가비가 있을 때만 필요하다', () => {
     expect(keys(tournament({ entryFee: 0, bankAccount: null }))).toEqual([]);
     expect(keys(tournament({ entryFee: 20000, bankAccount: null }))).toEqual(['bank-account']);

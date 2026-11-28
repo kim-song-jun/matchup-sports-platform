@@ -107,7 +107,7 @@ export function GameSummaryHeader({
       ) : isVoided ? (
         <span className="tm-badge tm-badge-red">무효 처리됨</span>
       ) : (
-        <span className="tm-badge tm-badge-grey">공식 결과 없음</span>
+        <span className="tm-badge tm-badge-grey">확정 전</span>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Activity, ChevronLeft, Ellipsis } from 'lucide-react';
 import { ActionMenu } from '@/components/v1-ui/action-menu';
 import type { ActionSheetAction } from '@/components/v1-ui/action-sheet';
+import type { TournamentStatusAdvance } from './tournament-admin-context';
 
 export interface TournamentDetailHeaderProps {
   title: string;
@@ -12,7 +13,8 @@ export interface TournamentDetailHeaderProps {
   meta: string;
   listHref: string;
   statusMenu: ReactNode;
-  primaryAction?: { label: string; emphasis: 'primary' | 'secondary'; busy: boolean; onClick: () => void };
+  /** 데스크톱 셸 폭에서만 넘긴다 — 폰·태블릿에서는 개요 카드가 이 버튼을 가진다. */
+  primaryAction?: Omit<TournamentStatusAdvance, 'hint'>;
   /** 머리에 둘 때만 넘긴다. `reasonLabel` 이 있으면 비활성 버튼과 사유를 보인다. */
   liveOps?: { href: string; reasonLabel?: string };
   moreActions: readonly ActionSheetAction[];
@@ -22,7 +24,7 @@ const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-blue-500 focus
 
 /**
  * 대회 상세 머리 한 줄 — 뒤로 · 대회명 · 상태 칩 · 현장 운영 · 다음 단계 주 버튼 · ⋯.
- * 칩과 주 버튼은 DOM 에 한 번만 두고, 폰에서는 둘째 줄로 내려가는 위치만 CSS `order` 로 바꾼다.
+ * 칩과 현장 운영은 DOM 에 한 번만 두고, 폰·태블릿에서는 둘째 줄로 내려가는 위치만 CSS `order` 로 바꾼다.
  */
 export function TournamentDetailHeader({
   title,
@@ -67,7 +69,7 @@ export function TournamentDetailHeader({
                 aria-expanded={expanded}
                 aria-haspopup={haspopup}
                 onClick={onToggle}
-                className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-strong)] text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] ${FOCUS_RING}`}
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-xl text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] lg:border lg:border-[var(--border-strong)] ${FOCUS_RING}`}
               >
                 <Ellipsis size={18} aria-hidden="true" />
               </button>
@@ -88,7 +90,7 @@ export function TournamentDetailHeader({
             type="button"
             disabled={primaryAction.busy}
             onClick={primaryAction.onClick}
-            className={`tm-btn tm-btn-md min-w-0 flex-1 whitespace-nowrap lg:order-4 lg:flex-none ${pushRight('primary')} ${
+            className={`tm-btn tm-btn-md whitespace-nowrap lg:order-4 ${pushRight('primary')} ${
               primaryAction.emphasis === 'primary' ? 'tm-btn-primary' : 'tm-btn-outline'
             }`}
           >
@@ -115,7 +117,7 @@ function LiveOpsButton({ href, reasonLabel }: { href: string; reasonLabel?: stri
   }
   return (
     <Link href={href} className="tm-btn tm-btn-md tm-btn-outline whitespace-nowrap gap-1.5">
-      <Activity size={16} aria-hidden="true" />
+      <Activity size={16} aria-hidden="true" className="hidden md:block" />
       현장 운영
     </Link>
   );

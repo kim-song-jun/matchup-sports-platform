@@ -7,6 +7,7 @@ import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-brac
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import type { LeagueBoardNode, LeagueBoardSide } from '@/lib/league-board-model';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import type { V1AdminBracketSlot, V1AdminTournamentRegistration } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
@@ -54,10 +55,10 @@ export function LeagueFixturePanel({
     slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId),
   );
   const bothTeamsSet = node.home.filled && node.away.filled;
-  const correctionsHref = `/admin/live/${encodeURIComponent(leagueId)}/records/corrections?fixtureId=${encodeURIComponent(node.fixtureId)}`;
+  const resultHref = resultsHref(adminLiveBase(leagueId), node.fixtureId);
   const consoleHref = `/admin/live/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(node.fixtureId)}/operate`;
 
-  // 정정·무효·확정 훅은 결과 검토 캐시만 비운다 — 리그 보드의 점수·상태는 여기서 다시 읽게 한다.
+  // 고치기·무효·확정 훅은 결과 화면의 캐시만 비운다 — 리그 보드의 점수·상태는 여기서 다시 읽게 한다.
   const notifyResult = useLeagueResultToast(leagueId, showToast);
 
   const handleAssign = (slotId: string, value: string) => {
@@ -137,8 +138,8 @@ export function LeagueFixturePanel({
     if (game.hasLiveRecords) {
       return (
         <div className="flex flex-col items-start gap-2">
-          <p className="tm-text-caption" style={MUTED}>라이브로 득점이 기록된 경기예요. 결과 고치기 화면에서 처리해 주세요.</p>
-          <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
+          <p className="tm-text-caption" style={MUTED}>라이브로 득점이 기록된 경기예요. 결과 화면에서 처리해 주세요.</p>
+          <Link href={resultHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 화면 열기</Link>
         </div>
       );
     }

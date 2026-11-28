@@ -247,6 +247,65 @@ describe('buildBoardCards — 상태와 할 일', () => {
     expect(byId(cards, 'live').isFieldNext).toBe(false);
   });
 
+  it('지난 날 예정으로 남은 경기는 다음 경기가 아니고, 오늘 구장의 첫 예정 경기가 다음 경기가 된다', () => {
+    const cards = buildBoardCards({
+      ...base,
+      items: [
+        fx('stale', 'f1', '2026-12-18T02:00:00Z'),
+        fx('today-first', 'f1', '2026-12-20T02:00:00Z'),
+        fx('today-second', 'f1', '2026-12-20T03:00:00Z'),
+        fx('next-week', 'f1', '2026-12-27T02:00:00Z'),
+      ],
+    });
+    expect(byId(cards, 'stale')).toMatchObject({ isFieldNext: false, action: null });
+    expect(byId(cards, 'today-first')).toMatchObject({ isFieldNext: true, action: { kind: 'console', emphasis: 'secondary' } });
+    expect(byId(cards, 'today-second').isFieldNext).toBe(false);
+    expect(byId(cards, 'next-week').isFieldNext).toBe(false);
+  });
+
+  it('오늘 남은 예정 경기가 없으면 앞으로의 첫 경기일 경기가 다음 경기다', () => {
+    const cards = buildBoardCards({
+      ...base,
+      items: [
+        fx('stale', 'f1', '2026-12-18T02:00:00Z'),
+        fx('upcoming', 'f1', '2026-12-27T02:00:00Z'),
+        fx('upcoming-2', 'f1', '2026-12-27T03:00:00Z'),
+      ],
+    });
+    expect(byId(cards, 'stale').isFieldNext).toBe(false);
+    expect(byId(cards, 'upcoming').isFieldNext).toBe(true);
+    expect(byId(cards, 'upcoming-2').isFieldNext).toBe(false);
+  });
+
+  it('KST 자정 직전과 직후는 다른 날이다 — 어제 밤 예정 경기는 지난 날이다', () => {
+    const cards = buildBoardCards({
+      ...base,
+      now: new Date('2026-12-20T15:10:00Z'),
+      items: [
+        fx('late-yesterday', 'f1', '2026-12-20T14:30:00Z'),
+        fx('after-midnight', 'f1', '2026-12-20T16:00:00Z'),
+      ],
+    });
+    expect(byId(cards, 'late-yesterday').isFieldNext).toBe(false);
+    expect(byId(cards, 'after-midnight').isFieldNext).toBe(true);
+  });
+
+  it('구장 미정 경기는 구장별 다음이 없어서, 앞으로의 가장 이른 시각 묶음이 모두 다음 경기다', () => {
+    const cards = buildBoardCards({
+      ...base,
+      items: [
+        fx('stale', null, '2026-12-18T02:00:00Z'),
+        fx('same-a', null, '2026-12-20T02:00:00Z'),
+        fx('same-b', null, '2026-12-20T02:00:00Z'),
+        fx('later', null, '2026-12-20T03:00:00Z'),
+      ],
+    });
+    expect(byId(cards, 'stale').isFieldNext).toBe(false);
+    expect(byId(cards, 'same-a')).toMatchObject({ isFieldNext: true, action: { kind: 'console' } });
+    expect(byId(cards, 'same-b')).toMatchObject({ isFieldNext: true, action: { kind: 'console' } });
+    expect(byId(cards, 'later')).toMatchObject({ isFieldNext: false, action: null });
+  });
+
   it('가장 앞 예정 경기가 구장 담당자 없음이면 담당자 배정이 우선이고 isFieldNext 는 유지된다', () => {
     const cards = buildBoardCards({
       ...base,

@@ -5,7 +5,9 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
+import { mergeByFixtureId } from '@/lib/merge-board-pages';
 import { OPERATIONS_BOARD_PAGE_LIMIT, readOperationsBoardPages } from '@/lib/operations-board-pages';
+import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameActorRole as FullGameActorRole, GamePeriod, GamePeriodDuration } from '@/types/game-operations';
@@ -213,6 +215,7 @@ export const resultReviewKeys = {
 /**
  * 보드 API 한 페이지 상한(100)에서 멈추면 101번째 경기부터 검토·정정 목록과 `?fixtureId=` 딥링크에서
  * 사라져 어드민이 그 결과를 고칠 수 없다 — 다음 커서가 없을 때까지 읽어 한 목록으로 합친다.
+ * 커서가 없거나, 이미 쓴 커서가 다시 오거나, 빈 페이지가 오면 거기서 멈춘다.
  */
 async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOperationsBoardResponse> {
   const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
@@ -225,8 +228,8 @@ async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOp
   );
   return {
     ...pages[pages.length - 1],
-    items: pages.flatMap((page) => page.items),
-    liveWarnings: pages.flatMap((page) => page.liveWarnings),
+    items: mergeByFixtureId(pages.flatMap((page) => page.items)),
+    liveWarnings: mergeByFixtureId(pages.flatMap((page) => page.liveWarnings)),
     nextCursor: null,
   };
 }
@@ -244,6 +247,8 @@ export function useTournamentEndedFixtures(tournamentId: string, options?: { ena
     queryFn: () => fetchAllEndedFixtures(tournamentId),
     enabled: Boolean(tournamentId) && (options?.enabled ?? true),
     staleTime: 15_000,
+    // 보드 카드가 「결과 확정 대기」로 바뀌는 주기와 같다 — 메뉴 숫자와 결과 목록이 보드보다 늦지 않게.
+    refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
   });
 }
 

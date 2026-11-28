@@ -17,9 +17,22 @@ import type { GameEventRecord, GameLineup } from '@/types/game-operations';
 import { formatPlayerLabel } from './player-label';
 import { participantIdentityName } from './participant-identity';
 
+/** 기록 시각. 회색 바탕 칩에 얹으면 12px 회색 글자가 4.19:1 로 AA 에 못 미쳐 흰 바탕 위 글자로 둔다. */
+const TIME_LABEL_CLASS = 'shrink-0 text-[length:var(--font-size-caption)] font-medium tabular-nums text-[var(--text-muted)]';
+
+/** 기록 줄의 「무엇을·누가」 글자. 콘솔은 목록 항목 크기(15/600)로 키운다. */
+const EVENT_TEXT_CLASS = {
+  boxed: 'text-[length:var(--font-size-body-sm)] font-medium',
+  plain: 'text-[length:var(--font-size-body)] font-semibold',
+} as const;
+
 /** "수정" 버튼 모양 — 합친 줄(경고 누적 퇴장)의 수정 버튼과 한 이벤트의 수정 버튼이 같은 모양이다. */
 const EDIT_BUTTON_CLASS =
   'flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40';
+
+/** 경기 콘솔(`appearance="plain"`)의 줄 버튼 — 테두리·아이콘 없는 회색 글자 버튼. 파랑은 콘솔에서 지금 할 일에만 쓴다. */
+const PLAIN_ROW_BUTTON_CLASS =
+  'flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-40';
 
 /**
  * 이벤트 행 왼쪽의 "전반 12:00" 뱃지 문구.
@@ -67,8 +80,7 @@ function participantSuffix(
   if (event.participantId !== null) {
     return playerName.has(event.participantId) ? ' · ' + playerName.get(event.participantId) : '';
   }
-  if (event.type === 'GOAL') return ' · 익명';
-  if (event.type === 'OWN_GOAL') return ' · OG';
+  if (event.type === 'GOAL' || event.type === 'OWN_GOAL') return ' · 선수 모름';
   return '';
 }
 
@@ -95,7 +107,8 @@ export function RecordedEventList({
   order = 'chronological',
   periodCount,
   maxRows,
-  renderMore,
+  compact = false,
+  appearance = 'boxed',
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -138,17 +151,26 @@ export function RecordedEventList({
   readonly order?: 'chronological' | 'newest-first';
   /** 보이는 순서에서 위 N줄만 그린다. 경고 누적 퇴장처럼 합친 줄은 한 줄로 센다. */
   readonly maxRows?: number;
-  /** `maxRows` 로 줄이 가려졌을 때만 목록 아래에 그린다. 인자는 가려진 것까지 합친 전체 줄 수다. */
-  readonly renderMore?: (totalRows: number) => ReactNode;
+  /**
+   * 폰 첫 화면용 한 줄 표시. 줄마다 버튼을 하나만 두고(어시스트가 없는 골은 어시스트, 나머지는 고치기),
+   * 취소된 기록과 「기록 취소」 줄·고친 기록 이력은 빼서 줄 높이를 48px 로 묶는다. 전부 보는 곳은 기본 표시다.
+   */
+  readonly compact?: boolean;
+  /**
+   * `boxed`(기본): 테두리 상자 안의 줄 목록, 종류·팀 색 점과 테두리 버튼. 결과 검토 화면이 쓴다.
+   * `plain`: 경기 콘솔 — 흰 카드 안에 놓이는 줄이라 바깥 상자·색 점이 없고, 버튼은 회색 글자 버튼이다.
+   */
+  readonly appearance?: 'boxed' | 'plain';
 }) {
+  const plain = appearance === 'plain';
   const lastReset = history.reduce((sequence, event) =>
     event.type === 'CORRECTION' && event.payload?.reason === '경기 시작 취소' && typeof event.payload.commandId === 'string'
       ? Math.max(sequence, event.sequence) : sequence, 0);
   const events = lastReset ? history.filter(event => event.sequence > lastReset) : history;
   if (events.length === 0) {
     return (
-      <p className="px-1 py-3 text-xs text-[var(--text-muted)]">
-        아직 기록된 이벤트가 없어요.
+      <p className={`py-3 text-xs text-[var(--text-muted)] ${plain ? '' : 'px-1'}`}>
+        아직 기록이 없어요.
       </p>
     );
   }
@@ -206,16 +228,44 @@ export function RecordedEventList({
       cancelled: reversedIds.has(event.id),
     };
   });
-  const listedEvents = visibleEvents.filter((event) => !secondYellowRed.absorbedYellows.has(event));
+  const listedEvents = visibleEvents.filter(
+    (event) =>
+      !secondYellowRed.absorbedYellows.has(event) &&
+      !(compact && (event.type === 'CORRECTION' || reversedIds.has(event.id))),
+  );
   const sortedEvents = order === 'newest-first' ? [...listedEvents].reverse() : listedEvents;
   const orderedEvents = maxRows === undefined ? sortedEvents : sortedEvents.slice(0, maxRows);
   const reverseHandler = onReverseEvent ?? onReverseSubstitution;
+  /** 버튼 안쪽. 콘솔은 아이콘 없이 글자만 두고, 글자 크기는 span 에 준다(전역 `button { font: inherit }`). */
+  const buttonContent = (icon: ReactNode, label: string) =>
+    plain ? (
+      <span className="text-[length:var(--font-size-label)] font-semibold">{label}</span>
+    ) : (
+      <>
+        {icon}
+        {label}
+      </>
+    );
+
+  /**
+   * 종류 점. 경고 누적 퇴장은 옐로 위에 레드를 겹친 점이다 — 장식이라 `aria-hidden` 이고, 뜻은 옆의 글자가 전한다.
+   * 콘솔(`plain`)은 색을 지금 할 일에만 쓰므로 점을 그리지 않는다.
+   */
+  const eventDot = (event: GameEventRecord, merged: boolean) =>
+    plain ? null : merged ? (
+      <span aria-hidden="true" className="relative h-2.5 w-4 shrink-0">
+        <span className="absolute left-1.5 top-0 h-2.5 w-2.5 rounded-full bg-[var(--red500)]" />
+        <span className="absolute left-0 top-0 h-2.5 w-2.5 rounded-full bg-[var(--yellow500)] ring-2 ring-[var(--card-surface)]" />
+      </span>
+    ) : (
+      <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${eventDotClass(event)}`} />
+    );
 
   /**
    * 한 이벤트의 액션 버튼들(어시스트·수정·되돌리기). 합친 줄(경고 누적 퇴장)은 옐로와 레드가 각자 시각 정정·취소를
    * 해야 하므로 `actionPrefix`("옐로"/"레드")로 글자를 구분해 버튼을 둘 낸다 — 어느 기록을 고치는지 글자로 알린다.
    */
-  const renderActions = (listedEvent: GameEventRecord, actionPrefix: string | null) => {
+  const renderActions = (listedEvent: GameEventRecord, actionPrefix: string | null, single = false) => {
     const { event } = currentOf(listedEvent);
     const canAttachAssist =
       onAttachAssist !== undefined &&
@@ -238,70 +288,178 @@ export function RecordedEventList({
       isTimeCorrectableType(event.type) &&
       !isBackfilledEvent(event.payload) &&
       !reversedIds.has(event.id);
+    // 44px 최소 터치 타깃(WCAG 2.5.5 유사 기준) — 이 콘솔의 실사용 맥락은 경기장에서 한 손으로 급하게 조작하는 것이라,
+    // 반복 눌리는 CTA가 44px 미만이면 오탭 위험이 커진다.
+    // 어시스트는 되돌리기와 같은 행 안쪽 액션 자리에 둔다 — 행 아래 전체 폭 밴드는 행 높이가 들쭉날쭉해지고 강조색 면적이 커진다(R-C1).
+    const assistButton = canAttachAssist ? (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onAttachAssist(event)}
+        aria-label="이 골에 어시스트 추가"
+        className={
+          plain
+            ? PLAIN_ROW_BUTTON_CLASS
+            : 'flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500'
+        }
+      >
+        {buttonContent(<Handshake size={12} aria-hidden="true" />, '어시스트')}
+      </button>
+    ) : null;
+    const editButton = canEditTime ? (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onEditEvent?.(listedEvent)}
+        aria-label={`기록 고치기 (${eventTypeLabel(event)})`}
+        className={plain ? PLAIN_ROW_BUTTON_CLASS : EDIT_BUTTON_CLASS}
+      >
+        {buttonContent(<Pencil size={12} aria-hidden="true" />, actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`)}
+      </button>
+    ) : canReverse ? (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => reverseHandler?.(event)}
+        // 보이는 글자는 「고치기」지만 누르면 기록 취소 확인으로 이어진다 — 보이는 글자를 이름 앞에 두어 음성 조작도 맞춘다.
+        aria-label={event.type === 'SUBSTITUTION' ? undefined : `${reverseLabel} · 기록 취소 (${eventTypeLabel(event)})`}
+        className={
+          plain
+            ? PLAIN_ROW_BUTTON_CLASS
+            : 'flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500'
+        }
+      >
+        {buttonContent(<Undo2 size={12} aria-hidden="true" />, reverseLabel)}
+      </button>
+    ) : null;
+    // 한 줄 표시에는 버튼 하나만 둔다 — 방금 넣은 골의 어시스트가 먼저다.
+    if (single) return assistButton ?? editButton;
     return (
       <>
-        {/* 44px 최소 터치 타깃(WCAG 2.5.5 유사 기준) — 이 콘솔의 실사용
-            맥락은 경기장에서 한 손으로 급하게 조작하는 것이라, 반복
-            눌리는 CTA가 44px 미만이면 오탭 위험이 커진다(Copilot 리뷰
-            지적: 되돌리기 32px). */}
-        {/* 어시스트 — 예전엔 행 아래에 깔리는 전체 폭 파란 밴드였다.
-            골이 있는 행마다 밴드가 붙으니 목록이 "행 / 행+밴드"로
-            들쭉날쭉해져 훑어보기 어려웠고(오너 지적: "어시스트 버튼
-            너무 구리다"), 강조색 면적도 커서 R-C1(단일 액센트) 위계를
-            흐렸다. 되돌리기와 같은 행 안쪽 액션 자리로 옮겨 모든 행의
-            높이·구조를 동일하게 만들고, 색은 텍스트에만 남긴다. */}
-        {canAttachAssist ? (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onAttachAssist(event)}
-            aria-label="이 골에 어시스트 추가"
-            className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
-          >
-            <Handshake size={12} aria-hidden="true" />
-            어시스트
-          </button>
-        ) : null}
-        {canEditTime ? (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onEditEvent?.(listedEvent)}
-            aria-label={`기록 고치기 (${eventTypeLabel(event)})`}
-            className={EDIT_BUTTON_CLASS}
-          >
-            <Pencil size={12} aria-hidden="true" />
-            {actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`}
-          </button>
-        ) : canReverse ? (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => reverseHandler?.(event)}
-            // 보이는 글자는 「고치기」지만 누르면 기록 취소 확인으로 이어진다 — 보이는 글자를 이름 앞에 두어 음성 조작도 맞춘다.
-            aria-label={event.type === 'SUBSTITUTION' ? undefined : `${reverseLabel} · 기록 취소 (${eventTypeLabel(event)})`}
-            className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
-          >
-            <Undo2 size={12} aria-hidden="true" />
-            {reverseLabel}
-          </button>
-        ) : null}
+        {assistButton}
+        {editButton}
       </>
     );
   };
 
+  /** 합친 줄(경고 누적 퇴장)의 수정 버튼 — 옐로와 레드는 같은 순간의 기록이라 시각을 같이 옮긴다. */
+  const mergedEditButton = (redEvent: GameEventRecord, yellowEvent: GameEventRecord) => (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onEditEvent?.(redEvent, [yellowEvent])}
+      aria-label={`기록 고치기 (${SECOND_YELLOW_RED_LABEL})`}
+      className={plain ? PLAIN_ROW_BUTTON_CLASS : EDIT_BUTTON_CLASS}
+    >
+      {buttonContent(<Pencil size={12} aria-hidden="true" />, '고치기')}
+    </button>
+  );
+
   return (
     <>
     <ul
-      className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)]"
-      aria-label="기록된 이벤트 목록"
+      className={
+        plain
+          ? 'flex flex-col divide-y divide-[var(--border)]'
+          : 'flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)]'
+      }
+      aria-label="기록 목록"
     >
       {orderedEvents.map((listedEvent) => {
         // 경고 누적 퇴장이면 이 줄은 레드이고, `mergedYellow` 가 그 레드가 흡수한 두 번째 옐로다.
         const mergedYellow = secondYellowRed.yellowOfRed.get(listedEvent) ?? null;
         const { correction, event } = currentOf(listedEvent);
+        if (compact) {
+          const teamName = event.sideId === null ? undefined : sideName.get(event.sideId);
+          const action =
+            mergedYellow === null
+              ? renderActions(listedEvent, null, true)
+              : onEditEvent !== undefined && resultOfficialized !== true
+                ? mergedEditButton(listedEvent, mergedYellow)
+                : renderActions(listedEvent, '레드', true);
+          return (
+            <li key={event.id} className={`flex min-h-[48px] items-center gap-2 ${plain ? '' : 'px-3'}`}>
+              <span className={`${TIME_LABEL_CLASS} min-w-16`}>{eventTimeLabel(event, periodCount)}</span>
+              {eventDot(event, mergedYellow !== null)}
+              {/* 줄이 길면 팀 이름부터 잘린다 — 누가 했는지가 먼저 남아야 한다. */}
+              <p className={`min-w-0 flex-1 truncate text-[var(--text-strong)] ${EVENT_TEXT_CLASS[appearance]}`}>
+                {mergedYellow !== null ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(event)}
+                {event.type === 'SUBSTITUTION'
+                  ? substitutionDetailSuffix(event, playerName)
+                  : participantSuffix(event, playerName) + assistSuffix(event, playerName)}
+                {teamName ? (
+                  <span className="text-[length:var(--font-size-caption)] font-normal text-[var(--text-muted)]"> · {teamName}</span>
+                ) : null}
+              </p>
+              {action}
+            </li>
+          );
+        }
         const yellowCurrent = mergedYellow === null ? null : currentOf(mergedYellow);
         const isReversed = reversedIds.has(event.id);
+        const actions =
+          mergedYellow === null ? (
+            renderActions(listedEvent, null)
+          ) : onEditEvent !== undefined && resultOfficialized !== true ? (
+            /* 합친 줄은 수정 버튼이 하나다 — 옐로와 레드는 같은 순간의 기록이라 시각을 같이 옮긴다.
+               기록 취소는 시트의 "기록 취소" 탭에서 레드만/모두로 갈린다. */
+            mergedEditButton(listedEvent, mergedYellow)
+          ) : (
+            /* 시각 수정이 없는 화면(취소만 되는 곳)은 옐로·레드를 각각 취소할 수 있게 둘을 낸다. */
+            <>
+              {renderActions(mergedYellow, '옐로')}
+              {renderActions(listedEvent, '레드')}
+            </>
+          );
+        const eventText = (
+          <>
+            {mergedYellow !== null ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(event)}
+            {isReversed ? <span className="font-semibold text-[var(--text-muted)]"> · 취소된 기록</span> : null}
+            {event.type === 'SUBSTITUTION'
+              ? substitutionDetailSuffix(event, playerName)
+              : participantSuffix(event, playerName) + assistSuffix(event, playerName)}
+          </>
+        );
+        const teamName = event.sideId ? (sideName.get(event.sideId) ?? '') : '';
+        const disclosures = (
+          <>
+            {yellowCurrent !== null && yellowCurrent.correction !== null ? (
+              <EventTimeCorrectionDisclosure
+                plain={plain}
+                correction={yellowCurrent.correction}
+                originalLabel={`${periodPrefix(yellowCurrent.event.period, periodCount)}${formatMatchClock(yellowCurrent.correction.originalClockMs)}`}
+              />
+            ) : null}
+            {correction !== null ? (
+              <EventTimeCorrectionDisclosure
+                plain={plain}
+                correction={correction}
+                originalLabel={`${periodPrefix(event.period, periodCount)}${formatMatchClock(correction.originalClockMs)}`}
+              />
+            ) : null}
+          </>
+        );
+        if (plain) {
+          // 콘솔: 시각 · 무엇을·누가(팀은 글자 끝에 회색으로) · 버튼을 한 줄에 둔다. 좁으면 글자만 줄을 늘리고 자르지 않는다.
+          return (
+            <li key={event.id} className="flex flex-col gap-1 py-2">
+              <div className="flex min-h-11 items-center gap-2">
+                <span className={`${TIME_LABEL_CLASS} min-w-16`}>{eventTimeLabel(event, periodCount)}</span>
+                <p
+                  className={`min-w-0 flex-1 break-keep text-[var(--text-strong)] ${EVENT_TEXT_CLASS.plain}`}
+                  style={{ overflowWrap: 'anywhere' }}
+                >
+                  {eventText}
+                  {teamName ? (
+                    <span className="text-[length:var(--font-size-caption)] font-normal text-[var(--text-muted)]"> · {teamName}</span>
+                  ) : null}
+                </p>
+                <div className="flex shrink-0 items-center gap-1">{actions}</div>
+              </div>
+              {disclosures}
+            </li>
+          );
+        }
         return (
           <li
             key={event.id}
@@ -329,57 +487,17 @@ export function RecordedEventList({
                     645886/649891/652602/655603ms 가 전부 "10'"로 보였다). 초까지 보여
                     구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                     충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
-                <span className="shrink-0 rounded bg-[var(--surface-soft)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
-                  {eventTimeLabel(event, periodCount)}
-                </span>
-                {mergedYellow !== null ? (
-                  /* 옐로 위에 레드를 겹친 점 — 장식이라 `aria-hidden` 이고, 뜻은 옆의 "경고 누적 퇴장" 글자가 전한다. */
-                  <span aria-hidden="true" className="relative h-2.5 w-4 shrink-0">
-                    <span className="absolute left-1.5 top-0 h-2.5 w-2.5 rounded-full bg-[var(--red500)]" />
-                    <span className="absolute left-0 top-0 h-2.5 w-2.5 rounded-full bg-[var(--yellow500)] ring-2 ring-[var(--card-surface)]" />
-                  </span>
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${eventDotClass(event)}`}
-                  />
-                )}
+                <span className={TIME_LABEL_CLASS}>{eventTimeLabel(event, periodCount)}</span>
+                {eventDot(event, mergedYellow !== null)}
                 {/* 좁은 컨테이너에서는 **자르지 말고 줄을 늘린다.** 이 목록에서 가장 중요한 정보가
                     "무엇을·누가"인데, 문단 가용폭이 390:205 · 1024:114 · 1280:213 px 라(2026-08-20 alpha 실측)
                     평범한 `골 · 10 {이름} (도움 7 {이름})` 도 두 줄이 정상이다. 예전엔 두 줄까지만 허용했지만
                     (`line-clamp-2`), 운영진에게 `실명 (닉네임)` 으로 이름이 길어지면서(2026-10-18) 두 줄로도
                     잘려 줄 수 제한을 없앴다 — 행이 길어지는 대가로 이름을 잃지 않는다. */}
-                <p className="min-w-0 break-words text-sm font-medium text-[var(--text-strong)]">
-                  {mergedYellow !== null ? SECOND_YELLOW_RED_LABEL : eventTypeLabel(event)}
-                  {isReversed ? <span className="font-semibold text-[var(--text-muted)]"> · 취소된 기록</span> : null}
-                  {event.type === 'SUBSTITUTION'
-                    ? substitutionDetailSuffix(event, playerName)
-                    : participantSuffix(event, playerName) + assistSuffix(event, playerName)}
-                </p>
+                <p className={`min-w-0 break-words text-[var(--text-strong)] ${EVENT_TEXT_CLASS.boxed}`}>{eventText}</p>
               </div>
               <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 @md:justify-end">
-                {mergedYellow === null ? (
-                  renderActions(listedEvent, null)
-                ) : onEditEvent !== undefined && resultOfficialized !== true ? (
-                  /* 합친 줄은 수정 버튼이 하나다 — 옐로와 레드는 같은 순간의 기록이라 시각을 같이 옮긴다.
-                     기록 취소는 시트의 "기록 취소" 탭에서 레드만/모두로 갈린다. */
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => onEditEvent(listedEvent, [mergedYellow])}
-                    aria-label={`기록 고치기 (${SECOND_YELLOW_RED_LABEL})`}
-                    className={EDIT_BUTTON_CLASS}
-                  >
-                    <Pencil size={12} aria-hidden="true" />
-                    고치기
-                  </button>
-                ) : (
-                  /* 시각 수정이 없는 화면(취소만 되는 곳)은 옐로·레드를 각각 취소할 수 있게 둘을 낸다. */
-                  <>
-                    {renderActions(mergedYellow, '옐로')}
-                    {renderActions(listedEvent, '레드')}
-                  </>
-                )}
+                {actions}
                 {/* 팀 귀속은 기록자가 매 행에서 즉시 확인해야 하는 정보인데, 행에서
                     가장 약하게 표현돼 있었다(11px·regular·muted, 우측 끝 — 알파 390px
                     실측). 색을 더 쓰지 않고(R-C1) 굵기로만 대비를 올린다 — 색으로
@@ -393,28 +511,16 @@ export function RecordedEventList({
                       }`}
                     />
                   )}
-                  {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
+                  {teamName}
                 </span>
               </div>
             </div>
-            {yellowCurrent !== null && yellowCurrent.correction !== null ? (
-              <EventTimeCorrectionDisclosure
-                correction={yellowCurrent.correction}
-                originalLabel={`${periodPrefix(yellowCurrent.event.period, periodCount)}${formatMatchClock(yellowCurrent.correction.originalClockMs)}`}
-              />
-            ) : null}
-            {correction !== null ? (
-              <EventTimeCorrectionDisclosure
-                correction={correction}
-                originalLabel={`${periodPrefix(event.period, periodCount)}${formatMatchClock(correction.originalClockMs)}`}
-              />
-            ) : null}
+            {disclosures}
             </div>
           </li>
         );
       })}
     </ul>
-    {orderedEvents.length < sortedEvents.length ? renderMore?.(sortedEvents.length) : null}
     </>
   );
 }
@@ -430,9 +536,11 @@ function correctionActorLabel(lane: 'OPERATOR' | 'PLATFORM_ADMIN' | null): strin
 function EventTimeCorrectionDisclosure({
   correction,
   originalLabel,
+  plain,
 }: {
   readonly correction: EventTimeCorrectionInfo;
   readonly originalLabel: string;
+  readonly plain: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -443,7 +551,9 @@ function EventTimeCorrectionDisclosure({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+        className={`flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-[length:var(--font-size-caption)] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${
+          plain ? 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]' : 'text-[var(--blue700)] hover:bg-[var(--blue50)]'
+        }`}
       >
         고친 기록
         <ChevronDown

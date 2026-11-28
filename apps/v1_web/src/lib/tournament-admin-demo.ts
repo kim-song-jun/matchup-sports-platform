@@ -203,7 +203,7 @@ function write(state: AdminDemoState, method: string, path: string, value: unkno
   }
   if (path === base && method === 'PATCH') {
     const { expectedVersion, ...updates } = body;
-    if (expectedVersion !== undefined && expectedVersion !== state.tournament.updatedAt) fail('대회 정보가 바뀌었어요. 창을 다시 열어 주세요.');
+    if (expectedVersion !== undefined && expectedVersion !== state.tournament.updatedAt) fail('대회 정보가 바뀌었어요. 화면을 새로 고쳐 주세요.');
     // Every submitted field must be stored, or the action fails. No partial pretend-save.
     for (const key of Object.keys(updates)) if (!Object.hasOwn(state.tournament, key) || ['id', 'createdAt', 'operationCounts', 'status', 'updatedAt'].includes(key)) fail(`체험에서 저장할 수 없는 설정이에요: ${key}`);
     if ('title' in updates && (typeof updates.title !== 'string' || !updates.title.trim())) fail('대회명을 입력해 주세요.');

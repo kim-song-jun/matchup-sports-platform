@@ -10,7 +10,7 @@ import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket } from '
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { formatAdminKstDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { KNOCKOUT_PHASES, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1TournamentStatus } from '@/types/api';
 
@@ -68,7 +68,7 @@ export function BracketPublishControl({
   const statusText = published ? '공개 중' : scheduled ? `공개 예약됨 · ${scheduledWhen}` : '비공개';
 
   const close = () => { if (!pending) { setOpen(false); setError(null); } };
-  const openSheet = () => { setMode('now'); setScheduleInput(''); setError(null); setOpen(true); };
+  const openSheet = () => { setMode('now'); setScheduleInput(scheduled ? isoToKstDatetimeLocal(bracketPublishScheduledAt) : ''); setError(null); setOpen(true); };
 
   const runPublish = (scheduledAt?: string) => {
     setError(null);
@@ -82,9 +82,10 @@ export function BracketPublishControl({
     });
   };
 
-  const submit = () => {
+  const publishNow = () => { if (!blockedReason) runPublish(); };
+
+  const schedule = () => {
     if (blockedReason) return;
-    if (mode === 'now') { runPublish(); return; }
     if (!scheduleInput) { setError('공개 시각을 정해 주세요.'); return; }
     // datetime-local 은 시간대 없는 KST 벽시계 문자열이다 — 기기 시간대로 읽지 않고 +09:00 을 고정한다.
     const iso = kstDatetimeLocalToIso(scheduleInput);
@@ -92,6 +93,8 @@ export function BracketPublishControl({
     if (new Date(iso).getTime() <= Date.now()) { setError('공개 예약 시각은 현재 시각 이후여야 해요.'); return; }
     runPublish(iso);
   };
+
+  const submit = () => (mode === 'now' ? publishNow() : schedule());
 
   const revert = async () => {
     const ok = await confirm({
@@ -133,6 +136,13 @@ export function BracketPublishControl({
           ? `${publishedWhen}에 공개됨 — 참가팀·방문자가 조·일정·대진표를 볼 수 있어요.`
           : `${scheduledWhen}에 자동 공개돼요. 그 전까지는 계속 고칠 수 있어요.`}
       </p>
+      {scheduled ? (
+        <div className="flex flex-col gap-1">
+          <label htmlFor={`${id}-at`} className="tm-text-label">공개 시각</label>
+          <input id={`${id}-at`} type="datetime-local" className="tm-input" value={scheduleInput} disabled={pending}
+            onChange={event => { setScheduleInput(event.target.value); setError(null); }} />
+        </div>
+      ) : null}
       {error ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p> : null}
     </div>
   ) : (
@@ -163,8 +173,14 @@ export function BracketPublishControl({
     </div>
   );
   const sheetFooter = settings ? (
-    <div className="flex justify-end gap-2">
+    <div className="flex flex-wrap justify-end gap-2">
       <Button variant="outline" onClick={close} disabled={pending}>닫기</Button>
+      {scheduled ? (
+        <>
+          <Button variant="outline" onClick={publishNow} loading={publish.isPending} disabled={pending}>지금 공개</Button>
+          <Button variant="primary" onClick={schedule} loading={publish.isPending} disabled={pending}>시각 바꾸기</Button>
+        </>
+      ) : null}
       <Button variant="danger" onClick={() => void revert()} loading={unpublish.isPending} disabled={pending}>{published ? '비공개로 되돌리기' : '예약 취소'}</Button>
     </div>
   ) : (

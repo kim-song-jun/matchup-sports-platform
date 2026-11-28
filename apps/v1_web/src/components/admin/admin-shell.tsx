@@ -502,10 +502,10 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
   }, [pathname]);
 
   return (
-    <div className="tm-admin-shell min-h-screen bg-[var(--bg)] flex">
+    <div className="tm-admin-shell min-h-screen bg-[var(--bg)] flex [--admin-sidebar-width:240px]">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────────── */}
       <aside
-        className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
+        className="hidden lg:flex w-[var(--admin-sidebar-width)] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
         aria-label="관리자 사이드바"
       >
         {/* Brand */}
@@ -588,7 +588,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
 
       {/* ── Right column: appbar + main ───────────────────────────────────── */}
       {/* --admin-sticky-top 은 아래 모바일 앱바(h-[52px]) 높이, --admin-gutter 는 main 의 좌우 패딩이다. */}
-      <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px] [--admin-sticky-top:52px]">
+      <div className="flex flex-col flex-1 min-w-0 lg:pl-[var(--admin-sidebar-width)] [--admin-sticky-top:52px]">
         {/* Mobile sticky appbar (<lg) */}
         <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
           <button

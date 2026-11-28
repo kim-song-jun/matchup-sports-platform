@@ -37,4 +37,10 @@ describe('LiveBadge', () => {
     expect(screen.getByText('전반 2:05')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('aria-label', '진행 중, 전반 2:05');
   });
+
+  it('단판에 붙은 연장 구간에서는 구간 이름을 시간 앞에 붙인다', () => {
+    render(<LiveBadge clock={{ periodNumber: 2, elapsedMs: 125_000, isPaused: false }} periodBreak={null} periodCount={1} />);
+    expect(screen.getByText('연장 전반 2:05')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-label', '진행 중, 연장 전반 2:05');
+  });
 });

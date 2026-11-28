@@ -194,11 +194,14 @@ function PickAnotherLink({ onNavigate, pathname }: { onNavigate?: () => void; pa
 }
 
 // ── 돌아가기 줄 ───────────────────────────────────────────────────────────
-function BridgeLink({ bridge }: { bridge: OpsBridge }) {
+// 경기 콘솔에서는 회색 글자다 — 콘솔의 파랑은 지금 단계와 지금 누를 버튼에만 쓴다(DESIGN.md §14).
+function BridgeLink({ bridge, muted }: { bridge: OpsBridge; muted: boolean }) {
   return (
     <Link
       href={bridge.href}
-      className={`inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] hover:underline ${NAV_FOCUS}`}
+      className={`inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded text-[length:var(--font-size-label)] font-medium ${
+        muted ? 'text-[var(--text-body)]' : 'text-[var(--blue700)] hover:underline'
+      } ${NAV_FOCUS}`}
     >
       <ChevronLeft size={14} aria-hidden="true" />
       {bridge.label}
@@ -405,7 +408,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         aria-label="대회 운영 사이드바"
       >
         <div className="min-h-[44px] px-4 pt-2">
-          {bridge ? <BridgeLink bridge={bridge} /> : null}
+          {bridge ? <BridgeLink bridge={bridge} muted={isFixtureConsole} /> : null}
           {contextLabel ? <p className="truncate pl-4 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{contextLabel}</p> : null}
         </div>
         <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-3 min-h-[64px]">
@@ -470,7 +473,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
           </header>
           {/* 종류 조회 중에도 자리(44px)는 잡아 둬서 링크가 생길 때 본문이 밀리지 않게 한다. */}
           <div className="flex h-[44px] items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-soft)] px-3">
-            {bridge ? <BridgeLink bridge={bridge} /> : null}
+            {bridge ? <BridgeLink bridge={bridge} muted={isFixtureConsole} /> : null}
             {contextLabel ? <span className="min-w-0 truncate text-[length:var(--font-size-label)] text-[var(--text-muted)]">· {contextLabel}</span> : null}
           </div>
         </div>

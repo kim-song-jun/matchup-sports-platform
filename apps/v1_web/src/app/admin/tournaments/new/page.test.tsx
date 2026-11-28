@@ -205,6 +205,25 @@ describe('대회 만들기 한 화면 폼', { timeout: 20_000 }, () => {
     expect(submit).toBeDisabled();
   });
 
+  it('만드는 중에는 혼성 인원 칸도 잠기고, 하단 바는 홈 표시줄 여백을 둔다', async () => {
+    useCreateHandler(async () => {
+      await delay(50);
+      return success({ id: 't-1' });
+    });
+    renderPage();
+    await fillRequired();
+    const quota = (label: string) => screen.getByRole('spinbutton', { name: label });
+    fireEvent.click(screen.getByRole('radio', { name: '혼성' }));
+    for (const label of ['남성 최소', '남성 최대', '여성 최소', '여성 최대']) expect(quota(label)).toBeEnabled();
+
+    fireEvent.click(submitButton());
+
+    await screen.findByRole('button', { name: '만드는 중…' });
+    for (const label of ['남성 최소', '남성 최대', '여성 최소', '여성 최대']) expect(quota(label)).toBeDisabled();
+    expect(screen.getByRole('region', { name: '만들기' }).style.paddingBottom).toBe('calc(12px + var(--v1-shell-safe-bottom, 0px))');
+    await waitFor(() => expect(routerPush).toHaveBeenCalled());
+  });
+
   it('여러 단계는 팀 수에 맞는 stagePlan 을 함께 보내고, 다른 방식으로 돌아오면 보내지 않는다', async () => {
     useCreateHandler();
     renderPage();

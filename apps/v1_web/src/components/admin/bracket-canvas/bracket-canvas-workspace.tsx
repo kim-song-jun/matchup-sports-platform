@@ -170,6 +170,7 @@ export function BracketCanvasWorkspace({
         sideLabels={selectedLabels}
         canWrite={canWrite}
         showToast={showToast}
+        autoFocusTitle={sidePanel}
         onClose={() => {
           if (sidePanel) focusFixtureOpener(selectedFixture.id);
           setSelectedFixtureId(null);

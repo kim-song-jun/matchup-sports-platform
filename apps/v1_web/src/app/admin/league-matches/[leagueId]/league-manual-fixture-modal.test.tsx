@@ -57,7 +57,7 @@ function setup({
 
 function pickRow(row: number, home: string, away: string) {
   fireEvent.change(screen.getByLabelText(`${row}번째 경기 홈 팀`), { target: { value: home } });
-  fireEvent.change(screen.getByLabelText(`${row}번째 경기 어웨이 팀`), { target: { value: away } });
+  fireEvent.change(screen.getByLabelText(`${row}번째 경기 원정 팀`), { target: { value: away } });
 }
 
 const createButton = (count: number) => screen.getByRole('button', { name: `경기 ${count}개 만들기` });
@@ -88,14 +88,14 @@ describe('LeagueManualFixtureModal (주차 단위 경기 추가, 2026-11-03 A안
     pickRow(1, 'team-a', 'team-b');
     fireEvent.click(screen.getByRole('button', { name: '+ 경기 줄 추가' }));
     fireEvent.click(createButton(2));
-    expect(await screen.findByRole('alert')).toHaveTextContent('2번째 경기의 홈 팀과 어웨이 팀을 모두 골라 주세요.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('2번째 경기의 홈 팀과 원정 팀을 모두 골라 주세요.');
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('같은 팀끼리는 고를 수 없게 막는다 — 반대편에 고른 팀은 목록에서 비활성', () => {
     setup();
     fireEvent.change(screen.getByLabelText('1번째 경기 홈 팀'), { target: { value: 'team-a' } });
-    const away = screen.getByLabelText('1번째 경기 어웨이 팀');
+    const away = screen.getByLabelText('1번째 경기 원정 팀');
     expect(within(away).getByRole('option', { name: 'A팀' })).toBeDisabled();
     expect(within(away).getByRole('option', { name: 'B팀' })).not.toBeDisabled();
   });

@@ -116,7 +116,7 @@ describe('RegistrationRowMenu — 데스크톱 팝오버', () => {
   it('대기로 두기는 대회가 닫혀 있으면 비활성이고 눌러도 부르지 않는다', () => {
     const handlers = openMenu('payment_checking', true, { admissionsBlockedReason: '종료된 대회예요.' });
     const item = screen.getByRole('menuitem', { name: /^대기로 두기/ });
-    expect(item).toBeDisabled();
+    expect(item).toHaveAttribute('aria-disabled', 'true');
     expect(item).toHaveTextContent('종료된 대회예요.');
     fireEvent.click(item);
     expect(handlers.onWaitlist).not.toHaveBeenCalled();

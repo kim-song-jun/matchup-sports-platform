@@ -246,12 +246,15 @@ interface AdminStatusPillProps {
   status: string;
   /** Override the derived label */
   label?: string;
+  /** 폰 폭(768px 미만)에서만 아이콘을 감춘다. 좁은 머리 한 줄에서 글자 칸을 넓힌다 — 글자는 그대로다. */
+  hideIconOnPhone?: boolean;
 }
 
-export function AdminStatusPill({ status, label }: AdminStatusPillProps) {
+export function AdminStatusPill({ status, label, hideIconOnPhone = false }: AdminStatusPillProps) {
   const meta = STATUS_META[status];
   const displayLabel = label ?? meta?.label ?? status;
   const tone: Tone = meta?.tone ?? 'gray';
+  const icon = meta?.icon ?? <CircleDot size={12} aria-hidden="true" />;
 
   return (
     <span
@@ -260,7 +263,7 @@ export function AdminStatusPill({ status, label }: AdminStatusPillProps) {
         TONE_CLASSES[tone],
       ].join(' ')}
     >
-      {meta?.icon ?? <CircleDot size={12} aria-hidden="true" />}
+      {hideIconOnPhone ? <span className="hidden md:inline-flex">{icon}</span> : icon}
       {displayLabel}
     </span>
   );

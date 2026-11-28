@@ -80,9 +80,16 @@ describe('resolveNextMilestone', () => {
   it('접수 마감이 24시간 안쪽이면 날짜가 아니라 남은 시각으로 말한다(2026-10 알파 실측)', () => {
     const headline = (registrationDeadlineAt: string) =>
       resolveNextMilestone(tournament({ registrationDeadlineAt }), new Date('2026-08-20T23:15:00+09:00')).headline;
-    expect(headline('2026-08-21T00:00:00+09:00')).toBe('접수 마감까지 45분 남았어요.');
-    expect(headline('2026-08-21T20:00:00+09:00')).toBe('접수 마감까지 20시간 남았어요.');
-    expect(headline('2026-08-23T09:00:00+09:00')).toBe('접수 마감까지 3일 남았어요.');
+    expect(headline('2026-08-21T00:00:00+09:00')).toBe('신청 마감까지 45분 남았어요.');
+    expect(headline('2026-08-21T20:00:00+09:00')).toBe('신청 마감까지 20시간 남았어요.');
+    expect(headline('2026-08-23T09:00:00+09:00')).toBe('신청 마감까지 3일 남았어요.');
+  });
+
+  it('신청 마감이 없거나 지났을 때도 같은 이름으로 말한다', () => {
+    const headline = (registrationDeadlineAt: string | null) =>
+      resolveNextMilestone(tournament({ registrationDeadlineAt }), NOW).headline;
+    expect(headline(null)).toBe('접수 중이에요. 신청 마감 시각이 아직 없어요.');
+    expect(headline('2026-08-18T09:00:00+09:00')).toBe('신청 마감 시각이 지났는데 아직 접수 중이에요.');
   });
 
   it('오늘 이미 지난 접수 마감은 "오늘 마감"이 아니라 확인이 필요하다고 본다', () => {

@@ -193,7 +193,7 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
       return null;
     }
     if (target === 2) {
-      if (periodsInvalid) return '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
+      if (periodsInvalid) return '각 경기 시간은 1~240분 사이의 정수로 입력해 주세요.';
       if (rosterLimitInvalid) return rosterLimitInvalid;
       if (plannedFixtureCountInvalid) return '총 경기 수는 1~500 사이로 입력해 주세요.';
       const teamFoulThresholdInvalid = leagueTeamFoulThresholdError(teamFoulThreshold);

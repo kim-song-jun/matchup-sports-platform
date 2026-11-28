@@ -2,6 +2,11 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RestTimerCard, RestTimerPresets, useRestTimer } from './rest-timer';
 
+/** 쉬는 시간 카드의 「MM:SS 남았어요」 — 숫자와 「남았어요」가 다른 크기의 두 글자라 한 문단의 글자로 찾는다. */
+function restCountdown(text: string, root: Pick<typeof screen, 'getByText'> = screen) {
+  return root.getByText((_, element) => element?.tagName === 'P' && element.textContent === text);
+}
+
 const KEY = 'teameet.v1.restTimer:game-1';
 type HookProps = { storageKey: string | null; scope: string | null };
 
@@ -175,7 +180,7 @@ describe('RestTimerCard · RestTimerPresets', () => {
   it('카드에 「1분 추가」「쉬는 시간 끝내기」가 있고 새로고침 안내 문구는 없다', () => {
     render(<CardHarness scope="halftime:p2" />);
     expect(screen.getByRole('button', { name: '쉬는 시간 10분' })).toBeInTheDocument();
-    expect(screen.getByText('10:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('10:00 남았어요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '1분 추가' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '쉬는 시간 끝내기' })).toBeInTheDocument();
     expect(screen.queryByText(/새로고침/)).toBeNull();
@@ -183,7 +188,7 @@ describe('RestTimerCard · RestTimerPresets', () => {
     act(() => {
       vi.advanceTimersByTime(3_000);
     });
-    expect(screen.getByText('09:57 남았어요')).toBeInTheDocument();
+    expect(restCountdown('09:57 남았어요')).toBeInTheDocument();
   });
 
   it('길이 배지를 누르면 칩이 펼쳐지고 고르면 길이가 바뀐다', () => {
@@ -195,7 +200,7 @@ describe('RestTimerCard · RestTimerPresets', () => {
     fireEvent.click(badge);
     fireEvent.click(screen.getByRole('button', { name: '5분' }));
     expect(screen.getByRole('button', { name: '쉬는 시간 5분' })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByText('05:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('05:00 남았어요')).toBeInTheDocument();
   });
 
   it('프리셋은 1·2·5·10·15·20분 여섯 개', () => {

@@ -21,7 +21,7 @@ export function TournamentParticipationPanel({ gameId, sides, disabled, onError 
   onError: (message: string) => void;
 }) {
   return (
-    <section className="flex flex-col gap-3 px-4" aria-label="킥오프 준비">
+    <section className="flex flex-col gap-3" aria-label="킥오프 준비">
       <div>
         <SectionTitle title="이번 경기 출전 명단" />
         <p className="mt-1 tm-text-caption">팀에서 설정한 경기 명단이에요. 변경하면 해당 경기 명단에 함께 반영돼요.</p>

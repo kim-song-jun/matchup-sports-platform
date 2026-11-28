@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatClock, formatGoalMinute, formatPenaltyScoreline, formatPeriodFormat, formatScoreline, isClockAbnormal } from './format';
+import { formatClock, formatGoalMinute, formatPenaltyScoreline, formatPeriodFormat, formatScoreline, isClockAbnormal, periodPrefix } from './format';
 
 /**
  * alpha 실측 사고(2026-08) 회귀 방지 -- 실제 DB 값으로 재현한다.
@@ -103,4 +103,19 @@ describe('formatPeriodFormat', () => {
       expect(formatPeriodFormat(value as never)).toBeNull();
     },
   );
+});
+
+describe('periodPrefix — 단판은 정규 구간만 말머리를 뺀다', () => {
+  it('단판의 정규 구간은 빈 말머리, 연장 구간은 이름이 붙는다', () => {
+    expect(periodPrefix(1, 1)).toBe('');
+    expect(periodPrefix(2, 1)).toBe('연장 전반 ');
+    expect(periodPrefix(3, 1)).toBe('연장 후반 ');
+  });
+
+  it('정규 2개와 구간 수를 모르는 경기는 전반·후반 그대로다', () => {
+    for (const count of [2, null, undefined]) {
+      expect(periodPrefix(1, count)).toBe('전반 ');
+      expect(periodPrefix(2, count)).toBe('후반 ');
+    }
+  });
 });

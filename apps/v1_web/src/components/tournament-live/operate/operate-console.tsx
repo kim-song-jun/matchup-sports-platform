@@ -65,7 +65,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       takeoverEnabled={tournamentOpsRole !== 'SUPPORT_READONLY'}
       operatorScopeKey={tournamentOpsRole}
       operationContextKey={JSON.stringify([tournamentId, fixtureId])}
-      headerTopClass={tournamentOpsRole === 'FIELD_OPERATOR' ? 'top-[52px]' : 'top-[52px] lg:top-0'}
+      headerTopClass="top-[var(--tournament-ops-mobile-header-offset,52px)]"
       allowPenaltyShootout={gameDetail.data?.isKnockoutFixture === true}
       resultReviewEnabled={Boolean(tournamentId && fixtureId)}
       renderResultReview={(resultGameId) => (

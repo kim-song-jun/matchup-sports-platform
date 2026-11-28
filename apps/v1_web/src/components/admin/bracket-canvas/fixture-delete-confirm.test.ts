@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeFixture, makeGame } from '@/test/bracket-canvas-fixtures';
-import { fixtureDeleteConfirm } from './fixture-delete-confirm';
+import { fixtureDeleteBlockedReason, fixtureDeleteConfirm } from './fixture-delete-confirm';
 
 const fixture = makeFixture({ id: 'f1', groupId: 'g', fixtureNumber: 1, game: makeGame() });
 const confirm = (target = fixture, fixtures = [target]) => fixtureDeleteConfirm({ title: '8강 1번 경기', fixture: target, fixtures });
@@ -16,11 +16,18 @@ describe('fixtureDeleteConfirm', () => {
     expect(confirm(fixture, [fixture, downstream, unrelated]).message).toContain('후속 경기 1개도 영향을 받아요.');
   });
 
+});
+
+describe('fixtureDeleteBlockedReason', () => {
+  it('결과도 진행도 없으면 지울 수 있다', () => {
+    expect(fixtureDeleteBlockedReason(fixture)).toBeNull();
+  });
+
   it.each([
     ['공식 결과', makeGame({ hasOfficialResult: true }), '결과가 있는 경기는 삭제할 수 없어요.'],
     ['진행 중', makeGame({ state: 'LIVE' }), '진행 중인 경기는 삭제할 수 없어요.'],
     ['일시 정지', makeGame({ state: 'PAUSED' }), '진행 중인 경기는 삭제할 수 없어요.'],
-  ])('%s 경기는 거절될 것을 미리 알린다', (_name, game, text) => {
-    expect(confirm(makeFixture({ id: 'f1', groupId: 'g', fixtureNumber: 1, game })).message).toContain(text);
+  ])('%s 경기는 서버가 거절하므로 이유를 돌려준다', (_name, game, reason) => {
+    expect(fixtureDeleteBlockedReason(makeFixture({ id: 'f1', groupId: 'g', fixtureNumber: 1, game }))).toBe(reason);
   });
 });

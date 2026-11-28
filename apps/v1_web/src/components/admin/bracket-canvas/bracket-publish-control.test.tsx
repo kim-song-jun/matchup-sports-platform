@@ -132,6 +132,32 @@ describe('BracketPublishControl', () => {
     await waitFor(() => expect(hooks.unpublish).toHaveBeenCalled());
   });
 
+  it('예약됨: 시트의 「지금 공개」가 예약을 기다리지 않고 바로 공개한다', () => {
+    show({ bracketPublishScheduledAt: '2099-08-01T09:00:00.000Z' });
+    fireEvent.click(screen.getByRole('button', { name: '공개 설정' }));
+    fireEvent.click(within(sheet()).getByRole('button', { name: '지금 공개' }));
+    expect(hooks.publish).toHaveBeenCalledWith(undefined, expect.objectContaining({ onSuccess: expect.any(Function) }));
+    hooks.publish.mock.calls[0][1].onSuccess({ tournamentId: 't-1', bracketPublishedAt: '2026-12-01T00:00:00.000Z', bracketPublishScheduledAt: null, alreadyPublished: false });
+    expect(showToast).toHaveBeenCalledWith('대진표를 공개했어요.', 'success');
+  });
+
+  it('예약됨: 「시각 바꾸기」는 현재 예약 시각(KST)에서 시작해 새 시각으로 다시 예약하고, 과거 시각은 mutate 없이 거절한다', () => {
+    show({ bracketPublishScheduledAt: '2099-08-01T09:00:00.000Z' });
+    fireEvent.click(screen.getByRole('button', { name: '공개 설정' }));
+    const dialog = sheet();
+    const input = within(dialog).getByLabelText('공개 시각');
+    expect(input).toHaveValue('2099-08-01T18:00');
+
+    fireEvent.change(input, { target: { value: '2020-01-01T09:00' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '시각 바꾸기' }));
+    expect(hooks.publish).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('공개 예약 시각은 현재 시각 이후여야 해요.');
+
+    fireEvent.change(input, { target: { value: '2099-09-01T20:00' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '시각 바꾸기' }));
+    expect(hooks.publish).toHaveBeenCalledWith({ scheduledAt: new Date('2099-09-01T20:00:00+09:00').toISOString() }, expect.anything());
+  });
+
   it('canWrite=false: 상태 배지만, 버튼 없음', () => {
     show({ canWrite: false, bracketPublishedAt: '2026-07-18T00:00:00.000Z' });
     expect(screen.getByText('공개 중')).toBeInTheDocument();

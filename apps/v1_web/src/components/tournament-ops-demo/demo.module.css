@@ -1,4 +1,7 @@
 .page { min-height:100dvh; background:var(--bg); color:var(--text-strong); }
+/* 경기 콘솔 체험: 실제 콘솔처럼 회색 지면 위에 흰 카드를 놓는다(콘솔 카드는 테두리가 없다). */
+.consolePage { background:var(--surface-soft); }
+.consolePage .notice { background:var(--card-surface); }
 .header { background:var(--card-surface); border-bottom:1px solid var(--border); }
 .headerInner { max-width:1200px; margin:auto; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
 .brand { display:inline-flex; align-items:center; min-height:44px; font-size:var(--font-size-heading); font-weight:800; letter-spacing:-1px; }

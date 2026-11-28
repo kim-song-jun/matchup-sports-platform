@@ -2,13 +2,14 @@
 
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Trash2, X } from 'lucide-react';
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { placedRegistrationIdsForSlot } from '@/lib/bracket-slot-candidates';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
 import type {
   V1AdminBracketFixture,
@@ -19,7 +20,7 @@ import type {
 import { fixtureTitle } from './bracket-canvas';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
-import { fixtureDeleteConfirm } from './fixture-delete-confirm';
+import { fixtureDeleteBlockedReason, fixtureDeleteConfirm } from './fixture-delete-confirm';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 import { ByeSideControl } from './bye-side-control';
 import { useStartedTeamChangeReason } from './use-started-team-change-reason';
@@ -36,6 +37,8 @@ export type BracketNodePanelProps = {
   sideLabels: Record<SideKey, string>;
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
+  /** 그림 위에 겹쳐 뜨는 패널은 열릴 때 제목으로 포커스를 가져와 ESC 가 바로 닫게 한다. 시트는 자기 포커스를 관리하므로 켜지 않는다. */
+  autoFocusTitle?: boolean;
   onClose: () => void;
 };
 
@@ -57,6 +60,7 @@ export function BracketNodePanel({
   sideLabels,
   canWrite,
   showToast,
+  autoFocusTitle = false,
   onClose,
 }: BracketNodePanelProps) {
   const assignSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
@@ -66,8 +70,14 @@ export function BracketNodePanel({
   const { confirm, ConfirmModal } = useConfirm();
   const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
   const [quickError, setQuickError] = useState<string | null>(null);
+  const deleteReasonId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (autoFocusTitle) titleRef.current?.focus();
+  }, [autoFocusTitle]);
 
   const title = fixtureTitle(fixture, groups);
+  const deleteBlockedReason = fixtureDeleteBlockedReason(fixture);
   const locked = isFixtureLocked(fixture);
   const teamChangeAccess = fixtureTeamChangeAccess(fixture);
   const group = groups.find((candidate) => candidate.id === fixture.groupId);
@@ -163,7 +173,7 @@ export function BracketNodePanel({
           <div className="flex flex-col items-start gap-2">
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{DIRECT_SIDE_BLOCKED[teamChangeAccess]}</p>
             {teamChangeAccess === 'official' && canWrite ? (
-              <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
+              <Link href={resultHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기</Link>
             ) : null}
           </div>
         );
@@ -238,7 +248,7 @@ export function BracketNodePanel({
     });
   };
 
-  const correctionsHref = `/admin/live/${encodeURIComponent(tournamentId)}/records/corrections?fixtureId=${encodeURIComponent(fixture.id)}`;
+  const resultHref = resultsHref(adminLiveBase(tournamentId), fixture.id);
 
   const renderResult = () => {
     if (game === null) return <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>경기 정보가 아직 준비되지 않았어요.</p>;
@@ -266,8 +276,8 @@ export function BracketNodePanel({
     if (game.hasLiveRecords) {
       return (
         <div className="flex flex-col items-start gap-2">
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>라이브로 득점이 기록된 경기예요. 결과 고치기 화면에서 처리해 주세요.</p>
-          <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>라이브로 득점이 기록된 경기예요. 결과 화면에서 처리해 주세요.</p>
+          <Link href={resultHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 화면 열기</Link>
         </div>
       );
     }
@@ -316,13 +326,17 @@ export function BracketNodePanel({
       style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)', boxShadow: 'var(--shadow-dropdown)' }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="tm-text-body-lg min-w-0 truncate font-bold" style={{ color: 'var(--text-strong)' }}>{title}</h2>
+        <h2 ref={titleRef} tabIndex={-1} className="tm-text-body-lg min-w-0 truncate font-bold focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500" style={{ color: 'var(--text-strong)' }}>{title}</h2>
         <div className="flex shrink-0 items-center">
           {canWrite && !stageManaged ? (
-            <button type="button" aria-label="경기 삭제" onClick={() => void handleDelete()} className={iconButton}
-              style={{ borderRadius: 'var(--radius-control)', color: 'var(--red700)' }}>
-              <Trash2 size={18} aria-hidden="true" />
-            </button>
+            <>
+              <button type="button" aria-label="경기 삭제" onClick={() => void handleDelete()} className={`${iconButton} disabled:opacity-50`}
+                disabled={deleteBlockedReason !== null} title={deleteBlockedReason ?? undefined} aria-describedby={deleteBlockedReason !== null ? deleteReasonId : undefined}
+                style={{ borderRadius: 'var(--radius-control)', color: 'var(--red700)' }}>
+                <Trash2 size={18} aria-hidden="true" />
+              </button>
+              {deleteBlockedReason !== null ? <span id={deleteReasonId} className="sr-only">{deleteBlockedReason}</span> : null}
+            </>
           ) : null}
           <button type="button" aria-label="패널 닫기" onClick={onClose} className={iconButton}
             style={{ borderRadius: 'var(--radius-control)', color: 'var(--text-muted)' }}>

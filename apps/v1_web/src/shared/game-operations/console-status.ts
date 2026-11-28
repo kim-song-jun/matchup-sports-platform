@@ -6,6 +6,7 @@ export type ConsoleStatusKey =
   | 'takeover-handoff'
   | 'takeover-denied'
   | 'read-only'
+  | 'record-error'
   | 'command-error'
   | 'command-retry'
   | 'banner-message'
@@ -54,6 +55,8 @@ export interface ConsoleStatusInput {
   readonly expiryError: string | null;
   readonly startBlockedByTeams: boolean;
   readonly commandError: string | null;
+  /** 방금 누른 기록·되돌리기가 실패한 결과. 진행 요청 오류와 따로 남는다. */
+  readonly recordError: { readonly kind: 'save' | 'undo'; readonly message: string } | null;
   readonly bannerMessage: string | null;
   readonly retryLabel: string | null;
   readonly queue: { readonly waiting: number; readonly failed: number };
@@ -87,8 +90,9 @@ function disconnectedBody(input: ConsoleStatusInput): string {
 function okHeadline(input: ConsoleStatusInput): string {
   if (input.sampleMode) return '체험 중 · 서버 연결 없음';
   const held = input.leaseRequired && input.takeoverEnabled && input.takeover.status === 'held';
-  if (held && input.gameState === 'SCHEDULED') return '이 기기에서 기록할 수 있어요 · 연결됨';
-  if (held && (input.gameState === 'LIVE' || input.gameState === 'PAUSED')) return '이 기기에서 기록 중 · 연결됨';
+  // 끊기면 이 줄이 경고로 바뀌므로, 기록 중일 때는 「연결됨」을 덧붙이지 않는다(자세히 시트의 연결 줄이 그대로 말한다).
+  if (held && input.gameState === 'SCHEDULED') return '이 기기에서 기록할 수 있어요';
+  if (held && (input.gameState === 'LIVE' || input.gameState === 'PAUSED')) return '이 기기에서 기록 중';
   return '연결됨';
 }
 
@@ -132,6 +136,14 @@ export function deriveConsoleStatus(input: ConsoleStatusInput): ConsoleStatus {
       tone: 'info',
       title: '보기만 할 수 있어요',
       body: '지원 담당자는 이 경기의 기록을 볼 수만 있어요.',
+    });
+  }
+  if (input.recordError !== null) {
+    items.push({
+      key: 'record-error',
+      tone: 'danger',
+      title: input.recordError.kind === 'save' ? '기록을 저장하지 못했어요' : '기록을 되돌리지 못했어요',
+      body: input.recordError.message,
     });
   }
   if (input.commandError !== null) {

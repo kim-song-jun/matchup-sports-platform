@@ -40,6 +40,9 @@ export function useMediaQuery(query: string, serverFallback = false): boolean {
  */
 export const DESKTOP_LIST_MEDIA_QUERY = '(min-width: 1024px)';
 
+/** 운영 보드 「목록」 보기가 일곱 칸 표로 그려지는 최소 폭. 이보다 좁으면 상태 배지·버튼이 옆 칸을 덮어 카드 목록을 쓴다. */
+export const WIDE_TABLE_MEDIA_QUERY = '(min-width: 1280px)';
+
 /**
  * 어드민 대진 그림이 편집 가능한 캔버스(데스크톱)로 바뀌는 폭. 스펙 D8 — 구조 편집은 768px 이상.
  * Tailwind `md` 와 같은 값이다.
@@ -57,3 +60,12 @@ export const BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY = '(min-width: 1024px)';
  * 1440 미만에선 옆 열을 두면 조 두 열이 다 들어가지 않아(alpha 실측 1280 에서 82px 잘림), 시트(순위표 버튼·칸 패널)로 대신한다.
  */
 export const BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY = '(min-width: 1440px)';
+
+/** Tailwind `md` 와 같은 값. 폰(미만)과 태블릿 이상에서 머리말 구성이 갈리는 화면이 쓴다. */
+export const MD_UP_MEDIA_QUERY = '(min-width: 768px)';
+
+/**
+ * Tailwind `lg` 와 같은 값. 어드민 셸이 사이드바를 보이는(= 데스크톱 셸) 폭 — `admin-shell.tsx` 의 `lg:`.
+ * 이보다 좁은 폰·태블릿에서 배치가 갈리는 어드민 화면이 쓴다.
+ */
+export const LG_UP_MEDIA_QUERY = '(min-width: 1024px)';

@@ -28,7 +28,7 @@ export function FieldConsoleDemo() {
     if (!await confirm({ title: '샘플 경기를 초기화할까요?', message: '이 체험의 점수와 경기 기록을 지워요. 실제 대회에는 영향을 주지 않아요.', confirmLabel: '초기화' })) return;
     client.clear(); setSession((value) => value + 1);
   }
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${styles.consolePage}`}>
     <div inert={step !== null}>
       <header className={styles.header}><div className={styles.headerInner}>
         <Link className={styles.brand} href="/home">teameet</Link>
@@ -40,7 +40,7 @@ export function FieldConsoleDemo() {
         </div>
       </div></header>
       <main className={styles.container}>
-        <h1 className="tm-text-heading mb-3">경기 운영콘솔 체험</h1>
+        <h1 className="tm-text-heading mb-3">경기 콘솔 체험</h1>
         <p className={styles.notice}>실제 구장 담당자와 같은 조작 화면이에요. 5인제 축구·팀별 교체 3회의 샘플 경기로 체험해요. 팀·선수는 모두 샘플이며 실제 서버에 전송하지 않아요. 새로고침하면 체험 기록이 초기화돼요.</p>
         <QueryClientProvider client={client}>
           <div hidden={step !== null}><FieldConsoleSession key={session} /></div>

@@ -28,6 +28,7 @@ function statusOf(overrides: Partial<ConsoleStatusInput> = {}): ConsoleStatus {
     expiryError: null,
     startBlockedByTeams: false,
     commandError: null,
+    recordError: null,
     bannerMessage: null,
     retryLabel: null,
     queue: { waiting: 0, failed: 0 },
@@ -89,7 +90,7 @@ describe('ConsoleStatusPanel — 상태 줄', () => {
   it('정상일 때는 status 한 줄이고 자세히 버튼이 44px 이상이다', () => {
     renderPanel();
     const row = screen.getByRole('status');
-    expect(row).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(row).toHaveTextContent(/^이 기기에서 기록 중자세히$/);
     expect(within(row).getByRole('button', { name: '자세히' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
     expect(screen.queryByRole('dialog')).toBeNull();
   });

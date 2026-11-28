@@ -76,7 +76,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 
 ## Progress Snapshot
 - Phase: D / PR #1632 stale query follow-up; root RED confirmed and minimal product fix ready for root GREEN.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-26-my-schedule-return/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-26-my-schedule-return/matchup-sports-platform
 - Branch: fix/mdqa-26-my-schedule-return
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
 - PR/head/merge: [PR #1632](https://github.com/kim-song-jun/matchup-sports-platform/pull/1632); Phase D started from 21ff6a80275f9c24b1c460c16cd6932deb7284b6. Root owns subsequent Git/PR cursors.

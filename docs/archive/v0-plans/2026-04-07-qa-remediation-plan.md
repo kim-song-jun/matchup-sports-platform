@@ -76,7 +76,7 @@
 
 **Likely root cause**
 - dev container uses bind-mounted workspace + named `node_modules` volumes, but `pnpm` linkage is inconsistent
-- `/app/node_modules/.modules.yaml` points to host store path `/Users/kimsungjun/Library/pnpm/store/v3`
+- `/app/node_modules/.modules.yaml` points to host store path `<host pnpm store>/v3`
 - container is `aarch64`, but `bcrypt` binary and dependency graph are not reliably container-native
 
 **Impact**

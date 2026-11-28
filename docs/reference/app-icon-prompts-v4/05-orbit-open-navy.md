@@ -1,6 +1,6 @@
 # 05-orbit-open-navy
 
-기준 시안: [05-orbit-open-navy.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/05-orbit-open-navy.png)
+기준 시안: [05-orbit-open-navy.png](../app-icons-v4/05-orbit-open-navy.png)
 
 ## 포지션
 

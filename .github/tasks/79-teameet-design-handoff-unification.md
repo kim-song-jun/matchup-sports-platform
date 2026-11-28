@@ -9,7 +9,7 @@ Priority: P1
 
 ## Context
 
-The user provided `/Users/kimsungjun/Downloads/Sports-platform-handoff.tar.gz` and asked to:
+The user provided `Sports-platform-handoff.tar.gz` (local file outside the repository) and asked to:
 
 1. extract/copy it into this repository
 2. analyze the full `Teameet Design.html` bundle and related files

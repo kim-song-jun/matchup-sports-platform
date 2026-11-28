@@ -53,7 +53,7 @@ Phase C root: 직렬 최소 검사·Changeset·committed exacthead 독립 리뷰
 | 2026-10-08 | report | 어느 시각이 정본인가? | 현재 실제 API timestamp와 date-utils KST 계약 확인, 16시간 숫자만으로 timezone 단정하지 않음 |
 
 ## Progress Snapshot
-- WT C:/Users/kinso/.codex/worktrees/mdqa-49-team-match-kst/matchup-sports-platform, branch fix/mdqa-49-team-match-kst, base origin/dev ffec5fd355dca129a9019e0e8260bbcfc9fc4820 fetch 직후 managed 생성.
+- WT <local Codex worktrees folder>/mdqa-49-team-match-kst/matchup-sports-platform, branch fix/mdqa-49-team-match-kst, base origin/dev ffec5fd355dca129a9019e0e8260bbcfc9fc4820 fetch 직후 managed 생성.
 - 원 checkout 0550/report49-before.txt 및 report49-claimed.txt/png, 실제 김성준·확인 중 표시.
 - Phase investigation/test authoring. PR없음, alpha after pending.
 

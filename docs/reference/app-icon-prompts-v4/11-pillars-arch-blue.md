@@ -1,6 +1,6 @@
 # 11-pillars-arch-blue
 
-기준 시안: [11-pillars-arch-blue.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/11-pillars-arch-blue.png)
+기준 시안: [11-pillars-arch-blue.png](../app-icons-v4/11-pillars-arch-blue.png)
 
 ## 포지션
 

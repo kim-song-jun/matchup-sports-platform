@@ -1,6 +1,6 @@
 # 12-pillars-compact-light
 
-기준 시안: [12-pillars-compact-light.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/12-pillars-compact-light.png)
+기준 시안: [12-pillars-compact-light.png](../app-icons-v4/12-pillars-compact-light.png)
 
 ## 포지션
 

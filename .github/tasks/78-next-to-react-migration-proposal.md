@@ -547,10 +547,10 @@ Option B는 현재 파일 구조(`app/**/page.tsx`)와 1:1로 대응하고, 이�
 
 ## Appendix C — Cross-links
 
-- 기본 프로젝트 규칙: `/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/CLAUDE.md`
-- 현 Next 설정: `/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/next.config.ts`
-- Middleware: `/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/middleware.ts`
-- Package manifest: `/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/package.json`
+- 기본 프로젝트 규칙: `CLAUDE.md`
+- 현 Next 설정: `apps/web/next.config.ts`
+- Middleware: `apps/web/src/middleware.ts`
+- Package manifest: `apps/web/package.json`
 - 직전 태스크 로드맵: `.github/tasks/next-session-plan-72-onward.md`, `72-team-balancing-v2-hardening.md`, `73-idempotency-retry-semantics.md`, `74-production-push-activation.md`
 
 ---

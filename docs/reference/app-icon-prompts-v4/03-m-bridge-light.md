@@ -1,6 +1,6 @@
 # 03-m-bridge-light
 
-기준 시안: [03-m-bridge-light.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/03-m-bridge-light.png)
+기준 시안: [03-m-bridge-light.png](../app-icons-v4/03-m-bridge-light.png)
 
 ## 포지션
 

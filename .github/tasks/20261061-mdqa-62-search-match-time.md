@@ -42,7 +42,7 @@ Actualsameentity API storedISO/browserTZ originalunconfirmed; demonstrate source
 Title/week syntheticdata mismatch unverified/outofscope; originalUI servingSHA unknown. CI/code != actualalpha PASS.
 
 ## Progress Snapshot
-Fresh fetch then managed ref origin/dev base c88c57a2a3980b3059b4ae3856e947435260240b. Workdir C:/Users/kinso/.codex/worktrees/mdqa-62-search-match-time/matchup-sports-platform; branch fix/mdqa-62-search-match-time. Own0550 report62-initial-detail/claimed-confirmed txt/png.
+Fresh fetch then managed ref origin/dev base c88c57a2a3980b3059b4ae3856e947435260240b. Workdir <local Codex worktrees folder>/mdqa-62-search-match-time/matchup-sports-platform; branch fix/mdqa-62-search-match-time. Own0550 report62-initial-detail/claimed-confirmed txt/png.
 
 Worker unchanged-product source SHA256 B4F1ABA5F057DA18F874290EA0D1658DCD879CBE7DD235DCD041DF347695C099: isolated actual America/Los_Angeles consumer RED 4 failures / 5 passes. Both personal/team cards rendered 07:57 for the ISO that the existing detail model renders 23:57; KST midnight rollover was also wrong. CLI zero-run and initial navigation-expectation harness failures are excluded from RED evidence. Raw: tmp/qa/mdqa-62/red-la-isolated.txt.
 

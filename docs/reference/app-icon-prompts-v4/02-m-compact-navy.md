@@ -1,6 +1,6 @@
 # 02-m-compact-navy
 
-기준 시안: [02-m-compact-navy.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/02-m-compact-navy.png)
+기준 시안: [02-m-compact-navy.png](../app-icons-v4/02-m-compact-navy.png)
 
 ## 포지션
 

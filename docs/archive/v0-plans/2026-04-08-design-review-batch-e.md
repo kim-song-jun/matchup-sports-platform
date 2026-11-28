@@ -49,10 +49,10 @@
 - Severity: `High`
 - Source: `design-main`, `ui-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/lessons/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/mercenary/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/marketplace/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/venues/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/lessons/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/mercenary/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/marketplace/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/venues/page.tsx)
 - Summary:
   - `lessons`는 블루 중심의 몰입형 카드 시스템인데, `mercenary`는 평평한 관리형 카드, `marketplace`는 회색 리스트형 커머스 템플릿, `venues`는 건조한 디렉토리 톤으로 갈린다.
   - 사용자 입장에서는 한 앱 안의 여러 기능이라기보다 다른 서비스 4개처럼 느껴진다.
@@ -62,8 +62,8 @@
 - Severity: `High`
 - Source: `ux-manager`
 - Affected pages:
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/mercenary/[id]/edit/page.tsx)
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/marketplace/[id]/edit/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/mercenary/[id]/edit/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/marketplace/[id]/edit/page.tsx)
 - Summary:
   - `mercenary/[id]/edit`는 특정 dev seed가 아니면 empty state로 빠지고, `marketplace/[id]/edit`는 route entity 대신 고정된 seed로 되돌아가는 경향이 있다.
   - 운영자 입장에서 “내가 지금 이 항목을 수정 중”이라는 신뢰가 깨진다.
@@ -73,7 +73,7 @@
 - Severity: `High`
 - Source: `ux-manager`
 - Affected page:
-  - [new/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/marketplace/new/page.tsx)
+  - [new/page.tsx](apps/web/src/app/(main)/marketplace/new/page.tsx)
 - Summary:
   - 파일 input은 보이지만 상태 반영, 미리보기 갱신, submit payload 연결이 없다.
   - 장터에서 이미지 신뢰도는 구매 판단의 핵심인데, 실제로는 동작하지 않는 업로드 UI를 보여준다.
@@ -83,10 +83,10 @@
 - Severity: `Medium`
 - Source: `ux-manager`, `ui-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/lessons/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/marketplace/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/venues/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/mercenary/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/lessons/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/marketplace/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/venues/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/mercenary/page.tsx)
 - Summary:
   - 평점, 매너 점수, 수강생 수, 리뷰가 어떤 것은 실데이터처럼 보이고 어떤 것은 샘플/고정값인데, 화면에서 그 경계가 드러나지 않는다.
   - 이 묶음은 거래/예약/참가 판단이 많아서 `verified / sample / estimated` 구분이 특히 중요하다.
@@ -96,10 +96,10 @@
 - Severity: `Medium`
 - Source: `ui-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/mercenary/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/marketplace/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/venues/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/lessons/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/mercenary/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/marketplace/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/venues/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/lessons/page.tsx)
 - Summary:
   - 카드 밀도, 이미지 비중, 메타 위치, 칩 크기, 모바일 터치 감각이 도메인마다 다르다.
   - 특히 `venues`의 city chips와 `mercenary`의 기본 칩은 동일한 탐색 surface라고 보기 어렵다.
@@ -109,9 +109,9 @@
 - Severity: `Medium`
 - Source: `ux-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/mercenary/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/my/mercenary/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/venues/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/mercenary/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/my/mercenary/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/venues/[id]/page.tsx)
 - Summary:
   - `내 모집/신청`처럼 포괄적으로 보이는 라벨이 실제로는 내 모집글만 다루거나, 탐색 화면 안에서 곧바로 생성 CTA로 점프하는 식의 목적 전환이 잦다.
   - 사용자는 각 화면이 조회인지, 운영인지, 생성인지 매번 다시 해석해야 한다.

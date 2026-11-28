@@ -1,7 +1,7 @@
 # Canonical ID Alias Map (auto-generated)
 
 Generated: 2026-04-26T05:14:33.741Z
-Source: `/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html`
+Source: `docs/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html`
 
 - Total artboards in functional sections: **306**
 - Skipped (docs/meta + already canonical): 295

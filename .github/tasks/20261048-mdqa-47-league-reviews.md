@@ -67,7 +67,7 @@ Phase C root 직렬검증·Changeset·independentreview·commit/push/devPR/댓�
 - Backend 9 추가 테스트는 owner/ops hide/unhide actor·before/after audit, support 조회/쓰기거부, 다른 리그 review 거부를 actual service에서 증명. 서버 moderation source 확장 없음; ALL baseline3곳 유지. API 문서와 web/API Changeset sync.
 - Root scope commit·최신dev드리프트 통합·committed API81/Web82/type/surface/pattern·각 exact head 독립 리뷰 후 같은 PR push·실제스레드 답변·재리뷰를 진행. alpha 원문 public league 후기404 before 유지; 수정 SHA 배포 이후 public/private/admin persona 실측은 대기.
 
-- Absolute WT C:/Users/kinso/.codex/worktrees/mdqa-47-league-reviews/matchup-sports-platform; feature fix/mdqa-47-league-reviews; latestorigin/dev1e4da237.
+- Absolute WT <local Codex worktrees folder>/mdqa-47-league-reviews/matchup-sports-platform; feature fix/mdqa-47-league-reviews; latestorigin/dev1e4da237.
 - Originalcheckout own ignored evidence 2026-10-08-heartbeat-0550/report47-before.txt + report47-claimed.txt/png.
 - Root actual alpha before: 공개 익명 UI가 표시된 실제 persona, 1280×760. 공개 종료 리그 상세에서 후기 링크 클릭 후 제목은 존재하지만 API404 TOURNAMENT_NOT_FOUND / 대회를 찾을 수 없어요. 실제 재시도 후도 동일. request response와 screenshot은 0550/report47-alpha-*. serving SHA는 UI/허용된 header에서 노출되지 않아 미확인. 로그인 prompt를 E2E 관리자 인증 증거로 사용하지 않음. 데이터 수정 없음.
 - Current v1 contract: 상세 및 awards의 후기 작성 입구는 regular_tournament/regular_league를 지원하고 V1TournamentReview FK·confirmed registration이 공통. 과거 거울 draft 봉쇄 주석은 현재 unified schema/route와 불일치. 후기 공개 조회/제출/미작성 목록 3곳만 ALL_COMPETITION_KINDS로 정렬. 공개/삭제/완료/active 팀/owner-manager/duplicate/upload/moderation gates와 awards kind 범위는 유지.

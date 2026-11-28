@@ -1,6 +1,6 @@
 # 18 — React Error #310 Production Crash Fix (P0)
 
-> **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
+> **Parent plan**: `enumerated-scribbling-popcorn.md` (저장소 밖 로컬 플랜 파일)
 > **Wave**: 1 (P0 critical, task 16 Phase 1.1로 진범 식별 후 시작)
 > **Owner**: frontend-ui-dev (lead, sub-component 분리 가능 시 frontend-data-dev 협업)
 > **Status**: completed

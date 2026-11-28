@@ -75,7 +75,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 
 ## Progress Snapshot
 - Phase: A / Implementation complete; root serialized GREEN pending.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-25-admin-league-return/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-25-admin-league-return/matchup-sports-platform
 - Branch: fix/mdqa-25-admin-league-return
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
 - PR/head/merge: not created.

@@ -78,7 +78,7 @@ Android 제보 화면에서 대회 문의 유형 native select가 문의 시트 
 
 ## Progress Snapshot
 - 2026-10-13T11:43Z: root UI 선점 성공. 담당 김성준·확인 중·저장 성공 안내·처리 이력2건 확인. 설명/재현/댓글0 읽음, 기존 소스 native select 확인.
-- Base: `79d1744c899725b5530b684983380caaaf48ab50`; dedicated worktree: `C:/Users/kinso/.codex/worktrees/mdqa-148-inquiry-topic/matchup-sports-platform`; branch: `fix/mdqa-148-inquiry-topic`.
+- Base: `79d1744c899725b5530b684983380caaaf48ab50`; dedicated worktree: `<local Codex worktrees folder>/mdqa-148-inquiry-topic/matchup-sports-platform`; branch: `fix/mdqa-148-inquiry-topic`.
 - UI choice pending / implementation NOT STARTED / consumer RED NOT RUN / alpha NOT RUN / PR NOT CREATED / closure NOT READY.
 - Root만 Git/PR/브라우저를 소유한다. 다른 에이전트와 변경을 되돌리지 않는다.
 

@@ -72,7 +72,7 @@ Phase 1 contracts: completed. Phase 2 UI: completed. Phase 3 validation/docs com
 ## Progress Snapshot — 2026-10-23 후속 회귀 수정
 
 - 원 PR #2032는 2026-10-22T03:07:25Z dev MERGED, head `705871b6b194d2d884e434c0ee08a32d81875442`, merge `c184cff233af2f77a4c2f6842e1d9905fbe10278`. 위의 미머지 기록은 당시 이력이며 현재 상태를 뜻하지 않는다.
-- 최신 `origin/dev` `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`에서 후속 작업을 분리했다. Worktree `C:/Users/kinso/.codex/worktrees/tournament-image-contract-followup/matchup-sports-platform`, branch `fix/tournament-image-contract-followup`. 기존 `pr2032-review-fixes` 작업트리의 로컬 회귀 테스트와 수정은 그대로 보존했다. 머지된 원 브랜치에는 push하지 않는다.
+- 최신 `origin/dev` `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`에서 후속 작업을 분리했다. Worktree `<local Codex worktrees folder>/tournament-image-contract-followup/matchup-sports-platform`, branch `fix/tournament-image-contract-followup`. 기존 `pr2032-review-fixes` 작업트리의 로컬 회귀 테스트와 수정은 그대로 보존했다. 머지된 원 브랜치에는 push하지 않는다.
 - 실제 결함 2건: 전역 HTTP pipe의 implicit Boolean conversion이 문자열 `"false"` 등을 true로 수용함 / 관리자 이미지 미리보기가 표시 이름 대신 영문 종목 코드를 전달해 공용 그래픽을 선택함. 권한 우회나 이미지 URL 비공개 보장 문제로 분류하지 않는다.
 - Owned: 대회 DTO와 직접 회귀 spec, 관리자 info-section과 spec, 이 canonical task, API 계약 3문서, 후속 patch Changeset. Forbidden: 공유 계약/정책, main, 다른 작업트리 WIP, DB/seed, tracker 완료 처리. Root가 구현·검증·Git을 소유하며 별도 구현자 외 리뷰어가 immutable head를 검수한다.
 - Acceptance: 생성/PATCH에서 JSON true/false와 생략/null을 보존하고 비boolean 값은 해당 필드의 400 검증 오류로 거절한다. 이미지 없는 풋살 대회의 목록·상세 미리보기는 풋살 그래픽을 선택한다. 기존 권한·CAS·업로드 오류와 화면 구조는 유지한다.

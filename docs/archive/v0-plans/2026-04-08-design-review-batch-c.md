@@ -37,7 +37,7 @@
 - Severity: `High`
 - Source: `ux-manager`, `ui-manager`
 - Affected page:
-  - [new/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/matches/new/page.tsx)
+  - [new/page.tsx](apps/web/src/app/(main)/matches/new/page.tsx)
 - Summary:
   - `직접 입력` 시설과 이미지 업로드가 실제로는 저장 경로와 연결되지 않거나 제출 직전에 막힌다.
   - 다단계 폼에서 보이는 선택지가 끝까지 유효하지 않으면 생성 플로우의 신뢰가 크게 떨어진다.
@@ -47,7 +47,7 @@
 - Severity: `High`
 - Source: `ux-manager`
 - Affected page:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/matches/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/matches/page.tsx)
 - Summary:
   - `/matches`는 탐색 화면으로는 안정적이지만, 상시 `매치 만들기` CTA가 없다.
   - empty state도 같은 도메인의 다음 행동이 아니라 `/mercenary`로 보내서 개인 매치 흐름이 끊긴다.
@@ -57,8 +57,8 @@
 - Severity: `High`
 - Source: `design-main`, `ui-manager`
 - Affected pages:
-  - [new/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/matches/new/page.tsx)
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/matches/[id]/edit/page.tsx)
+  - [new/page.tsx](apps/web/src/app/(main)/matches/new/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/matches/[id]/edit/page.tsx)
 - Summary:
   - 생성/수정만 흑백 토글, 별도 폼 스킨, 독립된 버튼 언어를 써서 목록/상세의 블루 중심 카드 문법과 분리된다.
   - 매치 여정의 핵심 액션 화면이 가장 다른 제품처럼 보이는 상태다.
@@ -68,7 +68,7 @@
 - Severity: `Medium`
 - Source: `ux-manager`
 - Affected page:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/matches/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/matches/[id]/page.tsx)
 - Summary:
   - 호스트에게 가장 큰 버튼이 비활성 `내가 만든 매치`로 보이고, 실제로 필요한 `수정`이나 관리 행동은 아래로 밀린다.
   - 참가자용 CTA는 명확하지만 호스트용 CTA 위계는 약하다.
@@ -78,7 +78,7 @@
 - Severity: `Medium`
 - Source: `ux-manager`, `ui-manager`
 - Affected page:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/my/matches/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/my/matches/page.tsx)
 - Summary:
   - 탭과 요약 카드 구조는 이해하기 쉽지만, URL 탭 동기화, 샘플 데이터 노출, 별도 삭제 오버레이가 함께 있어 신뢰감이 떨어진다.
   - 히스토리/관리 화면이 같은 흐름의 연장선이라기보다 따로 만든 대시보드처럼 느껴진다.
@@ -88,9 +88,9 @@
 - Severity: `Low`
 - Source: `design-main`, `ui-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/matches/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/matches/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/my/matches/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/matches/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/matches/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/my/matches/page.tsx)
 - Summary:
   - 상단 탐색 패턴이 `검색바+칩`, `breadcrumb`, `탭`, `sticky bar`로 제각각이고, 상세의 2열 정보 카드도 모바일에서 밀도가 높다.
   - 각 페이지 단독 완성도는 나쁘지 않지만, 라이프사이클 전체의 시각적 연속성은 약하다.

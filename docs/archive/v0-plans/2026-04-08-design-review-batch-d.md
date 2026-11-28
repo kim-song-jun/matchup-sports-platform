@@ -46,9 +46,9 @@
 - Severity: `High`
 - Source: `ux-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/page.tsx)
-  - [new/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/new/page.tsx)
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/[id]/edit/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/team-matches/page.tsx)
+  - [new/page.tsx](apps/web/src/app/(main)/team-matches/new/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/team-matches/[id]/edit/page.tsx)
 - Summary:
   - 팀매칭 목록, 생성, 수정이 모두 `soccer`/`futsal`만 전제하고 있어 서비스 전체 종목 범위와 어긋난다.
   - 사용자 입장에서는 “내 종목은 지원 안 하나?”라는 혼선을 만들고, 조용한 기능 누락처럼 보인다.
@@ -58,7 +58,7 @@
 - Severity: `High`
 - Source: `ux-manager`
 - Affected page:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/teams/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/teams/[id]/page.tsx)
 - Summary:
   - `mockTrustScore`, `mockBadges`, `mockRecentMatches`, `hasMercenaryPost = true`가 검증된 신뢰 정보처럼 렌더링된다.
   - 팀 상세는 사용자 판단의 중심 화면이라, 샘플/추정 데이터를 실제 신뢰 신호처럼 보이게 하면 위험하다.
@@ -68,10 +68,10 @@
 - Severity: `High`
 - Source: `design-main`, `ui-manager`, `ux-manager`
 - Affected pages:
-  - [new/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/teams/new/page.tsx)
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/teams/[id]/edit/page.tsx)
-  - [new/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/new/page.tsx)
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/[id]/edit/page.tsx)
+  - [new/page.tsx](apps/web/src/app/(main)/teams/new/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/teams/[id]/edit/page.tsx)
+  - [new/page.tsx](apps/web/src/app/(main)/team-matches/new/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/team-matches/[id]/edit/page.tsx)
 - Summary:
   - 팀 생성/수정과 팀매칭 생성/수정이 서로 다른 폼 스킨, 칩, 버튼, 간격 시스템을 써서 같은 제품 여정처럼 보이지 않는다.
   - 특히 `teams/new`가 가장 이질적이고, 모바일에서는 단계형 흐름과 단일 페이지 폼의 대비가 더 크게 느껴진다.
@@ -81,10 +81,10 @@
 - Severity: `High`
 - Source: `ui-manager`
 - Affected pages:
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/teams/[id]/edit/page.tsx)
-  - [edit/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/[id]/edit/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/my/teams/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/[id]/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/teams/[id]/edit/page.tsx)
+  - [edit/page.tsx](apps/web/src/app/(main)/team-matches/[id]/edit/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/my/teams/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/team-matches/[id]/page.tsx)
 - Summary:
   - 어떤 화면은 공용 `Modal`을 쓰고, 어떤 화면은 raw overlay를 직접 만든다.
   - destructive flow가 제품 전반의 공통 규칙을 따르지 않아, 일관성과 접근성 모두 흔들린다.
@@ -94,7 +94,7 @@
 - Severity: `Medium`
 - Source: `design-main`, `ui-manager`
 - Affected page:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/teams/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/teams/[id]/page.tsx)
 - Summary:
   - 신뢰도, 최근 경기, 활동 정보, SNS, 영상, 갤러리, 배지까지 한 화면에 몰려 있다.
   - 색과 카드 스타일도 많이 섞여 팀 여정 안에서 가장 홍보 페이지나 대시보드에 가까운 톤이 된다.
@@ -104,9 +104,9 @@
 - Severity: `Medium`
 - Source: `ux-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/teams/page.tsx)
-  - [team-list.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/teams/team-list.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/my/team-matches/page.tsx)
+  - [page.tsx](apps/web/src/app/(main)/teams/page.tsx)
+  - [team-list.tsx](apps/web/src/app/(main)/teams/team-list.tsx)
+  - [page.tsx](apps/web/src/app/(main)/my/team-matches/page.tsx)
 - Summary:
   - `/teams`는 탐색 화면처럼 보이지만 지역/종목/상태 필터가 약하고, 핵심 의사결정 정보가 카드 하단으로 밀린다.
   - `/my/team-matches`는 탭 구조는 괜찮지만 URL 상태 복원과 hosted/applied 맥락 구분이 충분히 명확하지 않다.
@@ -116,9 +116,9 @@
 - Severity: `Low`
 - Source: `design-main`, `ui-manager`, `ux-manager`
 - Affected pages:
-  - [arrival/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/[id]/arrival/page.tsx)
-  - [score/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/[id]/score/page.tsx)
-  - [evaluate/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(main)/team-matches/[id]/evaluate/page.tsx)
+  - [arrival/page.tsx](apps/web/src/app/(main)/team-matches/[id]/arrival/page.tsx)
+  - [score/page.tsx](apps/web/src/app/(main)/team-matches/[id]/score/page.tsx)
+  - [evaluate/page.tsx](apps/web/src/app/(main)/team-matches/[id]/evaluate/page.tsx)
 - Summary:
   - `arrival`, `score`, `evaluate`는 기능적으로 연결돼 있지만, 각각의 색/레이아웃/강조 방식이 달라 독립 툴처럼 느껴진다.
   - 게다가 `arrival`와 `score`는 mock 중심이라 운영 화면보다 데모 화면 인상이 강하다.

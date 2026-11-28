@@ -69,7 +69,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 
 ## Progress Snapshot
 - Phase: A / Investigation and implementation.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-22-tournament-return/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-22-tournament-return/matchup-sports-platform
 - Branch: fix/mdqa-22-tournament-return
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
 - PR/head/merge: not created.

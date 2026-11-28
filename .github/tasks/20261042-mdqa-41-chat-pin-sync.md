@@ -57,7 +57,7 @@ Status: In Progress
 
 ## Progress Snapshot
 - 0550 실행: 원 리포트/선점 성공 DOM와 screenshot은 원 checkout `tmp/qa/mdqa-assigned-monitor/2026-10-08-heartbeat-0550/report41-claimed.*`.
-- Dedicated worktree: `C:/Users/kinso/.codex/worktrees/mdqa-41-chat-pin-sync/matchup-sports-platform`.
+- Dedicated worktree: `<local Codex worktrees folder>/mdqa-41-chat-pin-sync/matchup-sports-platform`.
 - Branch: `fix/mdqa-41-chat-pin-sync`; base dev 5948dfd6. PR/수정/검증 아직 대기.
 - Frontend investigation: `lib/query-client.ts`는 `staleTime: 60_000`, `refetchOnWindowFocus: false`. 목록/상세 chat query에 override가 없고, 개인 pin PATCH는 같은 탭 QueryClient만 invalidate한다. Backend `ChatService.updateMe`는 participant 저장 후 응답하며 pin realtime emit이 없다.
 - 조사 가설: (1) 서버 저장 실패는 새로고침 후 일치/실제 PATCH 계약으로 기각, (2) B의 query 복귀 재조회 누락은 기본 focus false로 확인, (3) realtime pin 전달 누락은 updateMe와 message/safety listener 확인. 대안으로 명시된 focus refresh를 두 chat query에만 적용한다.
@@ -86,7 +86,7 @@ Status: In Progress
 
 ## Recurrence Progress Snapshot — 2026-10-08
 
-- 기존 PR1662는 MERGED이며 재사용하지 않는다. 후속 WT는 C:/Users/kinso/.codex/worktrees/mdqa-41-pin-recurrence/matchup-sports-platform, branch fix/mdqa-41-pin-recurrence, root가 fetch한 origin/dev 016847e 기준이다. root가 기존 리포트 김성준/확인 중 및 후속 열린 PR 중복 없음을 확인했다.
+- 기존 PR1662는 MERGED이며 재사용하지 않는다. 후속 WT는 <local Codex worktrees folder>/mdqa-41-pin-recurrence/matchup-sports-platform, branch fix/mdqa-41-pin-recurrence, root가 fetch한 origin/dev 016847e 기준이다. root가 기존 리포트 김성준/확인 중 및 후속 열린 PR 중복 없음을 확인했다.
 - 실제 alpha 재발 근거: 원 checkout tmp/qa/mdqa-assigned-monitor/2026-10-08-heartbeat-0550/report41-fresh-detail-1823.txt의 17:58 댓글. 9edd47d 배포 성공 후 새 두 탭의 A 고정1/B고정없음, 물리적 탭 복귀 후14.157초까지 불일치, B reload 일치, 해제 원복. 활성 대화는 원 고정 대상과 다른 팀 방이었다. UI serving SHA와 focus/visibility 실제 이벤트는 미노출·미검증이다.
 - 설치된 primary code: @tanstack/query-core 5.102.8/src/focusManager.ts는 window visibilitychange만 등록하고 window focus를 듣지 않는다. queryClient의 focus subscription → queryCache.onFocus → observer.refetch 경로를 확인했다. 기존 chat always 옵션과 HTTP 회귀는 visibilitychange만 검사했다. document가 계속 visible인 창 focus 복귀 누락은 재발을 설명할 수 있는 동작이며, 해당 alpha 세션의 확정 원인으로 단정하지 않는다.
 - 수정 전 실제 HTTP RED(18:32:59): 기존 두 chat spec 27건, raw11 FAIL/16 PASS(exit1,20.21s). window focus의 fresh/stale×pin/unpin4, query5031, 실제 base/filter/archive/detail 오류 소비자4, cleanup 전 focus 최신화1이 실제 제품 실패10건이다. 추가 deferred guard1은 tracked data 구독 누락으로 실패한 harness 문제이며 제품 실패 count에서 제외한다. visibility·Home·disabled/ID·hidden 경로는 통과했다.
@@ -100,7 +100,7 @@ Status: In Progress
 
 ## Follow-up Progress Snapshot — 2026-10-08 19:25 UTC
 
-- Active follow-up canonical: this same report #41 task in fresh managed worktree `C:/Users/kinso/.codex/worktrees/mdqa-41-filter-cache/matchup-sports-platform`; branch `fix/mdqa-41-filter-cache-return`, fresh fetched `origin/dev=0dcb03c3243ce40684208eae42cf3008e1c87224`. Previous merged PR1662/1674 and worktrees remain historical; no push to merged branches.
+- Active follow-up canonical: this same report #41 task in fresh managed worktree `<local Codex worktrees folder>/mdqa-41-filter-cache/matchup-sports-platform`; branch `fix/mdqa-41-filter-cache-return`, fresh fetched `origin/dev=0dcb03c3243ce40684208eae42cf3008e1c87224`. Previous merged PR1662/1674 and worktrees remain historical; no push to merged branches.
 - Fresh live #41 remains 김성준 / 확인 중. New 19:05–19:06 UTC two-tab actual UI recurrence and root-read attached stale/reload pixels are in own run1913 receipts. Initial all-list failure cause still unknown because direct loaded bundle/DOM-return/query/GET response telemetry is absent.
 - Phase 2 readonly diagnostic identifies six distinguishable hypotheses. H4: a warmed fresh filtered query is disabled on all-category; base return refresh does not stale the disabled sibling; category re-entry can reuse old pin. H4 is a bounded source candidate only and does not explain the initial all-list 41.880s stale symptom.
 - Phase 3 starts with unchanged-product actual consumer/HTTP RED for H4. Owned: `components/community/community-api-clients.tsx`, a separate actual-consumer regression spec/fixture if necessary, this task, one Changeset. Shared hook/query helper/API/DTO/schema/MSW/policies are forbidden unless root later approves a proven shared defect.

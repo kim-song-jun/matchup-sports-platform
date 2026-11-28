@@ -53,7 +53,7 @@ origin/dev5948dfd6에서 fetch 직후 managed전용 WT. #41은 별도 focus설�
 | 2026-10-08 | Report44 | WS/폴링 또는 다른 계정 수신 원인? | 발신자가 chat:message 대상에서 빠져 1인 팀은 이벤트 0건. 목록 구독 누락과 room subtree 중복 invalidation도 실제 소비자/QueryObserver RED로 확인. |
 
 ## Progress Snapshot
-- WT C:/Users/kinso/.codex/worktrees/mdqa-44-chat-message-sync/matchup-sports-platform; branch fix/mdqa-44-chat-message-sync; base5948dfd6.
+- WT <local Codex worktrees folder>/mdqa-44-chat-message-sync/matchup-sports-platform; branch fix/mdqa-44-chat-message-sync; base5948dfd6.
 - Root evidence report44-before/claimed DOM/screens; source investigation pending, no PR yet.
 
 ### 2026-10-08 root validation checkpoint

@@ -54,7 +54,7 @@ URL 복귀 상태에서 빠진 목록 페이지를 기존 필터 상태와 통�
 | 2026-10-08 | Report #42 | #22 재발인가? | 유형 유지, 페이지 번호만 누락. 독립 수정이며 global history scope는 제외. |
 
 ## Progress Snapshot
-- Worktree `C:/Users/kinso/.codex/worktrees/mdqa-42-tournament-page-return/matchup-sports-platform`, branch `fix/mdqa-42-tournament-page-return`.
+- Worktree `<local Codex worktrees folder>/mdqa-42-tournament-page-return/matchup-sports-platform`, branch `fix/mdqa-42-tournament-page-return`.
 - Original/claim DOM and screenshot: root ignored 0550 evidence `report42-{before,claimed}.*`.
 - Base 5948dfd6; frontend 구현·좁은 회귀 검증 완료, root 리뷰·통합 검증·publication 대기.
 - Implementation (frontend-ui-dev): 데스크톱 page를 안전한 정수로 URL에서 hydrate하고 페이지 선택은 `router.replace`로 현재 history entry에 반영한다. URL 반영 전 로컬 page draft가 카드의 `from`에도 같은 페이지를 담는다. 새 URL/Back에서는 draft를 비우고 URL 페이지를 읽는다. 필터 옵션·초기화·유형 전환은 page를 제거하고, 시트 여닫기는 page를 유지한다. 모바일 cursor/누적 및 오류·fetching 표면은 유지했다.

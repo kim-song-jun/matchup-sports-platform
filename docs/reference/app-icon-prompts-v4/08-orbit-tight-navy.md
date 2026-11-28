@@ -1,6 +1,6 @@
 # 08-orbit-tight-navy
 
-기준 시안: [08-orbit-tight-navy.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/08-orbit-tight-navy.png)
+기준 시안: [08-orbit-tight-navy.png](../app-icons-v4/08-orbit-tight-navy.png)
 
 ## 포지션
 

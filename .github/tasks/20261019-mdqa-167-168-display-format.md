@@ -9,7 +9,7 @@
 ## 정본
 
 - `docs/design/competition-canonical-flow.md` §3
-- `/Users/limseungje/.agents/skills/teameet-domain-rules/tournament-rules.md` §4·§5
+- `<로컬 에이전트 스킬 폴더>/teameet-domain-rules/tournament-rules.md` §4·§5
 
 ## 완료 조건
 

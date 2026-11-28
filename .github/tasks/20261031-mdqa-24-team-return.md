@@ -74,7 +74,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 
 ## Progress Snapshot
 - Phase: A / Minimal implementation ready for root's serialized GREEN validation.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-24-team-return/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-24-team-return/matchup-sports-platform
 - Branch: fix/mdqa-24-team-return
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
 - PR/head/merge: not created.

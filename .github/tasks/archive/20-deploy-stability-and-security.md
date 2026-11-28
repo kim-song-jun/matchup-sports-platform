@@ -1,6 +1,6 @@
 # 20 — Deploy Stability & Security Hardening (P1)
 
-> **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
+> **Parent plan**: `enumerated-scribbling-popcorn.md` (저장소 밖 로컬 플랜 파일)
 > **Wave**: 3 (P1, P0 task 17/18/19 머지 후 시작)
 > **Owner**: 병렬 (infra-devops-dev: deploy + infra-security-dev: 가드 + backend-data-dev: e2e fixture)
 > **Status**: completed

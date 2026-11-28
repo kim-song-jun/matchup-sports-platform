@@ -1,6 +1,6 @@
 # 04-m-notch-blue
 
-기준 시안: [04-m-notch-blue.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/04-m-notch-blue.png)
+기준 시안: [04-m-notch-blue.png](../app-icons-v4/04-m-notch-blue.png)
 
 ## 포지션
 

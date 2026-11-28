@@ -1,6 +1,6 @@
 # 10-pillars-tilt-navy
 
-기준 시안: [10-pillars-tilt-navy.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/10-pillars-tilt-navy.png)
+기준 시안: [10-pillars-tilt-navy.png](../app-icons-v4/10-pillars-tilt-navy.png)
 
 ## 포지션
 

@@ -73,7 +73,7 @@ Status: In Progress
 - RED: actual pending keyboard retry and active layout/primitive cases4FAIL/1PASS, separate dissolved cached503 case1FAIL. GREEN: existing teams-client98 + actual focus/error consumer13 + shared primitive5 =116/116 PASS. Evidence mdqa69-review-red.log, mdqa69-dissolved-review-red.log, mdqa69-review-green.log in root ignored run directory.
 - Web CI failure at6526521 was one outdated test expecting the list error title; the expectation now asserts the actual team-detail title. No production fallback or validation gate changed. Latest scope lint and committed-head independent review are root next gates; alpha failure/recovery/auth/persona/viewport remains NOTRUN while login is pending.
 - Base: `552f5b6fb98d8546daf5e26f7de7a8ac413251f2` (`origin/dev` 직전 fetch).
-- Worktree: `C:/Users/kinso/.codex/worktrees/mdqa-69-team-detail-refresh/matchup-sports-platform` (기존 적합한 checkout 재사용).
+- Worktree: `<local Codex worktrees folder>/mdqa-69-team-detail-refresh/matchup-sports-platform` (기존 적합한 checkout 재사용).
 - Branch: `fix/mdqa-69-refresh-error-notice`.
 - Original PR1758 head `05f58ee2db3a96ffdcc4f925ce2d38c4d0da5560`, merge `8cbab01073e862b00adf6e08ef2befaf727623a5`.
 - Current phase: GREEN implementation prepared in owned `teams-client.tsx` and dedicated Changeset; root serial GREEN pending. Independent review/review fixes/commit/PR/alpha remain pending.

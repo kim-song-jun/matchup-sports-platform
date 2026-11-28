@@ -1,6 +1,6 @@
 # 06-orbit-match-blue
 
-기준 시안: [06-orbit-match-blue.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/06-orbit-match-blue.png)
+기준 시안: [06-orbit-match-blue.png](../app-icons-v4/06-orbit-match-blue.png)
 
 ## 포지션
 

@@ -52,6 +52,8 @@ export function InfoSectionSheet({
   const [message, setMessage] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
   const Form = definition.Form;
+  // 올리는 중인 이미지도 닫으면 사라지는 작업이라 바뀐 칸과 같이 센다. 저장을 보내는 동안은 `pending` 이 닫기를 막는다.
+  const unsaved = dirty || busy;
 
   useEffect(() => {
     if (focusField) document.getElementById(infoFieldId(focusField))?.focus();
@@ -94,7 +96,7 @@ export function InfoSectionSheet({
   };
 
   const cancel = async () => {
-    if (!dirty || (await confirm(SIDE_SHEET_DISCARD_CONFIRM))) onClose();
+    if (!unsaved || (await confirm(SIDE_SHEET_DISCARD_CONFIRM))) onClose();
   };
 
   return (
@@ -103,7 +105,7 @@ export function InfoSectionSheet({
         open
         title={title}
         onClose={onClose}
-        dirty={dirty}
+        dirty={unsaved}
         pending={saving}
         footer={
           <div className="flex flex-col gap-2">

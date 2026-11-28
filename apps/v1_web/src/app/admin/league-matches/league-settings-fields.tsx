@@ -143,7 +143,7 @@ export function leagueTeamFoulThresholdError(value: string): string | null {
   return parseTeamFoulThresholdInput(value) === 'invalid' ? TEAM_FOUL_THRESHOLD_ERROR : null;
 }
 
-/** 팀 파울 기준(개). 비워 두면 기본 5개 — 한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 "다음부터 10m 프리킥"을 알린다. */
+/** 팀 파울 기준(개). 비워 두면 기본 5개 — 한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "세컨 파울 · 10m 프리킥"으로 알린다. */
 export function LeagueTeamFoulThresholdField({ value, onChange, disabled }: {
   value: string;
   onChange: (value: string) => void;
@@ -172,7 +172,7 @@ export function LeagueTeamFoulThresholdField({ value, onChange, disabled }: {
       </div>
       {error !== null && <p role="alert" className="mt-1 text-[length:var(--font-size-caption)] text-[var(--red700)]">{error}</p>}
       <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-        한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;을 알려요. 비우면 {DEFAULT_TEAM_FOUL_THRESHOLD}개예요. 리그를 연 뒤에도 규정 탭에서 바꿀 수 있어요.
+        한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;세컨 파울 · 10m 프리킥&rsquo;으로 알려요. 비우면 {DEFAULT_TEAM_FOUL_THRESHOLD}개예요. 리그를 연 뒤에도 규정 탭에서 바꿀 수 있어요.
       </p>
     </div>
   );

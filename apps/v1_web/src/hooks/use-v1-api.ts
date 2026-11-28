@@ -5475,7 +5475,10 @@ export function useV1CreateBracketBye(tournamentId: string) {
     mutationFn: (body: import('@/types/api').V1CreateBracketByePayload) =>
       v1Post<V1AdminBracketGroupTeam>(`/admin/tournaments/${tournamentId}/byes`, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) }),
+        queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) }),
+      ]);
     },
   });
 }

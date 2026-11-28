@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 import { mergeByFixtureId } from '@/lib/merge-board-pages';
+import { OPERATIONS_BOARD_PAGE_LIMIT, readOperationsBoardPages } from '@/lib/operations-board-pages';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
@@ -211,10 +212,6 @@ export const resultReviewKeys = {
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-const ENDED_FIXTURES_PAGE_LIMIT = 100;
-/** 한 번에 읽는 서버 페이지 상한(2,000경기). 서버가 커서를 잘못 주어도 요청이 끝없이 이어지지 않게 한다. */
-const ENDED_FIXTURES_MAX_PAGES = 20;
-
 /**
  * 보드 API 한 페이지 상한(100)에서 멈추면 101번째 경기부터 검토·정정 목록과 `?fixtureId=` 딥링크에서
  * 사라져 어드민이 그 결과를 고칠 수 없다 — 다음 커서가 없을 때까지 읽어 한 목록으로 합친다.
@@ -222,25 +219,19 @@ const ENDED_FIXTURES_MAX_PAGES = 20;
  */
 async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOperationsBoardResponse> {
   const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
-  const items: TournamentOperationsBoardItem[] = [];
-  const liveWarnings: TournamentOperationsBoardResponse['liveWarnings'] = [];
-  const usedCursors = new Set<string>();
-  let cursor: string | null = null;
-  let page!: TournamentOperationsBoardResponse;
-  for (let pageCount = 0; pageCount < ENDED_FIXTURES_MAX_PAGES; pageCount += 1) {
-    page = await v1Get<TournamentOperationsBoardResponse>(path, {
+  const pages = await readOperationsBoardPages((cursor) =>
+    v1Get<TournamentOperationsBoardResponse>(path, {
       status: 'ENDED',
-      limit: ENDED_FIXTURES_PAGE_LIMIT,
+      limit: OPERATIONS_BOARD_PAGE_LIMIT,
       ...(cursor === null ? {} : { cursor }),
-    });
-    items.push(...page.items);
-    liveWarnings.push(...page.liveWarnings);
-    const next = page.nextCursor;
-    if (!next || page.items.length === 0 || usedCursors.has(next)) break;
-    usedCursors.add(next);
-    cursor = next;
-  }
-  return { ...page, items: mergeByFixtureId(items), liveWarnings: mergeByFixtureId(liveWarnings), nextCursor: null };
+    }),
+  );
+  return {
+    ...pages[pages.length - 1],
+    items: mergeByFixtureId(pages.flatMap((page) => page.items)),
+    liveWarnings: mergeByFixtureId(pages.flatMap((page) => page.liveWarnings)),
+    nextCursor: null,
+  };
 }
 
 /**
@@ -449,7 +440,7 @@ export function useVoidResultRevision(gameId: string, tournamentId?: string) {
     mutationFn: (input: VoidResultInput) =>
       postGameCommand<GameRevisionMutationResult>(
         `/games/${encodeURIComponent(gameId)}/result-revisions/${encodeURIComponent(input.revisionId)}/void`,
-        { expectedVersion: input.expectedVersion, reason: input.reason },
+        { expectedVersion: input.expectedVersion, reason: input.reason, confirmationText: '결과 무효', resetToScheduled: true },
       ),
     onSuccess: () => invalidateGame(queryClient, gameId, tournamentId),
   });

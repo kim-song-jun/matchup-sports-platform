@@ -257,7 +257,9 @@ export function BracketNodePanel({
       return <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>진행 중인 경기는 라이브 콘솔에서 입력해요.</p>;
     }
     const revision = game.latestRevision;
-    if (revision !== null && revision.state !== 'VOID') {
+    if (revision?.state === 'VOID') return <BracketResultActions tournamentId={tournamentId} fixtureId={fixture.id} game={game}
+      isKnockout={isKnockout} homeLabel={sideLabels.HOME} awayLabel={sideLabels.AWAY} canWrite={canWrite} showToast={showToast} />;
+    if (revision !== null) {
       return (
         <BracketResultActions
           tournamentId={tournamentId}
@@ -285,9 +287,6 @@ export function BracketNodePanel({
     if (!canWrite) return null;
     return (
       <div className="flex flex-col gap-2">
-        {revision !== null ? (
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>무효 처리된 결과예요. 점수를 다시 넣을 수 있어요.</p>
-        ) : null}
         <BracketQuickResultForm
           homeLabel={sideLabels.HOME}
           awayLabel={sideLabels.AWAY}

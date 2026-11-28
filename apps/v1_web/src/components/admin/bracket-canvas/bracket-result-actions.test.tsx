@@ -221,11 +221,27 @@ describe('BracketResultActions — 점수 고치기', () => {
 });
 
 describe('BracketResultActions — 결과 무효', () => {
+  it('사유만 입력하거나 확인 문구가 다르면 요청하지 않고 취소한다', async () => {
+    renderActions();
+    fireEvent.click(screen.getByRole('button', { name: '결과 무효' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('무효 사유'), { target: { value: '잘못 입력한 결과' } });
+    for (const value of ['', '결과무효', '결과 무효 ', ' 결과 무효']) {
+      fireEvent.change(within(dialog).getByLabelText('확인 문구: 결과 무효'), { target: { value } });
+      expect(within(dialog).getByRole('button', { name: '무효로 처리' })).toBeDisabled();
+    }
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(mocks.voidRevision).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '결과 무효' }));
+    expect(screen.getByLabelText('확인 문구: 결과 무효')).toHaveValue('');
+  });
   it('사유를 받아 현재 확정 리비전을 무효로 처리한다', async () => {
     const props = renderActions();
     fireEvent.click(screen.getByRole('button', { name: '결과 무효' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('무효 사유'), { target: { value: '다른 경기 결과였어요' } });
+    expect(within(dialog).getByRole('button', { name: '무효로 처리' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('확인 문구: 결과 무효'), { target: { value: '결과 무효' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '무효로 처리' }));
     await waitFor(() =>
       expect(mocks.voidRevision).toHaveBeenCalledWith({ revisionId: 'rev-1', expectedVersion: 5, reason: '다른 경기 결과였어요' }),
@@ -239,6 +255,7 @@ describe('BracketResultActions — 결과 무효', () => {
     fireEvent.click(screen.getByRole('button', { name: '결과 무효' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('무효 사유'), { target: { value: '사유' } });
+    fireEvent.change(within(dialog).getByLabelText('확인 문구: 결과 무효'), { target: { value: '결과 무효' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '무효로 처리' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('다음 경기가 이미 시작돼서 바꿀 수 없어요.');
   });

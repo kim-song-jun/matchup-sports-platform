@@ -1,3 +1,5 @@
+결과 무효는 `결과 무효` 정확 입력을 요구하며, 대회 경기는 기존 이력을 보존하고 시작 전 대진으로 복구할 수 있다. [결과 무효·복구 계약](./domains/tournament-operations.md#결과-무효-후-대진-복구-2026-11-27).
+
 대회 대진 상단 초기화는 preview snapshot 확인 후 같은 상태만 초기화한다. 참가 신청·설정·등록 시간/구장은 보존하며 진행·기록·결과가 있는 경기는 차단한다. [초기화 계약](./domains/tournaments.md#대진-상단-초기화-2026-11-27).
 
 대회 취소는 공백이 아닌 사유(최대 500자)를 필수로 받고 양쪽 감사 이력에 저장한다. [상태 변경 계약](./domains/tournaments.md).
@@ -66,6 +68,8 @@ N개 토너먼트 대회의 독립 대진 초기화와 예선 수정도 활성 �
 Personal-match online place classification: public detail includes `isOnline`; the authenticated, audited `PATCH /admin/matches/:matchId/online` sets that factual value without changing publication or search visibility. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
 
 12강 부전승 홈·어웨이 교환은 [Tournaments 계약](./domains/tournaments.md)의 `PUT /admin/tournament-slots/:slotId/bye-side`를 따른다. 저장 배치와 승자 연결을 함께 변경한다.
+
+다른 경기로 옮길 때는 `PUT /api/v1/admin/tournament-slots/:slotId/bye-position`에 `sourceFixtureId`, `expectedSide`, `targetFixtureId`, `side`, `expectedOrigin`을 보낸다. 목적지의 기존 슬롯 ID, 승자 원천 경기 ID, 직접 배정한 팀의 참가 ID 또는 빈 자리의 목적지 경기 ID를 검증한다. 수동 부전승 저장 API는 `targetFixtureId`와 `targetSide`를 함께 받아 직행 경기를 연결한다.
 
 Ordinary team-match period rules (MD-QA #141): host-authorized defaults, separate single/two-period selection, immutable pins and pre-play edit gates are documented in [team matches](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141).
 

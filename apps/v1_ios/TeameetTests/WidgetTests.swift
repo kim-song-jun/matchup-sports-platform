@@ -92,3 +92,41 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(WidgetAPI.savedStatus(Data(#"{"data":{}}"#.utf8), requested: "GOING"), "GOING")
     }
 }
+
+final class WidgetFollowupTests: XCTestCase {
+    func testLogoPriorityDeduplicationAndCacheLimit() {
+        let model = WidgetModel(live: [.init(teamLogoUrl: "/mine", opponentLogoUrl: "/new-opponent")],
+                                pending: [.init(teamLogoUrl: "/mine", opponentLogoUrl: "/pending")],
+                                schedules: (0..<20).map { .init(teamLogoUrl: "/\($0)") })
+        XCTAssertEqual(WidgetLogoPolicy.paths(model: model, limit: 4) { $0 == "/mine" }, ["/new-opponent", "/pending", "/0", "/1"])
+        XCTAssertEqual(WidgetLogoPolicy.paths(model: model, limit: 0) { _ in false }, [])
+        XCTAssertEqual(WidgetLogoPolicy.paths(model: model, limit: 100) { _ in false }.count, 20)
+    }
+    func testBudgetCancelsSlowBatch() async {
+        let cancelled = expectation(description: "Timed-out batch cancels its network session")
+        cancelled.assertForOverFulfill = false
+        let clock = ContinuousClock()
+        let start = clock.now
+        await WidgetFetchBudget.run(timeout: .milliseconds(20), cancel: { cancelled.fulfill() }) {
+            do { try await Task.sleep(for: .seconds(10)) } catch { return }
+            XCTFail("Slow operation must be cancelled")
+        }
+        await fulfillment(of: [cancelled], timeout: 1)
+        XCTAssertLessThan(start.duration(to: clock.now), .seconds(1))
+    }
+    func testLockScreenPriorityAndPrivacy() {
+        let now: Int64 = 2_000_000
+        let game = WidgetModel.Live(teamName: "한강 로버스", opponentName: "마포 레인저스", score: nil)
+        let model = WidgetModel(generatedAt: now, live: [game], pending: [.init(title: "팀 훈련", canRespond: true)])
+        let plan = WidgetPresentation.plan(model, updatedAt: now, now: now)
+        XCTAssertEqual(plan.kind, .live)
+        XCTAssertEqual(WidgetPresentation.inline(plan, now: now), "● LIVE 한강 —:— 마포")
+        var ended = model
+        ended.live[0].state = "ENDED"
+        XCTAssertEqual(WidgetPresentation.liveStatus(ended.live[0]), "종료")
+        XCTAssertEqual(WidgetPresentation.plan(ended, updatedAt: now, now: now + 900_000).kind, .pending)
+        ended.live[0].period = .init(phase: "HALFTIME")
+        ended.live[0].state = "LIVE"
+        XCTAssertEqual(WidgetPresentation.liveStatus(ended.live[0]), "하프타임")
+    }
+}

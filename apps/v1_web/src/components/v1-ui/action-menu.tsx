@@ -45,6 +45,7 @@ export function ActionMenu({ label, actions, trigger, align = 'start', header, s
   }, []);
 
   // 폭이 갈리면 열려 있던 쪽 표면은 사라지므로 닫아 둔다 — 되돌아와도 저절로 다시 열리지 않게.
+  // effect 가 아니라 렌더 중에 고쳐야 폭이 바뀐 첫 프레임에 옛 표면이 한 번 더 그려지지 않는다.
   const [lastDesktop, setLastDesktop] = useState(desktop);
   if (lastDesktop !== desktop) {
     setLastDesktop(desktop);

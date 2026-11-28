@@ -79,6 +79,15 @@ describe('ConsoleScoreCard', () => {
     expect(away.querySelector('svg')).toBeNull();
   });
 
+  it('기준을 넘는 파울부터는 「세컨 파울 · 10m 프리킥」으로 바뀌고 예고 문구는 사라진다', () => {
+    renderCard({ foulCounts: { 'side-home': 4, 'side-away': 3 }, foulThreshold: 3 });
+    const [home, away] = screen.getAllByRole('group');
+    expect(within(home).getByText('세컨 파울 · 10m 프리킥')).toBeInTheDocument();
+    expect(within(home).queryByText('다음부터 10m 프리킥')).toBeNull();
+    expect(within(away).getByText('다음부터 10m 프리킥')).toBeInTheDocument();
+    expect(within(away).queryByText('세컨 파울 · 10m 프리킥')).toBeNull();
+  });
+
   it('팀 파울 줄에는 구간 이름이 없다 — 구간은 단계 줄이 말한다', () => {
     renderCard();
     expect(screen.getAllByText(/^팀 파울 \d+$/)).toHaveLength(2);

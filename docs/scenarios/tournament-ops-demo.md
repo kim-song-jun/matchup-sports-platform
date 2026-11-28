@@ -1,7 +1,7 @@
 # 실제 어드민을 사용하는 대회 운영 체험
 
 Task: [20261123](../../.github/tasks/archive/20261123-tournament-ops-demo.md) · PR #2168·#2170
-Status: Alpha PASS on a8cb59951; 13/13 screens, 3/3 viewports, account/entity API requests 0
+Status: Alpha PASS on a8cb59951 (대회 정보가 수정 모달이던 때); 13/13 screens, 3/3 viewports, account/entity API requests 0. 대회 정보 「기본」 수정 시트(시나리오 2번)는 이 PR 이 배포된 뒤 다시 확인한다.
 
 2026-11-05 사용자 A안 선택으로 기존 5단계·3개 역할의 별도 시뮬레이터 계획을 대체한다.
 기존 `/admin/ops/tournaments`, `/my/tournament-staff`의 새 탭 진입과 로그인 없는 공유 URL은 유지한다.
@@ -21,7 +21,7 @@ Status: Alpha PASS on a8cb59951; 13/13 screens, 3/3 viewports, account/entity AP
 | # | 실제 사용자 흐름 | 로컬 검증 | Alpha after |
 |---|---|---|---|
 | 1 | 비로그인 진입과 실제 11개 관리 메뉴·현장 2개 화면 | 실제 컴포넌트 13/13 PASS | 13/13 PASS |
-| 2 | 대회 정보 「기본」 수정 시트 → 저장 → 헤더 반영 | 실제 UI PASS | 시트로 바뀐 뒤 다시 확인 전 |
+| 2 | 대회 정보 「기본」 수정 시트 → 저장 → 헤더 반영 | 실제 UI PASS | a8cb59951 에서 수정 모달로 PASS; 시트는 배포 뒤 확인 전 |
 | 3 | 팀 카드 → 확인 모달 → 4팀 참가 확정, 대기는 별도 상태 | 실제 UI·모델 PASS | 4팀 확정 PASS; 대기는 모델 증거 |
 | 4 | 실제 대진 마법사 → 4팀 미리보기 → 생성·팀 배정 | 실제 모델 PASS | PASS |
 | 5 | 실제 칸 상세 → 점수 입력 → 확인 → 결승 진출 표시 | 실제 UI·모델 PASS | PASS; 통계 화면 탐색 PASS |

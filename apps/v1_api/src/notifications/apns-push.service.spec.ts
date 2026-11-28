@@ -350,6 +350,50 @@ describe('ApnsPushService', () => {
     expect(connect).toHaveBeenCalledTimes(2);
   });
 
+  describe('Live Activity', () => {
+    const state = { state: 'LIVE', score: { mine: 1, opponent: 0 } };
+
+    it('addresses the activity topic with the liveactivity push type and no collapse id', async () => {
+      configure();
+      const { service, session } = build([{ status: 200 }]);
+
+      const outcome = await service.sendLiveActivity('abc123', { event: 'update', contentState: state });
+
+      expect(outcome).toBe('delivered');
+      expect(session.sent[0]).toMatchObject({
+        ':path': '/3/device/abc123',
+        'apns-topic': 'kr.co.teameet.alpha.push-type.liveactivity',
+        'apns-push-type': 'liveactivity',
+      });
+      expect(session.sent[0]).not.toHaveProperty('apns-collapse-id');
+      expect(JSON.parse(session.bodies[0]!)).toEqual({
+        aps: { timestamp: nowMs / 1000, event: 'update', 'content-state': state },
+      });
+    });
+
+    it('sends the dismissal date, in seconds, only when the activity ends', async () => {
+      configure();
+      const { service, session } = build([{ status: 200 }]);
+
+      await service.sendLiveActivity('abc123', { event: 'end', contentState: state, dismissalDate: 1_700_000_900 });
+
+      expect(JSON.parse(session.bodies[0]!).aps).toMatchObject({ event: 'end', 'dismissal-date': 1_700_000_900 });
+    });
+
+    it('reports a token rejected at both gateways as permanent, so the caller can drop it', async () => {
+      configure();
+      const bad = JSON.stringify({ reason: 'BadDeviceToken' });
+      const { service } = build([{ status: 400, body: bad }, { status: 400, body: bad }]);
+
+      expect(await service.sendLiveActivity('abc123', { event: 'update', contentState: state })).toBe('permanent');
+    });
+
+    it('does nothing without credentials', async () => {
+      const { service } = build();
+      expect(await service.sendLiveActivity('abc123', { event: 'update', contentState: state })).toBe('disabled');
+    });
+  });
+
   it('serves ios and nothing else', () => {
     configure();
     const { service } = build();

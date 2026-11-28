@@ -11,13 +11,26 @@ import { useTournamentEndedFixtures } from './use-tournament-result-review';
  * 딥링크에서 사라졌다 — 큰 리그에서 어드민이 그 경기 결과를 고칠 입구가 없었다(2026-10-01).
  */
 const requests: URLSearchParams[] = [];
+type Mode = 'normal' | 'no-cursor-key' | 'same-cursor' | 'empty-page' | 'endless';
+let mode: Mode = 'normal';
 const fixture = (n: number) => ({ fixtureId: `f-${n}`, gameId: `g-${n}`, revisionId: `r-${n}` });
+const envelope = (data: object) => HttpResponse.json({ status: 'success', timestamp: '2026-10-01T00:00:00.000Z', data });
 
 const server = setupServer(
   http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
     const params = new URL(request.url).searchParams;
     requests.push(params);
     const firstPage = params.get('cursor') === null;
+    if (mode === 'no-cursor-key') return envelope({ items: [fixture(1)], watermark: 'w', liveWarnings: [] });
+    if (mode === 'same-cursor') {
+      return envelope({ items: [fixture(requests.length)], nextCursor: 'stuck', watermark: 'w', liveWarnings: [] });
+    }
+    if (mode === 'empty-page') {
+      return envelope({ items: firstPage ? [fixture(1)] : [], nextCursor: 'more', watermark: 'w', liveWarnings: [] });
+    }
+    if (mode === 'endless') {
+      return envelope({ items: [fixture(requests.length)], nextCursor: `c${requests.length}`, watermark: 'w', liveWarnings: [] });
+    }
     return HttpResponse.json({
       status: 'success',
       timestamp: '2026-10-01T00:00:00.000Z',
@@ -43,6 +56,7 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {
   requests.length = 0;
+  mode = 'normal';
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
 });
 
@@ -66,54 +80,38 @@ describe('useTournamentEndedFixtures', () => {
     ]);
   });
 
-  describe('서버가 커서를 잘못 주어도 요청이 끝없이 이어지지 않는다', () => {
-    const boardReply = (items: unknown[], nextCursor: string | null) =>
-      HttpResponse.json({
-        status: 'success',
-        timestamp: '2026-10-01T00:00:00.000Z',
-        data: { items, nextCursor, watermark: 'w', liveWarnings: [] },
-      });
+  it('서버가 nextCursor 를 빼먹어도 같은 요청을 되풀이하지 않고 한 페이지로 끝낸다', async () => {
+    mode = 'no-cursor-key';
+    const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
 
-    it('이미 쓴 커서가 다시 오면 거기서 멈춘다', async () => {
-      server.use(
-        http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
-          requests.push(new URL(request.url).searchParams);
-          return boardReply([fixture(requests.length)], 'same-cursor');
-        }),
-      );
-      const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests).toHaveLength(1);
+    expect(result.current.data?.items).toHaveLength(1);
+  });
 
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(requests.map((params) => params.get('cursor'))).toEqual([null, 'same-cursor']);
-      expect(result.current.data?.items).toHaveLength(2);
-    });
+  it('같은 커서가 다시 오면 거기서 멈춘다', async () => {
+    mode = 'same-cursor';
+    const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
 
-    it('빈 페이지가 오면 커서가 있어도 멈춘다', async () => {
-      server.use(
-        http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
-          requests.push(new URL(request.url).searchParams);
-          return boardReply([], 'cursor-after-empty');
-        }),
-      );
-      const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests.map((params) => params.get('cursor'))).toEqual([null, 'stuck']);
+  });
 
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(requests).toHaveLength(1);
-      expect(result.current.data?.items).toEqual([]);
-    });
+  it('빈 페이지가 오면 커서가 남아 있어도 멈춘다', async () => {
+    mode = 'empty-page';
+    const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
 
-    it('커서가 계속 새로 와도 20쪽에서 멈춘다', async () => {
-      server.use(
-        http.get('*/api/v1/tournament-ops/tournaments/:tournamentId/operations', ({ request }) => {
-          requests.push(new URL(request.url).searchParams);
-          return boardReply([fixture(requests.length)], `cursor-${requests.length}`);
-        }),
-      );
-      const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests).toHaveLength(2);
+    expect(result.current.data?.items).toHaveLength(1);
+  });
 
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(requests).toHaveLength(20);
-      expect(result.current.data?.items).toHaveLength(20);
-    });
+  it('끝없이 새 커서가 와도 20페이지에서 멈춘다', async () => {
+    mode = 'endless';
+    const { result } = renderHook(() => useTournamentEndedFixtures('league-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(requests).toHaveLength(20);
+    expect(result.current.data?.items).toHaveLength(20);
   });
 });

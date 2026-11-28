@@ -58,7 +58,7 @@ export function BracketResultActions({
 
   const resultHref = resultsHref(adminLiveBase(tournamentId), fixtureId);
   const isOfficial = latest.state === 'OFFICIAL';
-  const summary = `${REVISION_STATE_LABELS[latest.state]} · ${formatGameResultScoreWithPenalties(latest.score)}`;
+  const summary = latest.state === 'VOID' ? REVISION_STATE_LABELS.VOID : `${REVISION_STATE_LABELS[latest.state]} · ${formatGameResultScoreWithPenalties(latest.score)}`;
 
   const runCorrection = async (score: V1QuickResultScore, reason: string) => {
     const base = revisionsQuery.data?.find((candidate) => candidate.id === latest.id);
@@ -112,9 +112,9 @@ export function BracketResultActions({
     setBusy(true);
     setModalError(null);
     try {
-      await voidRevision.mutateAsync({ revisionId: latest.id, expectedVersion: game.version, reason });
+      const result = await voidRevision.mutateAsync({ revisionId: latest.id, expectedVersion: game.version, reason });
       setStep('idle');
-      showToast('결과를 무효로 처리했어요.', 'success');
+      showToast(result.replacement ? '결과를 무효로 처리하고 시작 전으로 복구했어요.' : '결과를 무효로 처리했어요.', 'success');
     } catch (error) {
       setModalError(describeBracketCanvasError(error, '결과를 무효로 처리하지 못했어요.'));
     } finally {
@@ -168,14 +168,14 @@ export function BracketResultActions({
         </>
       ) : null}
 
-      {!game.hasLiveRecords && canWrite && step === 'idle' ? (
-        isOfficial ? (
+      {(!game.hasLiveRecords || latest.state === 'VOID') && canWrite && step === 'idle' ? (
+        isOfficial || latest.state === 'VOID' ? (
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="md" disabled={revisionsQuery.isPending} onClick={() => setStep('form')}>
+            {isOfficial ? <Button variant="outline" size="md" disabled={revisionsQuery.isPending} onClick={() => setStep('form')}>
               점수 고치기
-            </Button>
+            </Button> : null}
             <Button variant="outline" size="md" style={{ color: 'var(--red700)' }} onClick={() => { setModalError(null); setStep('void'); }}>
-              결과 무효
+              {isOfficial ? '결과 무효' : '시작 전으로 복구'}
             </Button>
           </div>
         ) : (
@@ -220,8 +220,10 @@ export function BracketResultActions({
       />
       <ReasonModal
         open={step === 'void'}
+        key={step === 'void' ? 'void-open' : 'void-closed'}
         title="결과를 무효로 처리할까요?"
-        message="무효로 처리하면 이 경기의 공식 점수와 기록이 취소돼요. 사유를 남겨 주세요."
+        message="기존 경기 기록은 이력으로 보존하고 공식 결과와 진출 배정을 취소해요. 대회 경기는 같은 팀·자리·시간·구장으로 시작 전 상태를 만들어요. 다음 경기가 시작됐다면 처리할 수 없어요."
+        confirmationText="결과 무효"
         reasonLabel="무효 사유"
         confirmLabel="무효로 처리"
         tone="danger"

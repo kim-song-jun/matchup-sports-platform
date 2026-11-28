@@ -1,3 +1,7 @@
+## 2026-11-27 — 결과 무효 후 시작 전 복구 (검증 중)
+
+[시나리오](./void-result-reset.md). `결과 무효` 정확 입력과 사유를 요구하고 기존 Game 이력은 보존하며 새 예정 경기로 대진을 복구한다. 부전승·시간·구장·진출 연결 보존, 하류/단계 잠금, 멱등 재전송, 감사 실패 rollback을 검증한다. 실제 PostgreSQL은 CI, Alpha 실행과3폭 화면은 미완료다.
+
 ## 2026-11-27 — 초기화 직접 입력 확인·감사 상세 (후속 검증 중)
 
 [시나리오](./bracket-reset-button.md) · [작업](../../.github/tasks/20261111-preliminary-edit-reset.md). `초기화한다` 정확 입력 후 실행, 서버 동일 검증, 변경 전 전체 대진/편성/순위와 처리 결과 감사의 원자적 저장. API22/Web23 및 타입/정책 PASS. 최종 감사 실패 rollback 실DB·새 PR/Alpha3폭은 진행 중이다.
@@ -687,3 +691,9 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 구현/검증 기록: [.github/tasks/20261130-competition-stage-composition.md](../../.github/tasks/20261130-competition-stage-composition.md)의 2026-11-26 후속 절. Alpha after/실제 DB 미검증이며 기존 증거를 재사용하지 않아요.
 
 - 2026-11-27: [iOS 홈 위젯 PR-A](ios-widget-base.md) — Alpha unsigned 앱+확장 컴파일, 단위 8/8, 고정 샘플 7/7. 실제 alpha API·위젯 호스트 검증 대기.
+
+- 2026-11-27: [iOS 잠금화면 PR-B 및 로고 후속](ios-widget-lock-screen.md) — Alpha 앱+확장 unsigned, 13/13 단위 PASS. 고정 샘플 7/7, 실제 alpha/WidgetKit 호스트 검증 대기.
+
+- 2026-11-27: [iOS Live Activity PR-C](ios-live-activity.md) — PR-B 위 stacked 변경. 17/17 단위·실제 ActivityKit 합성 데이터 UI 검증, 실제 alpha API는 별도 대기.
+
+- 2026-11-27: [iOS Live Activity 푸시 앱 연동 PR-D](ios-live-activity-push.md) — 서버 별도 PR 초안 계약, 토큰 갱신·폐기 및 endedAt 고정 기한. Alpha 관련24개 단위/앱+확장 컴파일·Production unsigned PASS. 실제 alpha/APNs 검증 대기.

@@ -37,9 +37,9 @@ export function useV1SetByeSide(tournamentId: string) {
   const { v1Put } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ slotId, ...body }: { slotId: string; side: 'HOME' | 'AWAY'; expectedSide: 'HOME' | 'AWAY' }) =>
+    mutationFn: ({ slotId, ...body }: { slotId: string; side: 'HOME' | 'AWAY'; expectedSide: 'HOME' | 'AWAY'; sourceFixtureId?: string; targetFixtureId?: string; expectedOrigin?: string }) =>
       v1Put<{ side: 'HOME' | 'AWAY'; sortOrder: number; affectedTeamMatchIds: string[] }>(
-        `/admin/tournament-slots/${encodeURIComponent(slotId)}/bye-side`, body),
+        `/admin/tournament-slots/${encodeURIComponent(slotId)}/${body.targetFixtureId ? 'bye-position' : 'bye-side'}`, body),
     onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
   });
 }
@@ -74,8 +74,8 @@ export function useV1AssignTournamentSlot(competitionId: string, scope: BracketC
   const { v1Put } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ slotId, registrationId }: { slotId: string; registrationId: string | null }) =>
-      v1Put<V1AssignSlotResult>(`/admin/tournament-slots/${encodeURIComponent(slotId)}/assignment`, { registrationId }),
+    mutationFn: ({ slotId, ...body }: { slotId: string; registrationId: string | null; swapSlotId?: string; expectedRegistrationId?: string | null }) =>
+      v1Put<V1AssignSlotResult>(`/admin/tournament-slots/${encodeURIComponent(slotId)}/assignment`, body),
     onSuccess: () => invalidateCompetitionViews(queryClient, competitionId, scope),
   });
 }

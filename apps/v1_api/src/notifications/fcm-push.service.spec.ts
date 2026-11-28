@@ -96,6 +96,23 @@ describe('FcmPushService', () => {
       .toThrow('does not belong');
   });
 
+  it('sends a widget refresh as a data-only, normal-priority message without a notification', async () => {
+    configureCredentials();
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    const service = new FcmPushService(pushDevices as never, logger as never);
+    service.onModuleInit();
+
+    await service.send(androidDevices(['widget-fcm-registration-token']), {
+      notificationId: 'widget-refresh',
+      title: '',
+      dataOnly: { type: 'widget_refresh' },
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      message: { token: 'widget-fcm-registration-token', data: { type: 'widget_refresh' }, android: { priority: 'normal' } },
+    });
+  });
+
   it('sends through FCM HTTP v1 and separates permanent from transient token failures', async () => {
     configureCredentials();
     fetchMock

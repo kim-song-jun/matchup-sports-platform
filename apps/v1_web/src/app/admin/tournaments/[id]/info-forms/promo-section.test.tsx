@@ -48,7 +48,7 @@ describe('홍보 섹션 시트', () => {
     expect(home.getByLabelText('장소 문구')).toHaveValue('');
     expect(home.getByLabelText('상금 문구')).toHaveValue('');
     expect(view.inSheet().getByText('켜면 홈과 대회 목록 위쪽에 이 대회가 카드로 보여요.')).toBeInTheDocument();
-    expect(view.inSheet().getByText('비운 제목은 대회명이 대신 나와요. 날짜·장소·상금은 「다시 채우기」 로 넣어요.')).toBeInTheDocument();
+    expect(view.inSheet().getByText('비운 제목은 대회명이 대신 나와요. 날짜·장소·상금은 「다시 채우기」로 넣어요.')).toBeInTheDocument();
     expect(view.sheet().textContent).not.toContain('켜면 대회 정보로 카드 문구를 채워요');
   });
 
@@ -141,6 +141,22 @@ describe('홍보 섹션 시트', () => {
 
     expect(view.patchKeys()).toEqual(['promoHomeImageUrl']);
     expect(backend.state.patches[0].promoHomeImageUrl).toBe('/uploads/promo-home.webp');
+  });
+
+  it.each([
+    ['아래 「취소」', (view: View) => within(view.sheet()).getByRole('button', { name: '취소' })],
+    ['위 「닫기」', (view: View) => within(view.sheet()).getByRole('button', { name: '닫기' })],
+  ])('이미지를 올리는 중에 %s 를 눌러도 버릴지 먼저 묻고, 계속 고치면 시트가 남는다', async (_label, closer) => {
+    upload.mutateAsync.mockReturnValue(new Promise(() => {}));
+    const view = renderInfoSheet(promoSection, start(homeOn));
+
+    fireEvent.change(fileInput(view, '홈 오늘의 추천'), { target: { files: [new File(['x'], 'promo.png', { type: 'image/png' })] } });
+    fireEvent.click(closer(view));
+
+    expect(await screen.findByText('저장하지 않고 닫을까요?')).toBeInTheDocument();
+    expect(view.onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '계속 고치기' }));
+    expect(view.onClose).not.toHaveBeenCalled();
   });
 
   it.each([

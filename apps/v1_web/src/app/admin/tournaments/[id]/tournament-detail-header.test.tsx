@@ -54,7 +54,9 @@ describe('TournamentStatusMenu', () => {
     openMenu(/접수 중/);
 
     // 진행 막대는 메뉴 위 header 라 role="menu" 밖, 같은 팝오버 안에 있다.
-    const panel = screen.getByRole('menu', { name: '대회 상태' }).parentElement as HTMLElement;
+    const menu = screen.getByRole('menu', { name: '대회 상태' });
+    const panel = menu.parentElement as HTMLElement;
+    expect(within(menu).queryByRole('list', { name: '진행 단계' })).not.toBeInTheDocument();
     expect(within(panel).getByText('지금: 접수 중')).toBeInTheDocument();
     const steps = within(within(panel).getByRole('list', { name: '진행 단계' })).getAllByRole('listitem');
     expect(steps.map((step) => step.textContent)).toEqual(['초안 (지난 단계)', '접수 중', '접수 마감', '진행 중', '완료']);

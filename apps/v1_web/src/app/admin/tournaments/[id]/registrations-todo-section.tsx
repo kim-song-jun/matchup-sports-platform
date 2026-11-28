@@ -57,6 +57,7 @@ export function RegistrationsTodoSection({
   const selectedCount = selectable.filter((row) => selectedIds.has(row.id)).length;
   const canSelect = ctx.canWrite && selectable.length > 0;
   // 고를 행이 없어지면 모드도 함께 닫는다 — 안 그러면 새 입금 대기 팀이 들어올 때 모드가 되살아난다.
+  // 자기 state 를 렌더 중에 조건부로 고친다(prop 변화에 맞추는 React 권장 방식) — effect 로 미루면 닫히기 전 한 프레임이 그려진다.
   if (!canSelect && selecting) setSelecting(false);
   const phoneSelecting = !wide && canSelect && selecting;
   const layout: Layout = wide ? 'wide' : phoneSelecting ? 'select' : 'narrow';

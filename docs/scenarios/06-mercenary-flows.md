@@ -9,7 +9,7 @@ The earlier checked scenarios were executed against legacy `apps/api` and `apps/
 - `apps/v1_web` has no `/mercenary`, `/mercenary/new`, or `/mercenary/[id]` route.
 - `apps/v1_api` has no mercenary controller, service, DTO, Prisma model, migration, or fixture.
 - The landing page still advertises mercenary recruiting, and the popup screen enum includes `mercenary`; these references are promises/navigation taxonomy, not an implemented user flow.
-- The new-page decision is gated in [`teameet-new-page-scope-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html). Option B is recommended because it is the only candidate that creates a genuinely absent user-facing v1 page rather than extending an existing route.
+- The new-page decision is gated in `teameet-new-page-scope-decision.html` (local file outside the repository). Option B is recommended because it is the only candidate that creates a genuinely absent user-facing v1 page rather than extending an existing route.
 
 ## Pending V1 Scenario Contract
 

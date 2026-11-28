@@ -2,7 +2,7 @@
 
 ## 범위와 검증
 
-- 원본 아카이브: `/Users/kimsungjun/Downloads/Sports-platform-handoff.tar.gz`
+- 원본 아카이브: `Sports-platform-handoff.tar.gz`(저장소 밖 로컬 파일)
 - canonical 반입 경로: `docs/archive/reference/handoff-2026-04-25/sports-platform/`
 - 주 진입점: `project/Teameet Design.html`
 - 의도 확인 소스: `chats/chat1.md`

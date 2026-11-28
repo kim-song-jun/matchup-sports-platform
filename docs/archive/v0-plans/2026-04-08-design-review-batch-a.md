@@ -38,11 +38,11 @@
 - Severity: `High`
 - Source: `ux-manager`
 - Affected pages:
-  - [landing/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/landing/page.tsx)
-  - [about/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/about/page.tsx)
-  - [guide/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/guide/page.tsx)
-  - [pricing/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/pricing/page.tsx)
-  - [faq/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/faq/page.tsx)
+  - [landing/page.tsx](apps/web/src/app/landing/page.tsx)
+  - [about/page.tsx](apps/web/src/app/about/page.tsx)
+  - [guide/page.tsx](apps/web/src/app/guide/page.tsx)
+  - [pricing/page.tsx](apps/web/src/app/pricing/page.tsx)
+  - [faq/page.tsx](apps/web/src/app/faq/page.tsx)
 - Summary:
   - 공개 페이지 전반이 “왜 TeamMeet을 써야 하는가”는 잘 설명하지만, “지금 첫 매치를 하려면 무엇을 누르고 어디로 가야 하는가”는 한 번에 읽히지 않는다.
   - CTA가 대부분 `/login`으로 수렴하지만, 로그인 이후 최단 경로가 시각적으로 이어지지 않는다.
@@ -52,7 +52,7 @@
 - Severity: `Medium`
 - Source: `ux-manager`, `design-main`, `ui-manager`
 - Affected page:
-  - [login/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/(auth)/login/page.tsx)
+  - [login/page.tsx](apps/web/src/app/(auth)/login/page.tsx)
 - Summary:
   - 이메일 로그인/회원가입, 로그인 없이 둘러보기, 개발용 dev-login 패널이 모두 한 페이지에서 존재감을 가진다.
   - 운영용 보조 흐름이 실제 사용자 주행동보다 덜 낮은 우선순위를 갖고 있어 첫 화면 집중도가 분산된다.
@@ -63,9 +63,9 @@
 - Severity: `Medium`
 - Source: `design-main`, `ui-manager`
 - Affected pages:
-  - [about/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/about/page.tsx)
-  - [landing/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/landing/page.tsx)
-  - [pricing/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/pricing/page.tsx)
+  - [about/page.tsx](apps/web/src/app/about/page.tsx)
+  - [landing/page.tsx](apps/web/src/app/landing/page.tsx)
+  - [pricing/page.tsx](apps/web/src/app/pricing/page.tsx)
 - Summary:
   - Batch A의 기본 언어는 `blue-first`인데, `about`는 emerald/amber/purple/red가 넓게 섞여 브랜드 톤을 흔든다.
   - `landing`은 스포츠 카드의 멀티컬러가 히어로 이후 시선을 과도하게 분산시킨다.
@@ -76,7 +76,7 @@
 - Severity: `Medium`
 - Source: `ux-manager`
 - Affected page:
-  - [pricing/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/pricing/page.tsx)
+  - [pricing/page.tsx](apps/web/src/app/pricing/page.tsx)
 - Summary:
   - 구독 플랜, 경기 참가비, 플랫폼 수수료가 한 페이지에서 함께 설명되지만, “무엇을 언제 왜 내는가”의 mental model이 한 문장으로 정리되지 않는다.
   - 투명성을 강조하지만 읽는 입장에서는 비용 체계가 분리돼 보인다.
@@ -86,7 +86,7 @@
 - Severity: `Low`
 - Source: `ui-manager`
 - Affected page:
-  - [faq/page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/faq/page.tsx)
+  - [faq/page.tsx](apps/web/src/app/faq/page.tsx)
 - Summary:
   - 질문 헤더에 `truncate`가 들어가 있어 좁은 화면에서 잘린 질문이 먼저 보인다.
   - 카테고리 탭 + 긴 제목 조합에서 탐색성이 조금 떨어진다.

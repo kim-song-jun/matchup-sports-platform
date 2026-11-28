@@ -1,6 +1,6 @@
 # 17 — TeamMatch 6 Missing Fields (P0)
 
-> **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
+> **Parent plan**: `enumerated-scribbling-popcorn.md` (저장소 밖 로컬 플랜 파일)
 > **Wave**: 1 (P0 critical, task 16 검증 후 시작)
 > **Owner**: backend-data-dev (lead) → backend-api-dev → frontend-data-dev → frontend-ui-dev
 > **Status**: completed

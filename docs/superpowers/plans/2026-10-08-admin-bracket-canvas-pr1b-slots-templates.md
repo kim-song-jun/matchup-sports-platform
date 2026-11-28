@@ -36,7 +36,7 @@ PR-1a 가 이미 만든 것은 **다시 만들지 않고 import 만 한다**: `e
 - 대회 단건 조회는 `findTournamentOnSurface`(`tournaments/tournament-surface-lookup.ts:100`)만 쓴다(`lint:surface` 래칫).
 - 이 PR 에는 정규 리그 자리가 **존재하지 않는다**(리그 템플릿은 PR-5a). 리그 종류 자리 반영이 필요해지는 지점은 `assignLeagueFixtureSideInTx`(PR-5a) 대신 409 `SLOT_LEAGUE_NOT_SUPPORTED_YET` 를 던진다 — PR-5a 가 이 한 곳을 교체한다(Task 7).
 - `group_knockout` 템플릿은 PR-4 범위다. 이 PR 의 플래너는 422 `BRACKET_TEMPLATE_UNSUPPORTED` 로 거부한다(Task 2).
-- **격리 하네스로 돌린다.** 이 PR 은 PR-1a 가 만든 `V1TournamentSlot`·`homeSlotId` 를 쓰는 서비스·스펙이 대부분이라, 공유 `node_modules` 의 옛 Prisma client(생성 금지)로는 ts-jest 진단이 깨진다. 이 문서의 모든 `jest`/`tsc` 명령은 PR-1a Task 2 가 만든 `$ISO/jest.iso.config.cjs`·`$ISO/tsconfig.isocheck.json` 을 쓴다. PR 시작 시 한 번 확인한다: `export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas ISO=/Users/sungjun/.cache/bracket-canvas-iso; ls "$ISO/jest.iso.config.cjs" "$ISO/tsconfig.isocheck.json" "$ISO/prisma-client/client.d.ts"` — 없으면 PR-1a Task 2 Step 10 의 생성 절차를 그대로 다시 실행한다. PR-1a 이후 스키마가 바뀌지 않았으므로 재생성 결과는 같다. `ISO` 경로의 정의는 index 한 곳이며 여기서 바꾸지 않는다.
+- **격리 하네스로 돌린다.** 이 PR 은 PR-1a 가 만든 `V1TournamentSlot`·`homeSlotId` 를 쓰는 서비스·스펙이 대부분이라, 공유 `node_modules` 의 옛 Prisma client(생성 금지)로는 ts-jest 진단이 깨진다. 이 문서의 모든 `jest`/`tsc` 명령은 PR-1a Task 2 가 만든 `$ISO/jest.iso.config.cjs`·`$ISO/tsconfig.isocheck.json` 을 쓴다. PR 시작 시 한 번 확인한다: `export WT="$(git rev-parse --show-toplevel)" ISO="$HOME/.cache/bracket-canvas-iso"; ls "$ISO/jest.iso.config.cjs" "$ISO/tsconfig.isocheck.json" "$ISO/prisma-client/client.d.ts"` — 없으면 PR-1a Task 2 Step 10 의 생성 절차를 그대로 다시 실행한다. PR-1a 이후 스키마가 바뀌지 않았으므로 재생성 결과는 같다. `ISO` 경로의 정의는 index 한 곳이며 여기서 바꾸지 않는다.
 - 통합 스펙(`test/**/*.integration-spec.ts`)은 `DATABASE_URL` 이 있는 환경에서만 돈다. 이 문서의 "통합" 명령은 하네스 설정에 통합 환경(`isolated-integration-environment.cjs`)과 `--testMatch` 를 얹은 형태이며 로컬 준비(`migrate deploy` → `competition-config-backfill.cli`)는 색인 Global Constraints 를 따른다. 로컬 DB 가 없으면 푸시 후 CI 결과(생성된 client 사용)로 red/green 을 확인한다.
 - **surface 게이트 baseline 은 같은 커밋에서 갱신한다.** `scripts/v1-surface-check.mjs` 는 허용치 초과뿐 아니라 실측보다 큰 baseline 도 실패시킨다(래칫). 이 PR 이 늘리는 곳: raw SQL `v1_tournaments` 1곳(`competition-bracket-lock.ts`, Task 1 → `tournament-raw-sql-baseline.json`), `ALL_COMPETITION_KINDS` 호출부 `tournament-slot.service.ts` 2곳(Task 7) → 3곳(Task 12) (→ `tournament-league-allowed-baseline.json`). 해당 Task 의 커밋 pathspec 에 JSON 을 포함한다.
 - 커밋 메시지 끝의 attribution 줄은 실행 세션의 지침을 따른다(이 계획의 예시엔 생략).
@@ -3543,7 +3543,7 @@ curl -sS "${H[@]}" -X POST "https://alpha.teameet.co.kr/api/v1/admin/tournaments
 ```
 Expected: 첫 줄 `404`, 이어서 `"code":"SLOT_NOT_FOUND"`, `"code":"TOURNAMENT_NOT_FOUND"`, `"code":"TOURNAMENT_NOT_FOUND"` — 라우트가 없으면 Nest 기본 `Cannot PUT …` 404 라 `code` 가 안 나온다(그게 "배포 안 됨" 신호). 기존 대회 하나로 `GET /api/v1/admin/tournaments/<기존 대회 id>/bracket` 이 200 이고 최상위에 `slots` 배열이 있는지도 본다(PR-1a 응답 — 이 PR 이 깨지 않았다는 회귀 확인).
 
-4. 메인 작업트리 동기화(머지 하나당 한 번): `cd /Users/sungjun/Dev/projects/matchup-sports-platform && git fetch origin dev -q && git merge --ff-only origin/dev`. FF 가 거부되면 백업 후 진행 규칙을 따른다.
+4. 메인 작업트리 동기화(머지 하나당 한 번): `cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')" && git fetch origin dev -q && git merge --ff-only origin/dev`. FF 가 거부되면 백업 후 진행 규칙을 따른다.
 5. 결과(배포 SHA, 스모크 코드 4개)를 PR 코멘트 없이 사용자 보고에 적는다 — 이 저장소는 public 이므로 실제 대회 id 등 식별자는 보고 채팅에만 둔다.
 
 ---

@@ -54,7 +54,7 @@ managedWT는 fetch직후 origin/dev5948dfd6 기준. 다른 독립PR/peerQA 진�
 | 2026-10-08 | Report45 | 기존26중복/회귀? | 개인 내 일정 vs 독립 팀 일정 경로, 현재소스와 PR확인중복없음. |
 
 ## Progress Snapshot
-- Absolute WT C:/Users/kinso/.codex/worktrees/mdqa-45-team-schedule-return/matchup-sports-platform; branch fix/mdqa-45-team-schedule-return; base5948dfd6b69e5f62a0e6c8f9f2de1ae38f7abf97.
+- Absolute WT <local Codex worktrees folder>/mdqa-45-team-schedule-return/matchup-sports-platform; branch fix/mdqa-45-team-schedule-return; base5948dfd6b69e5f62a0e6c8f9f2de1ae38f7abf97.
 - Root original checkout evidence tmp/qa/mdqa-assigned-monitor/2026-10-08-heartbeat-0550/report45-before/claimed.txt,png.
 - Initial source TeamScheduleListPageClient sets all/list/currentmonth/null selection with local useState; links don't capture state. Worker actual contract investigation/RED→fix in progress. No PR yet.
 ### Implementation checkpoint — 2026-10-08 16:18 KST

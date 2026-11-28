@@ -54,12 +54,12 @@
 - Severity: `High`
 - Source: `design-main`, `ux-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/disputes/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/disputes/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/venues/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/teams/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/reviews/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/statistics/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/disputes/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/disputes/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/venues/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/teams/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/reviews/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/statistics/page.tsx)
 - Summary:
   - 운영자가 실제 엔티티와 실시간 상태를 보고 판단해야 하는 화면인데, mock 데이터나 ID fallback이 화면을 채운다.
   - 관리자 영역은 사용자-facing보다 더 엄격한 사실성이 필요한데, 현재는 “운영 콘솔”과 “시연용 surface”가 혼재되어 있다.
@@ -69,10 +69,10 @@
 - Severity: `High`
 - Source: `design-main`, `ux-manager`, `ui-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/users/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/disputes/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/settlements/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/lesson-tickets/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/users/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/disputes/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/settlements/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/lesson-tickets/page.tsx)
 - Summary:
   - 경고, 정지, 분쟁 해결, 정산 처리 같은 운영 액션이 실제 트랜잭션/부분 실패/처리 이력 없이 로컬 상태나 toast에 머문다.
   - 운영 액션은 “누가, 왜, 언제, 무엇을 바꿨는지”가 남아야 하는데 현재 흐름은 그 감각이 거의 없다.
@@ -82,7 +82,7 @@
 - Severity: `High`
 - Source: `design-main`, `ux-manager`
 - Affected page:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/team-matches/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/team-matches/page.tsx)
 - Summary:
   - `admin/team-matches` 상세 진입이 `/team-matches/[id]` 공개 영역으로 빠져 admin shell과 운영 맥락이 끊긴다.
   - 관리 작업이 필요한 흐름에서 권한 표면이 분리되면 복귀 동선과 컨텍스트 유지가 모두 약해진다.
@@ -92,9 +92,9 @@
 - Severity: `High`
 - Source: `ui-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/lessons/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/users/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/lesson-tickets/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/lessons/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/users/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/lesson-tickets/page.tsx)
 - Summary:
   - 운영자가 클릭하는 수정/제재/일괄 처리 액션이 실제 편집이나 결과 확인으로 이어지지 않고 “준비 중” 또는 mock 처리로 끝나는 경우가 있다.
   - 관리자 화면에서는 이런 affordance mismatch가 곧 실수 위험으로 연결된다.
@@ -104,10 +104,10 @@
 - Severity: `Medium`
 - Source: `design-main`, `ui-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/matches/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/matches/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/disputes/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/payments/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/matches/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/matches/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/disputes/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/payments/page.tsx)
 - Summary:
   - 어떤 화면은 칩, 어떤 화면은 텍스트 컬러, 어떤 화면은 badge 없이 숫자만으로 상태를 드러낸다.
   - 운영자는 빠른 판독이 중요하므로 `full / completed / pending / resolved` 같은 상태는 공통 칩 grammar로 묶어야 한다.
@@ -117,10 +117,10 @@
 - Severity: `Medium`
 - Source: `ux-manager`
 - Affected pages:
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/matches/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/users/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/matches/[id]/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/team-matches/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/matches/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/users/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/matches/[id]/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/team-matches/page.tsx)
 - Summary:
   - 어떤 페이지는 breadcrumb가 있고 어떤 페이지는 없다.
   - 목록/상세/관리라는 역할이 페이지마다 다르게 보이면서 현재 위치와 복귀 경로가 고르지 않다.
@@ -130,10 +130,10 @@
 - Severity: `Medium`
 - Source: `ux-manager`, `ui-manager`
 - Affected pages:
-  - [layout.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/layout.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/venues/new/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/lesson-tickets/page.tsx)
-  - [page.tsx](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/admin/dashboard/page.tsx)
+  - [layout.tsx](apps/web/src/app/admin/layout.tsx)
+  - [page.tsx](apps/web/src/app/admin/venues/new/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/lesson-tickets/page.tsx)
+  - [page.tsx](apps/web/src/app/admin/dashboard/page.tsx)
 - Summary:
   - 모바일 sidebar close button은 44px 기준보다 작고, 시설 등록은 기본 유효성 검증이 얕으며, lesson ticket row action은 터치 타깃이 부족하다.
   - 대시보드는 `0`을 `-`로 렌더링해 운영자가 “값 없음”으로 오해할 수 있다.

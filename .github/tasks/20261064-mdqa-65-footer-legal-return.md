@@ -57,7 +57,7 @@ shared AppChrome은 서버 not-found 소비자도 있으므로 unsuspended searc
 ## Progress Snapshot
 - Root claim 김성준·확인 중 실제 표시05:26KST, run1913/report65-claim-confirmed.txt/png; original 설명/3첨부 실제 픽셀 검수. alpha1180×757 인증된 계정에서 body card 정상/footer 재현2회, 직접 serving SHA unknown/AFTER pending.
 - managed creation855c8d9f-7d19-4199-885f-2f50c83404f8: fresh fetch origin/dev78ee에서 생성, root branch fix/mdqa-65-footer-legal-return. 착수 전 #41 PR1703 실제 dev merge ffada44c7960ef137bdd113ff8c205fcc9724db2를 root fetch/clean FF로 안전 통합, 작업 base ffada44c7. 실제 dev도 dev/clean/up-to-date 확인했다.
-- own WT C:/Users/kinso/.codex/worktrees/mdqa-65-footer-legal-return/matchup-sports-platform, ignored evidence tmp/qa/mdqa-65; dependency junction만 기존 dev-pr-1654-review 런타임을 재사용, 설치 없음.
+- own WT <local Codex worktrees folder>/mdqa-65-footer-legal-return/matchup-sports-platform, ignored evidence tmp/qa/mdqa-65; dependency junction만 기존 dev-pr-1654-review 런타임을 재사용, 설치 없음.
 - root 변경 .github/tasks 1개 외 제품 착수 전 clean. Phase2 worker dispatch/실제 RED부터 시작; root 다른 PR/웹/SSOT 후속은 owned shell 경로와 분리한다. root merge/Done/delete0.
 
 - Phase2 worker base `ffada44c7960ef137bdd113ff8c205fcc9724db2`에서 완료. source는 `shell.tsx` 1개(18 insert/8 delete), 새 actual consumer spec 1개와 이 task/Changeset만 수정했다. 법적 문서 GET·TermsClient/AuthFrame/AppBackLink/AppShellFrame·설정 본문 page·공유 history/query는 실제 구현이며 Next navigation/Link 경계만 fixture다.

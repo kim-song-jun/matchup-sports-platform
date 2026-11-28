@@ -1,6 +1,6 @@
 # 19 — Admin DTO 정형화 & 이미지 업로드 UI (P0)
 
-> **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
+> **Parent plan**: `enumerated-scribbling-popcorn.md` (저장소 밖 로컬 플랜 파일)
 > **Wave**: 2 (P0, task 17/18 머지 후 시작 권장 — 충돌 위험 낮지만 reviewer 부하 분산)
 > **Owner**: 병렬 (backend-api-dev: admin DTO + frontend-ui-dev: image-upload)
 > **Status**: completed

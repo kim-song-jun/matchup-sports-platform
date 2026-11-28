@@ -71,7 +71,7 @@ Canonical QA: #66 https://teameet.jmandu.kr/issues/66/. 별도 QA가 2026-10-08 
 
 ## Progress Snapshot
 - Phase: 3 / latest-source validation + atomic commit preparation.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-chat-pointer-entry/matchup-sports-platform.
+- Worktree: <local Codex worktrees folder>/mdqa-chat-pointer-entry/matchup-sports-platform.
 - Branch: fix/mdqa-chat-pointer-entry, base b11e714bc9e6180ca3c88c6dbd67ad921893409f (fresh fetch origin/dev).
 - root test slot: single frontend worker; no full suite/build/local Next server.
 - H1: eager parent capture retargets click away from Link. H2: movedRef/vertical jitter incorrectly suppresses click. H3: auth/router/API rejection; Enter/desktop success and absent pointer navigation requests argue against a shared permission failure.

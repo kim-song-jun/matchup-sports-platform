@@ -59,7 +59,7 @@ Status: In Progress
 - 실제 alpha는 머지·배포 후 수정 검증 가능. 기존 실패 첨부는 root가 원본 픽셀 검수했다.
 - 공유 파일은 다른 작업 소유권 확인 후 범위를 root에게 알린다.
 - 변경은 matches 로컬 helper·caller·테스트·Changeset·본 task 6개뿐이다. 공유 CSS/범용 focus helper/훅/타입/MSW/DTO/schema 변경은 없다.
-- 기존 dependency runtime의 root/app node_modules에 own worktree junction 2개를 연결했다. 타깃은 `C:/Users/kinso/.codex/worktrees/dev-pr-1708-review/matchup-sports-platform`의 대응 경로다. 설치·lockfile·env 변경 없이 no-cache 테스트에만 사용했고 root 검증을 위해 연결을 유지한다.
+- 기존 dependency runtime의 root/app node_modules에 own worktree junction 2개를 연결했다. 타깃은 `<local Codex worktrees folder>/dev-pr-1708-review/matchup-sports-platform`의 대응 경로다. 설치·lockfile·env 변경 없이 no-cache 테스트에만 사용했고 root 검증을 위해 연결을 유지한다.
 
 ## Ambiguity Log
 | Date | Raised by | Question | Resolution |
@@ -89,7 +89,7 @@ Status: In Progress
 ## Progress Snapshot
 - Phase: A / CODE_CORRECTED_ROOT_VALIDATION_PENDING; B 독립 리뷰·타입/커밋 검증·PR 대기
 - Base: 최신 origin/dev aa9cc7febf23de1e28c10d03bbc7fc9d44d1e052
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-67-create-error-visibility/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-67-create-error-visibility/matchup-sports-platform
 - Branch: fix/mdqa-67-create-error-visibility
 - Tracker claim proof: root evidence heartbeat0242/report67-claim-proof.png
 - PR: pending

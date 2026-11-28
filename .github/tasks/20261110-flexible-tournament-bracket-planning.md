@@ -521,7 +521,7 @@ alpha의 실제 관리자 계정으로 1440·768·390px, 라이트·다크에서
 ## Progress Snapshot
 
 - 2026-10-27: 사용자 개발 진행 요청 및 UI **A. 단계별 설정 + 조 편성 추천 카드** 선택.
-- 기반: origin/dev d1080c684, 작업 브랜치 feat/flexible-tournament-brackets, 독립 작업 폴더 C:/Users/seungmin/flexible-brackets-20261027. 원본 awards WIP는 변경하지 않았다.
+- 기반: origin/dev d1080c684, 작업 브랜치 feat/flexible-tournament-brackets, 독립 작업 폴더 <로컬 작업 폴더>/flexible-brackets-20261027. 원본 awards WIP는 변경하지 않았다.
 - 구현: 4~64 짝수 단독 대진, 불균등 조별 인원/진출 수, 1·2회전, 내부 홀수 결선, 실제 경기 없는 부전승, 시드/추첨/수동 배정, 재대결 경고와 확인, 서버 preview와 stale hash, CAS 초안, 동일 요청 키 재시도와 응답 유실 복구.
 - 연결 수정: GROUP_RANK의 원천 조/순위를 배정 후에도 유지하고 부전승 메타데이터와 함께 동기화한다. 수동 조 advanceCount=null은 실제 결선 배정 팀을 qualification에 반영한다. 완료 전 파란 강조는 하지 않으며 미설정 인원을 2명으로 추측하지 않는다.
 - 구현 결정: 별도 generic phase 대신 기존 phase에 round64/round32를 추가했다. 첫 라운드는 2의 거듭제곱 phase와 N팀 첫 라운드 이름을 사용한다. v1 전용 플래너는 정확한 기존 배치를 유지하고, v2만 일반 생성기를 사용한다.

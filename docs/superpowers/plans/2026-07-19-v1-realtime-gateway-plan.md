@@ -25,7 +25,7 @@
 - [ ] **Step 1: Create the worktree**
 
 ```bash
-cd /Users/sungjun/Documents/projects/matchup-sports-platform
+cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 git fetch origin dev --quiet
 git worktree add .claude/worktrees/v1-realtime-gateway -b feat/v1-realtime-gateway origin/dev
 cd .claude/worktrees/v1-realtime-gateway
@@ -34,7 +34,7 @@ cd .claude/worktrees/v1-realtime-gateway
 - [ ] **Step 2: Add backend dependencies**
 
 ```bash
-export PATH="/Users/sungjun/.nvm/versions/node/v24.15.0/bin:$PATH"
+export PATH="$HOME/.nvm/versions/node/v24.15.0/bin:$PATH"
 cd apps/v1_api
 pnpm add @nestjs/websockets@^11.1.18 @nestjs/platform-socket.io@^11.1.18 socket.io@^4.8.1
 cd ../..

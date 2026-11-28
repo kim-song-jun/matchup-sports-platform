@@ -1,6 +1,6 @@
 # 16 — Verification Audit (Phase 1)
 
-> **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
+> **Parent plan**: `enumerated-scribbling-popcorn.md` (저장소 밖 로컬 플랜 파일)
 > **Wave**: 0 (사전 검증, 다른 task의 입력값을 확정하는 단계)
 > **Owner**: orchestrator + Explore agents
 > **Status**: pending
@@ -156,7 +156,7 @@ CI는 deploy 전 typecheck/lint/test를 돌리지만, 로컬에서 현재 main�
 
 - [ ] **1.4.1** 사전 확인: docker compose up (PostgreSQL + Redis) — integration 테스트 의존
   ```bash
-  cd /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform
+  cd "$(git rev-parse --show-toplevel)"
   docker compose up -d
   ```
 - [ ] **1.4.2** Frontend typecheck:

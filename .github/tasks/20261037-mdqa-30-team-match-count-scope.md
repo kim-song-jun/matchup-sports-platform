@@ -79,7 +79,7 @@ alpha 실측은 dev 머지·배포 후 수행. root는 자동 머지나 main 승
 - Phase B / 최소 안내 2줄·Changeset 구현, root RED 4/4 → GREEN 166/166, 타입·수정하지 않은 패턴 검사 PASS 완료.
 - Phase C / 독립 4/4 코드 리뷰 Critical=0 / Warning=0 PASS. root committed-tree 검수·feature push·base dev PR·tracker 댓글 pending.
 - Phase D / 실제 alpha 390/768/1440, 최초 20→더 보기 40, 종목 선택·0건·로딩과 console/network는 머지·배포 후 pending. 외부 제보 첨부와 코드 검증을 새 alpha PASS로 표현하지 않는다.
-- Base: origin/dev `7a8bb9b0ed5d8416492fce1963eefaddb2176bed`; worktree `C:/Users/kinso/.codex/worktrees/mdqa-30-team-match-count/matchup-sports-platform`; branch `fix/mdqa-30-team-match-count-scope`.
+- Base: origin/dev `7a8bb9b0ed5d8416492fce1963eefaddb2176bed`; worktree `<local Codex worktrees folder>/mdqa-30-team-match-count/matchup-sports-platform`; branch `fix/mdqa-30-team-match-count-scope`.
 - 증거: root ignored `tmp/qa/mdqa-assigned-monitor/2026-10-06-heartbeat-1124/report-30-claimed.{txt,png}`, `report-30-red.txt`. 변경은 위 Owned 4개 파일에 한정한다.
 - 재현 20→40은 외부 보고의 실제 alpha 증거이며 이번 root fresh QA로 계산하지 않는다.
 
@@ -130,7 +130,7 @@ alpha 실측은 dev 머지·배포 후 수행. root는 자동 머지나 main 승
 - Phase C 코드 리뷰 완료: frozen intended 5/5 독립 재리뷰 Critical=0 / Warning=0 PASS, 최초 카드 `from` finding 해소. reviewer는 root의 실제 RED/GREEN/타입·패턴 로그와 production/test/Changeset 내용을 재검수하고 SHA-256을 기록했다(`report-30-search-independent-review.md`). 최종 task의 이 진행 기록 추가는 root가 맡았다.
 - 게시 직전 최신 origin/dev fetch, HEAD...origin/dev drift 0/0, base `2888193bdf3a741131ebc0480ff280f6d3e143d8` 유지. 아래 5개 pathspec만 stage/commit한 뒤 실제 committed blob과 검증·리뷰한 내용을 대조한다. 최종 PR/head·리뷰/CI·댓글/머지 mapping은 원 checkout SSOT와 이 worktree 후속 snapshot에 연결한다.
 - 선점 후 실제 웹 대조: 모든 담당자 미완료 16/16·접수 0/0, 실제 김성준 담당 전체 20/20·미완료 14/14, pagination 끝까지 확인. 기존 21개 상세와 신규 #32 상세를 읽어 22/22 확인했다. 기존 집계 안내의 머지/alpha PASS 이력은 위 역사 기록과 SSOT에 보존한다.
-- Base: origin/dev `2888193bdf3a741131ebc0480ff280f6d3e143d8`; worktree `C:/Users/kinso/.codex/worktrees/mdqa-30-search-sync/matchup-sports-platform`; branch `fix/mdqa-30-search-query-sync`.
+- Base: origin/dev `2888193bdf3a741131ebc0480ff280f6d3e143d8`; worktree `<local Codex worktrees folder>/mdqa-30-search-sync/matchup-sports-platform`; branch `fix/mdqa-30-search-query-sync`.
 - Root evidence: `F:/user/documents/project/matchup-sports-platform/tmp/qa/mdqa-assigned-monitor/2026-10-06-heartbeat-1302/`.
 
 ## MD-QA #32 사후 QA 재발 수정 (2026-10-09 heartbeat0242)
@@ -166,7 +166,7 @@ alpha 실측은 dev 머지·배포 후 수행. root는 자동 머지나 main 승
 ### Progress Snapshot
 - Phase: A / REVIEW_FINDING_INVESTIGATION
 - Base: latest fetched origin/dev aa9cc7febf23de1e28c10d03bbc7fc9d44d1e052
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-32-search-history-recurrence/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-32-search-history-recurrence/matchup-sports-platform
 - Branch: fix/mdqa-32-search-history-recurrence
 - Root evidence: F:/user/documents/project/matchup-sports-platform/tmp/qa/mdqa-assigned-monitor/2026-10-09-heartbeat-0242/report32-new-review.json
 - Original PR/head/merge and old QA remain historical; new follow-up PR pending. No duplicate tracker ticket.

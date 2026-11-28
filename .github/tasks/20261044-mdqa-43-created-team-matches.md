@@ -54,7 +54,7 @@ alpha 로그인 E2E관리자의 /my/matches/created에서 팀매치 조회가 re
 | 2026-10-08 | Report #43 | 팀 목록은 실제 0인가? | 조회 실패이므로 미확정. 정상 빈 상태를 확정 표시하지 않는다. |
 
 ## Progress Snapshot
-- Worktree `C:/Users/kinso/.codex/worktrees/mdqa-43-created-team-matches/matchup-sports-platform`, branch `fix/mdqa-43-created-team-matches`.
+- Worktree `<local Codex worktrees folder>/mdqa-43-created-team-matches/matchup-sports-platform`, branch `fix/mdqa-43-created-team-matches`.
 - Root ignored 0550 report43-before/claimed DOM와 screenshot 보존. 실제 API 원인/수정/검증/PR 대기.
 - Root actual alpha before: same authenticated E2E관리자, 1280×720, GET `/api/v1/me/team-matches?scope=created&limit=50` returns 409 `TEAM_MATCH_OPERATIONAL_DATA_INVALID`; 개인0/팀오류 동시 false empty 확인. Public platform match `7b63bb6e-8949-4aa4-8731-b901b79b17a6` is 200/platformManaged=true/hostTeam=null/startsAt present/manageRoute=null. Public response has no creator field, so exact offending row is not established.
 - Implementation: shared public/my read invariant supports standalone platform recruitment before host approval, requires startAt and valid host relation, keeps non-platform/league/tournament null-host 409 and strict write operational guards. Nullable team fields preserve applied team context and owner/manager management permissions. Partial error suppresses full-list empty conclusion. Domain docs and existing platform fixture synced; hooks/types/global MSW/schema unchanged.

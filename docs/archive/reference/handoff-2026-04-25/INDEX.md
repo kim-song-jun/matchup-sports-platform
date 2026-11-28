@@ -2,7 +2,7 @@
 
 ## 목적
 
-- 원본 압축: `/Users/kimsungjun/Downloads/Sports-platform-handoff.tar.gz`
+- 원본 압축: `Sports-platform-handoff.tar.gz`(저장소 밖 로컬 파일)
 - canonical 반입 경로: `docs/archive/reference/handoff-2026-04-25/sports-platform/`
 - 분석 기준일: `2026-04-25`
 

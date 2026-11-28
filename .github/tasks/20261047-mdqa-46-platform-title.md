@@ -56,7 +56,7 @@ Mock data updates needed: 실제 모델 fixture의 현재 제목을 사용. API/
 
 ## Progress Snapshot
 - Base: origin/dev `1e4da237740bb6ada81c74fa8d16b34503633107`, fetch 후 actual dev branch=dev clean 및 FF 확인.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-46-platform-title/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-46-platform-title/matchup-sports-platform
 - Branch: fix/mdqa-46-platform-title
 - Tracker evidence: 원 checkout tmp/qa/mdqa-assigned-monitor/2026-10-08-heartbeat-0550/report46-before.txt 및 report46-claimed.txt/png.
 - Code cause: actual h1이 `tm-desktop-page-head tm-show-desktop`에 있고 route chrome 상세 title은 빈 문자열. Backend metadata title은 브라우저 문서 제목에만 적용됨.

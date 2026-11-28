@@ -65,7 +65,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 
 ## Progress Snapshot
 - Phase: A implementation ready / root serialized GREEN and independent review pending.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-28-bracket-tab-return/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-28-bracket-tab-return/matchup-sports-platform
 - Branch: fix/mdqa-28-bracket-tab-return
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
 - PR/head/merge: not created.

@@ -59,7 +59,7 @@ Status: Review
 기존 Task 180은 G6–G13 통합 이력이라 MD-QA #180의 작업 문서로 재사용하지 않아요. 이번 변경은 사용자가 요청한 MD-QA 자동 수정 범위에서 이미 더보기 메뉴에 있는 차단 사유의 중복 전역 렌더만 제거해요. 새 화면·새 동작·정보 구조를 설계하는 선택은 만들지 않아요. 별도 제품 디자인 선택이 생기면 구현 전에 A·B·C 제시와 사용자 선택을 적용해요.
 
 ## Progress Snapshot
-- Worktree: `/Users/sungjun/.codex/worktrees/mdqa-180/matchup-sports-platform`
+- Worktree: `<local Codex worktrees folder>/mdqa-180/matchup-sports-platform`
 - Branch/base: `codex/mdqa-180-20261023` / `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`
 - RED: focused Vitest filtered by `MD-QA #180` — 1 failed / 3 passed / 103 skipped, actual exit 1. The failure captured the duplicate global `role=status` warning before ⋯ was opened.
 - Fix/GREEN: removed only the global warning render. The initial same-command run passed 4/4 selected tests (103 skipped), actual exit 0.

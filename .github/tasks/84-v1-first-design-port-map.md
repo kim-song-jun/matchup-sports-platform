@@ -514,7 +514,9 @@ Validation notes:
   `ubuntu26.04-x64`, and no system Linux Chromium was available.
 - `visual-qa-codex` MCP capture was unavailable in this runtime, so visual
   evidence used the script's Windows Chrome CLI fallback with
-  `CHROME_CLI_EXECUTABLE='/mnt/c/Program Files/Google/Chrome/Application/chrome.exe'`.
+  `CHROME_CLI_EXECUTABLE='/mnt/c/Program Files/Google/Chrome/Application/chrome.exe'`
+  plus `CHROME_CLI_OUT_WSL` and `CHROME_CLI_OUT_WIN`, the same output folder as a
+  WSL path and as a Windows path (the script has no default for them).
   The fallback uses `CHROME_CLI_WINDOW_SIZE=487,1056` and
   `CHROME_CLI_DEVICE_SCALE_FACTOR=1.3` to approximate the 375x812 CSS viewport
   under Windows display scaling.

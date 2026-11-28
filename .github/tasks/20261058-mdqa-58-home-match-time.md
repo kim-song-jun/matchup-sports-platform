@@ -53,7 +53,7 @@ Status: In Progress
 | 2026-10-08 | report58 | 정본 시각/브라우저 시간대 원인 | 현재 v1 상세/date-utils/API startsAt 계약을 교차 확인하고 실제 다른 TZ 소비자 실패로 입증한다. 시간대 설정·데이터는 변경하지 않는다. |
 
 ## Progress Snapshot
-- Fresh origin/dev d0f57f01ce95ed12d9d7508594f03b15be0efa72 직후 managed worktree C:/Users/kinso/.codex/worktrees/mdqa-58-home-match-time/matchup-sports-platform, branch fix/mdqa-58-home-match-time.
+- Fresh origin/dev d0f57f01ce95ed12d9d7508594f03b15be0efa72 직후 managed worktree <local Codex worktrees folder>/mdqa-58-home-match-time/matchup-sports-platform, branch fix/mdqa-58-home-match-time.
 - Root own0550/report58-initial-detail.txt 및 report58-claimed-confirmed.txt/png; 다른 진행 없음 확인·선점 저장 성공. 이전 초기 조사 기록이며 아래 최신 커서로 이어간다.
 - 2026-10-08 22:06 KST: 홈 private formatDate/formatTime은 기기 timezone, 같은 상세 toTeamMatch는 공유 KST formatCardDate/Time을 사용함을 확인했다. API list/detail startsAt는 모두 같은 startAt(Date) 계약이다. 공유 formatter alias import와 private 두 함수 삭제만 적용했다. 홈 개인 매치 두 API 모양·리그 마감·공지·팝업 날짜 소비자도 동일한 KST 계약으로 통일되며 invalid 날짜 원문/빈 시각 정책은 보존한다.
 - source-unchanged 실제 native Intl timezone/hours 증명과 model·상세·actual HTTP 홈 카드10건: America/Los_Angeles 7 FAIL/3 PASS, UTC 7 FAIL/3 PASS, Asia/Seoul10 PASS. 수정 후 같은 실제 matrix LA10/10, UTC 신규10+기존home-page20+home-wave8 8=38/38, Seoul10/10. raw logs는 own worktree tmp/qa/mdqa-58/red-{la,utc,seoul}.txt 및 green-{la,utc,seoul}.txt, base Vitest 전체 상속·test.env.TZ만 변경한 ignored config를 보존한다. formatter/HTTP hook/view를 mock하지 않는다. 원 실제 경기 ISO 값·원 브라우저 timezone을 합성 fixture로 확정하지 않는다.

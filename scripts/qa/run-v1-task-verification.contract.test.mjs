@@ -26,6 +26,12 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { descriptorRead } from './verify-team-tournament-bound-sources.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+// The harness binds these two local files; fixtures with a scrubbed environment must forward them.
+const boundSourceEnvironment = Object.fromEntries(
+  ['V1_BOUND_PDF_PATH', 'V1_BOUND_PREVIEW_PATH']
+    .filter((name) => process.env[name])
+    .map((name) => [name, process.env[name]]),
+);
 const planSHA = 'dc4ecb2f76592799f8460135d9ea755a6e8fd768de17a29af7e61cf2b21508dd';
 const workload = 'task-1-host-supervisor-v1';
 const image = 'teameet-v1-verification:node22-pnpm9.15.4';
@@ -436,6 +442,7 @@ function candidateFixture({
     candidateSHA,
     environment: {
       ...gitEnvironment,
+      ...boundSourceEnvironment,
       OMO_SELECTED_PLAN_SHA: planSHA,
     },
     evidenceRoot: join(temporaryDirectory, 'evidence'),
@@ -2129,6 +2136,7 @@ function cleanRestartFixture() {
       GIT_DIR: join(worktree, '.git'),
       GIT_WORK_TREE: repoRoot,
       GIT_INDEX_FILE: join(worktree, '.git/index'),
+      ...boundSourceEnvironment,
       OMO_SELECTED_PLAN_SHA: planSHA,
     },
     cleanup: () => rmSync(temporaryDirectory, { recursive: true, force: true }),

@@ -76,7 +76,7 @@ Windows Android SDK36/build-tools36.0.0/JDK17은 설치돼 있다. 프로젝트 
 
 ## Progress Snapshot
 - Report #132: 김성준 / 확인 중, 실제 선점 증거 tmp/qa/mdqa-assigned-monitor/2026-10-13-heartbeat-0244/claim-132.png.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-132-adaptive-icon/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-132-adaptive-icon/matchup-sports-platform
 - Branch: fix/mdqa-132-adaptive-icon; initial HEAD 552f5b6fb98d8546daf5e26f7de7a8ac413251f2.
 - Phase: implementation handed off, root RED5 failures → GREEN6/6. Native build/device QA/independent review/Git/PR are pending root execution.
 - Owned paths: `apps/v1_android/app/src/main/res/drawable/ic_launcher_adaptive_foreground.xml`, `apps/v1_android/app/src/main/res/drawable-nodpi/ic_launcher_symbol.png`, `apps/v1_android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`, `apps/v1_android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`, `scripts/qa/android-adaptive-icon.test.mjs`, this task.

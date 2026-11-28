@@ -81,7 +81,7 @@ Status: In Progress
 ## Progress Snapshot
 - Canonical task: .github/tasks/20261041-chat-list-content-entitlement.md
 - Root automation/run: 5-pr-qa / 2026-10-08-heartbeat-0313
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-chat-entitlement-content/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-chat-entitlement-content/matchup-sports-platform
 - Branch: fix/mdqa-chat-content-entitlement
 - Base: origin/dev @ ae8bf32a5cc15fe8234bb9244cdb35edb5d6afd1
 - Existing finding: PR1653 / review5450911328 / P2 current content-query entitlement gap.

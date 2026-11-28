@@ -55,7 +55,7 @@ UI 구조·토큰·primitive·상태는 변경하지 않는 기존 문구 선택
 원문의 kind=tournament는 목록 필터이고 실제 DTO kind는 regular_tournament/regular_league다. 정확한 API/consumer contract를 worker가 확인한다. PR1695와 같은 증상이지만 제품은 이미 머지됐고 정식 후속 지적만 존재하며 열린 fix PR/활성 #63 task는 없다. 별도 최신 dev fix branch에서 잔존 분기를 수정한다.
 
 ## Progress Snapshot
-2026-10-08T16:59 heartbeat run1659. Root freshfetch/clean actualdev FF origin2edc863e9311b11251d89dc1318ce1fb736cff60. Managed worktree C:/Users/kinso/.codex/worktrees/mdqa-63-tournament-flow-copy/matchup-sports-platform, feature fix/mdqa-63-tournament-flow-copy, same latestdev base. UI 선점 증거 own1659/report63-claimed-confirmed.txt/png. 조사/실제 RED 준비; source patch·검증·리뷰·커밋·PR·댓글·alpha AFTER 대기. 이전 #61 및 다른 리포트 증거/실패/삭제 확인 대기는 유지한다.
+2026-10-08T16:59 heartbeat run1659. Root freshfetch/clean actualdev FF origin2edc863e9311b11251d89dc1318ce1fb736cff60. Managed worktree <local Codex worktrees folder>/mdqa-63-tournament-flow-copy/matchup-sports-platform, feature fix/mdqa-63-tournament-flow-copy, same latestdev base. UI 선점 증거 own1659/report63-claimed-confirmed.txt/png. 조사/실제 RED 준비; source patch·검증·리뷰·커밋·PR·댓글·alpha AFTER 대기. 이전 #61 및 다른 리포트 증거/실패/삭제 확인 대기는 유지한다.
 
 2026-10-08T17:21Z: 원본 첨부2/2를 직접 읽었고 각 natural1180×757 이미지에서 시즌 주차 안내를 확인했다. 새 consumer 회귀9개에서 실제 RED2/7 PASS, RED 전후 제품 blob a06d492bdfeac92788133fd888c2daa42b3cf05f 동일. getFlowSteps 시즌 분기만 kind=regular_league로 좁힌 뒤 focused9/9 및 기존 consumer28/28 PASS. 원본 raw 검증은 ignored tmp/qa/mdqa-63/에 보존한다. dirty-tree 결과이므로 아직 PR-ready·실제 alpha PASS로 판정하지 않는다. 후속 타입·커밋 기준 검증·독립 리뷰·PR·같은 리포트 댓글은 root 단계다. PR1695의 실제 미해결 P2 discussion_r4221841571과 같은 증상이며 후속 alpha 확인까지 원 지적을 임의 종료하지 않는다.
 

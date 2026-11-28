@@ -53,7 +53,7 @@ serial 최소 worker slot root 승인 후만 실행. 최신 외부 리뷰 오류
 | 2026-10-08 | report | 정확한 마감 시각/원인은? | 제목만으로 추정하지 않고 API/공통 helper 현재 계약 대조 |
 
 ## Progress Snapshot
-- WT C:/Users/kinso/.codex/worktrees/mdqa-48-tournament-recruitment-status/matchup-sports-platform, branch fix/mdqa-48-tournament-recruitment-status, base origin/dev ffec5fd355dca129a9019e0e8260bbcfc9fc4820 fetch 직후 managed 생성.
+- WT <local Codex worktrees folder>/mdqa-48-tournament-recruitment-status/matchup-sports-platform, branch fix/mdqa-48-tournament-recruitment-status, base origin/dev ffec5fd355dca129a9019e0e8260bbcfc9fc4820 fetch 직후 managed 생성.
 - 원 checkout 0550/report48-before.txt 및 report48-claimed.txt/png. 실제 담당 김성준·확인 중 표시 확인.
 - Phase investigation/test authoring. PR없음, alpha after pending.
 

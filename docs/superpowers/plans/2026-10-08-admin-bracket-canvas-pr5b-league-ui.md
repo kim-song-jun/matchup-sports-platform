@@ -92,7 +92,7 @@ PR-5a 가 내려주는 계약(색인 "응답 확장"): 리그 어드민 상세�
 - [ ] **Step 1: 선행 PR 산출물 존재 확인 (없으면 여기서 멈춘다)**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 grep -n "export type V1AdminBracketSlot\|export type V1AdminBracketFixtureGame\|export interface V1AdminBracketSlot\|export interface V1AdminBracketFixtureGame" src/types/api.ts
 grep -n "export function fixtureNodeState" src/lib/bracket-canvas-layout.ts
 grep -n "export function describeBracketCanvasError" src/lib/bracket-canvas-errors.ts
@@ -284,7 +284,7 @@ describe('leagueSideLabel / leagueFixtureMatchupLabel', () => {
 - [ ] **Step 2: 실행해 실패 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/vitest run src/lib/league-fixture-meta.test.ts
 ```
 
@@ -437,7 +437,7 @@ Expected: 파일 2개.
 - [ ] **Step 2: 실행해 실패 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/vitest run src/lib/league-next-action.test.ts "src/app/league-matches/[leagueId]/fixtures/[fixtureId]/league-fixture-detail-client.test.tsx" "src/app/admin/league-matches/[leagueId]/league-match-fixtures-client.test.tsx" -t "비어 있는|미정"
 ```
 
@@ -692,7 +692,7 @@ describe('useV1ApplyLeagueTemplate', () => {
 - [ ] **Step 2: 실행해 실패 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/vitest run src/hooks/use-v1-bracket-canvas.league-template.test.tsx
 ```
 
@@ -1356,7 +1356,7 @@ describe('LeagueFixturePanel — 일정 · 취소 · 닫기', () => {
 - [ ] **Step 2: 실행해 실패 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/vitest run src/components/admin/bracket-canvas/league-fixture-panel.test.tsx
 ```
 
@@ -1786,7 +1786,7 @@ describe('LeagueScheduleBoard — 렌더', () => {
 - [ ] **Step 2: 실행해 실패 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/vitest run src/components/admin/bracket-canvas/league-schedule-board.test.tsx
 ```
 
@@ -2816,7 +2816,7 @@ describe('LeagueTemplateDialog', () => {
 - [ ] **Step 3: 실행해 실패 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/vitest run "src/app/admin/league-matches/[leagueId]/league-template-dialog.test.tsx"
 ```
 
@@ -3111,7 +3111,7 @@ Expected: 파일 4개.
 기본 보기가 보드로 바뀌므로 기존 49개 렌더가 표를 찾지 못한다. 기계적 치환이다.
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 F="src/app/admin/league-matches/[leagueId]/league-match-fixtures-client.test.tsx"
 grep -c '<LeagueMatchFixturesClient leagueId="league-1" />' "$F"        # 49
 sed -i '' 's|<LeagueMatchFixturesClient leagueId="league-1" />|<LeagueMatchFixturesClient leagueId="league-1" initialView="list" />|' "$F"
@@ -3503,7 +3503,7 @@ export default async function AdminLeagueMatchDetailPage({ params, searchParams 
 - [ ] **Step 6: 실행해 통과 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/vitest run "src/app/admin/league-matches/[leagueId]/league-match-fixtures-client.test.tsx" "src/app/admin/league-matches/[leagueId]/league-template-dialog.test.tsx" src/components/admin/bracket-canvas/league-schedule-board.test.tsx
 ./node_modules/.bin/tsc --noEmit -p tsconfig.json
 node scripts/v1-pattern-check.mjs
@@ -3542,7 +3542,7 @@ Expected: 파일 3개.
 - [ ] **Step 2: 영향 범위 타깃 검증 (풀스위트는 돌리지 않는다)**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 ./node_modules/.bin/tsc --noEmit -p tsconfig.json
 node scripts/v1-pattern-check.mjs
 ./node_modules/.bin/vitest run src/lib/league-fixture-meta.test.ts src/lib/league-next-action.test.ts src/lib/league-board-model.test.ts src/hooks/use-v1-bracket-canvas.league-template.test.tsx src/components/admin/bracket-canvas/league-fixture-panel.test.tsx src/components/admin/bracket-canvas/league-schedule-board.test.tsx "src/app/admin/league-matches/[leagueId]/league-template-dialog.test.tsx" "src/app/admin/league-matches/[leagueId]/league-match-fixtures-client.test.tsx" "src/app/league-matches/[leagueId]/fixtures/[fixtureId]/league-fixture-detail-client.test.tsx" "src/app/league-matches/[leagueId]/league-match-standings-client.test.tsx" "src/app/tournaments/[id]/tournament-detail-client.test.ts" "src/app/tournaments/[id]/tournament-detail-page-client.test.tsx"
@@ -3553,7 +3553,7 @@ Expected: 전부 PASS, tsc 0, 패턴 통과.
 - [ ] **Step 3: 커밋된 상태 기준 확인 (공유 트리의 미커밋 파일에 속지 않는다)**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git status --porcelain | grep -v '^??' || echo "추적 파일 변경 없음"
 git diff --name-only origin/dev...HEAD | grep -v '^apps/v1_web/\|^\.changeset/\|^docs/' || echo "v1_web 밖 변경 없음"
 ```
@@ -3580,9 +3580,10 @@ Expected: 파일 1개.
 - [ ] **Step 1: 내 머지가 alpha 에 배포됐는지 확인한다 (배포 창 중엔 측정 금지)**
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 gh run list --workflow deploy-alpha.yml --branch dev --limit 1 --repo kim-song-jun/matchup-sports-platform --json headSha,status,conclusion --jq '.[0]'
 curl -fsSI https://alpha.teameet.co.kr/landing | grep -i 'x-teameet-commit'
-git -C /Users/sungjun/Dev/projects/matchup-sports-platform merge-base --is-ancestor <내 머지 커밋> <x-teameet-commit 값> && echo "포함됨"
+git merge-base --is-ancestor <내 머지 커밋> <x-teameet-commit 값> && echo "포함됨"
 ```
 
 Expected: run `completed/success`, `포함됨` 출력. 아니면 배포가 끝날 때까지 기다린 뒤 다시 확인한다.

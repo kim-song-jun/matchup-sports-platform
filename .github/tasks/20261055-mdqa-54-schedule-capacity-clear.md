@@ -55,7 +55,7 @@ Latest origin/dev base016847e; root fetch before worktree done. #50 shared hooks
 
 ## Progress Snapshot
 - Root run0550 continues, report read+claim19:06 saved screenshot/text under main tmp/qa/mdqa-assigned-monitor/2026-10-08-heartbeat-0550.
-- worktree C:/Users/kinso/.codex/worktrees/mdqa-54-schedule-capacity-clear/matchup-sports-platform, branch fix/mdqa-54-schedule-capacity-clear, origin/dev016847e.
+- worktree <local Codex worktrees folder>/mdqa-54-schedule-capacity-clear/matchup-sports-platform, branch fix/mdqa-54-schedule-capacity-clear, origin/dev016847e.
 - Implementation/RED/committed review/PR/comment/alpha pending; no worker Git writes.
 
 ### Capacity clear contract — root integration

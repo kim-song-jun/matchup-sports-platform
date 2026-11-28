@@ -106,7 +106,7 @@ alpha 실제 배포와 인증 세션에 의존. 병렬 구현은 가능하지만
 - 예상 geometry (아직 라이브 검증 아님): 현재 root 실측 배지 폭 합265.65625px + 4px×3 = 277.65625px로 390px의 가용278px에 들어간다. 768/1440에서도 같은 배지 위계와 한 줄 구성을 유지하며, 더 좁은 화면이나 긴 데이터는 기존 자연 줄바꿈을 허용한다.
 - [x] root가 기존 상세 회귀32개를 worker1/파일 직렬로 각1회 실행해32/32 PASS, TypeScript와 기존 v1 패턴 검사도 각1회 PASS. 기존 React act 경고1건은 기록했다. CSS 클래스/가짜 geometry 단위 테스트는 추가하지 않았다. 로그는 위 followup-18의 detail-tests.log/typecheck.log/patterns.log다. 호스트 preflight CPU9%,여유17.1GB,Node59/Chrome24; Docker daemon은 없으며 이번 프론트 단위 검증에는 필요하지 않았다. 의존성은 기존 lockfile의 offline cache만 재사용했고 다운로드0/manifest변경0이다.
 - [x] 독립 frontend/code reviewer가 의도된4/4경로를 검토해 Critical0/Warning0. 실제 alpha 간격 after는 pending으로 유지했다. 보고서: ignored followup-18/code-review.md.
-- [x] [dev 후속 PR #1627](https://github.com/kim-song-jun/matchup-sports-platform/pull/1627) 게시/채팅 attach. 제품 source commit `3629665f93cd2007231801ee2995882673706a64`, branch `fix/mdqa-18-mobile-status-chips`, worktree `C:/Users/kinso/.codex/worktrees/mdqa-18-19-postqa-docs/matchup-sports-platform`. 이 인계 문서 커밋으로 제품을 다시 바꾸지 않는다.
+- [x] [dev 후속 PR #1627](https://github.com/kim-song-jun/matchup-sports-platform/pull/1627) 게시/채팅 attach. 제품 source commit `3629665f93cd2007231801ee2995882673706a64`, branch `fix/mdqa-18-mobile-status-chips`, worktree `<local Codex worktrees folder>/mdqa-18-19-postqa-docs/matchup-sports-platform`. 이 인계 문서 커밋으로 제품을 다시 바꾸지 않는다.
 - [x] 후속 #1627은 최신 head Gates/API/Web 성공, Copilot FindingsNone, 독립 코드 리뷰4/4 PASS 후 dev에 머지됐다(위 a29 merge). 새 자동 머지 정책을 추가하지 않았다.
 - [x] 다른 실행의 역사 detail 재검수는 #18 comment-31에 PASS로 기록됐다. 이 자동화의 신규 alpha 캡처/QA는 사용자 범위 변경으로 제외됐으며 홈의 아래 별도 미해결 지점을 전체 완료와 구분한다.
 - Tracker QA transition remains BLOCKED_UI_OPTION_ABSENT; Done/보류로 대체하지 않는다.
@@ -118,7 +118,7 @@ alpha 실제 배포와 인증 세션에 의존. 병렬 구현은 가능하지만
 - New evidence: [comment-31](https://teameet.jmandu.kr/issues/18/#comment-31), 김성준 10.06 10:58 KST. 마감 캠페인 `/tournaments/campaigns/alpha-qa-futsal-recruiting`의 `/home` 추천 카드가 계속 `참가 신청하기`를 표시한다. 기존 events/campaign/detail 수정과 별도로 남은 경로다. 콘텐츠 제목의 모집중 낱말은 결함 근거로 쓰지 않는다.
 - Authenticated IAB를 통해 김성준 담당 실명, 전체 9건, 활성 3건, 상세·설명·최근 댓글 및 추가 pagination 없음을 확인했다. 이전 Chrome 연결 blocker는 해소됐다. #19 comment-29는 역사 QA PASS이며 신규 결함이 아니다.
 - Dedup: 기존 워크트리/태스크/열린 dev PR을 확인했다. #18 홈 후속 PR은 없고 #1628(MD-QA #20), #1629(MD-QA #21) 및 #1610은 타 작업이다.
-- Worktree: `C:/Users/kinso/.codex/worktrees/mdqa-18-home-cta/matchup-sports-platform`; branch `fix/mdqa-18-home-recruitment-cta`; fetch 직후 `origin/dev` a29f080a5에서 생성했다. 이미 머지된 기존 branch에 새 fix를 push하지 않는다.
+- Worktree: `<local Codex worktrees folder>/mdqa-18-home-cta/matchup-sports-platform`; branch `fix/mdqa-18-home-recruitment-cta`; fetch 직후 `origin/dev` a29f080a5에서 생성했다. 이미 머지된 기존 branch에 새 fix를 push하지 않는다.
 - Owned (builder): `apps/v1_web/src/components/home/tournament-hero-card.tsx`, direct `tournament-hero-card.test.tsx`, `.changeset/mdqa-18-home-recruitment-cta.md`. Root owns this canonical task and Git/PR/state. Forbidden: shared helpers/hooks/types/MSW/API/schema/CSS/tokens, unrelated home paths, main, old worktrees. Shared scope expansion 필요 시 root와 조율한다. Subagent commit/push 금지.
 - Acceptance: 만료된 0/4 대회 홈 카드가 신청 가능하다고 안내하지 않는다. 기존 캠페인/상세 링크·카드 노출·정렬·outline 위계를 유지한다. 미래 마감/마감일 없음·정원 충족·마감 경계·시간 경과 계약을 현재 v1 신청 게이트와 대조해 실제 렌더 회귀 테스트로 고정한다. 신청/결제/API 계약은 변경하지 않는다.
 - Ambiguity: 구조·토큰 변경 없는 기존 신청 상태 로직 연결이므로 CLAUDE.md의 로직 전용 예외를 적용한다. 일반 대회 gate는 `deadline < now`; 캠페인의 기존 gate는 `deadline <= now`다. 링크 대상의 경계와 맞춘다.

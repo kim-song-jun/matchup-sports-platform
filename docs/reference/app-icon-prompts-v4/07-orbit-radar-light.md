@@ -1,6 +1,6 @@
 # 07-orbit-radar-light
 
-기준 시안: [07-orbit-radar-light.png](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/reference/app-icons-v4/07-orbit-radar-light.png)
+기준 시안: [07-orbit-radar-light.png](../app-icons-v4/07-orbit-radar-light.png)
 
 ## 포지션
 

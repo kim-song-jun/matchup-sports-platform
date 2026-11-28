@@ -13,9 +13,6 @@ import { isAbsolute, join, parse, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 
-const DEFAULT_PDF =
-  '/Users/sungjun/Downloads/Teameet_app_v1_팀관리_대회운영_상세기획서_2026-07-28.pdf';
-const DEFAULT_PREVIEW = '/Users/sungjun/Downloads/preview.html';
 const DESIGN_PATH =
   'docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html';
 
@@ -268,12 +265,23 @@ function readCommittedDesign(commit, repoRoot) {
   };
 }
 
+function requiredSourcePath(options, optionName, envName, label) {
+  const value = (options[optionName] ?? process.env[envName])?.trim();
+  if (!value) {
+    throw new VerificationError(
+      'MALFORMED_INPUT',
+      `Missing ${label} path: pass --${optionName} or set ${envName}`,
+    );
+  }
+  return value;
+}
+
 export function verifyBoundSources(options, repoRoot = process.cwd()) {
   const pdf = descriptorRead(
-    options['pdf-path'] ?? process.env.V1_BOUND_PDF_PATH ?? DEFAULT_PDF,
+    requiredSourcePath(options, 'pdf-path', 'V1_BOUND_PDF_PATH', 'product specification PDF'),
   );
   const preview = descriptorRead(
-    options['preview-path'] ?? process.env.V1_BOUND_PREVIEW_PATH ?? DEFAULT_PREVIEW,
+    requiredSourcePath(options, 'preview-path', 'V1_BOUND_PREVIEW_PATH', 'preview HTML'),
   );
   const designPath = options['design-path'] ?? process.env.V1_BOUND_DESIGN_PATH;
   const design = designPath

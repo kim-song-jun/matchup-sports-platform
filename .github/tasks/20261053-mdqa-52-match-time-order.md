@@ -57,7 +57,7 @@ Given 종료가 시작 이하인 입력, When 다음/최종 제출, Then 명확�
 - 종료 날짜는 입력·복원된 실제 값만 사용하고, 생략된 과거 초안은 기존 시작 날짜로 검증한다. `HH:mm` 00–23/00–59 보호와 달력 날짜 round-trip 검사로 24:00/11:60/2월30일/잘못된 달을 차단한다. 날짜만 입력하면 종료 시간도 요구하며 손상 날짜를 시작 날짜나 익일로 대체하지 않는다. UI 전용 endDate/endTime은 POST/PATCH에 보내지 않는다.
 - 후속 local GREEN61/61(consumer31+validation30, 21.09s): 기존50 전부 유지+consumer5·validation6. actual GET의 익일 매치를 무변경 또는 제목 수정 후 원 ISO로 PATCH하고 이전 이동 시 표시 날짜를 유지하며, 사용자가 명시한 익일 날짜 생성과 확인/POST, 손상된 저장 날짜의 오류·수정 링크/POST 없음, 명시적 same-day 역전·날짜만 입력 차단을 확인했다. 증거 `tmp/qa/mdqa-52/green-explicit-end-date.txt`, 기존 2파일 1worker 명령. 새로운 helper/import는 local 소스만 사용한다.
 - 후속 preflight CPU39%, free physical10640MiB/virtual22880MiB, Node78/browser7, Docker daemon 없음, alpha landing HEAD200. 모든 테스트 process exit와 MSW·QueryClient·scroll stub·env·navigation/overlay cleanup 완료, serial slot 반환. tsc/fullsuite/Git/브라우저/서버 실행 없음. root committed/type·독립 재리뷰·PR·tracker·alpha gate 대기이며 기존 RED/GREEN50과 리뷰 이력은 아래에 보존한다.
-- Dedicated worktree: `C:/Users/kinso/.codex/worktrees/mdqa-52-match-time-order/matchup-sports-platform`.
+- Dedicated worktree: `<local Codex worktrees folder>/mdqa-52-match-time-order/matchup-sports-platform`.
 - Branch: `fix/mdqa-52-match-time-order`; fresh origin/dev base `016847e36093e775de71dd16e059d902df39602f`.
 - Phase: 최소 production 수정 및 local narrow GREEN 완료. root committed/type·독립 리뷰·PR·tracker·alpha 검증 대기; dev 머지·실측 완료로 간주하지 않는다.
 - Claimed: 실제 IAB 저장 toast와 김성준·확인 중 표시 확인. 증거 0550/report52-claim-confirmed.txt/png.

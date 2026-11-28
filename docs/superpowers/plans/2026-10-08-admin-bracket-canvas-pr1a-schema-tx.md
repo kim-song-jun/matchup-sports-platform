@@ -53,11 +53,11 @@ Task 14 Step 4 가 이 표의 export 가 실제 코드에 있는지 grep 으로 
 
 ### 셸 변수 — 블록마다 첫 두 줄로 다시 정의한다
 
-Bash 호출 사이에는 셸 상태(`export`·`cd`)가 이어지지 않는다. 그래서 `$WT`·`$ISO` 를 쓰는 **모든 bash 블록은 아래 두 줄로 시작한다**(이미 각 블록 맨 위에 있다 — 블록을 따로 떼어 실행해도 그대로 돈다). `ISO` 는 저장소 밖 고정 경로이고 Task 2 에서 채운다. 블록 안에서는 `cd` 도 그 블록 안에서만 유효하므로 각 블록이 필요한 `cd` 를 직접 한다.
+Bash 호출 사이에는 셸 상태(`export`·`cd`)가 이어지지 않는다. 그래서 `$WT`·`$ISO` 를 쓰는 **모든 bash 블록은 아래 두 줄로 시작한다**(이미 각 블록 맨 위에 있다 — 블록을 따로 떼어 실행해도 그대로 돈다). `WT` 는 이 PR 의 worktree 루트라서 블록은 그 worktree 안에서 실행한다. `ISO` 는 저장소 밖 고정 경로이고 Task 2 에서 채운다. 블록 안에서는 `cd` 도 그 블록 안에서만 유효하므로 각 블록이 필요한 `cd` 를 직접 한다.
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 ```
 
 ## File Structure
@@ -95,8 +95,8 @@ export ISO=/Users/sungjun/.cache/bracket-canvas-iso
 - [ ] **Step 1: 삽입 위치가 하나뿐인지 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && grep -c '늦은 쪽이 이긴다 |$' docs/design/competition-canonical-flow.md   # 기대: 1
 grep -n '^## 7. 태스크 매핑' docs/design/competition-canonical-flow.md              # 기대: 한 줄
 ```
@@ -126,8 +126,8 @@ grep -n '^## 7. 태스크 매핑' docs/design/competition-canonical-flow.md     
 - [ ] **Step 3: 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && grep -c '^| 대진 자리(slot)와 템플릿 |\|^| 정규 리그 빈 경기 |\|^| 어드민 빠른 결과 |\|^| 득점 기록 0건 경기의 승부차기 킥 수 |' docs/design/competition-canonical-flow.md   # 기대: 4
 awk -F'|' '/^\| (대진 자리|정규 리그 빈 경기|어드민 빠른 결과|득점 기록 0건)/ {print NF}' docs/design/competition-canonical-flow.md   # 기대: 모두 7 (앞뒤 빈 칸 + 5열)
 ```
@@ -135,8 +135,8 @@ awk -F'|' '/^\| (대진 자리|정규 리그 빈 경기|어드민 빠른 결과|
 - [ ] **Step 4: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "docs(design): 정본 §6 결정 이력에 대진 자리·리그 빈 경기·빠른 결과·킥 수 면제 추가" -- docs/design/competition-canonical-flow.md && git show --stat HEAD
 ```
 
@@ -157,8 +157,8 @@ cd $WT && git commit -m "docs(design): 정본 §6 결정 이력에 대진 자리
 - [ ] **Step 1: 마이그레이션 폴더 이름이 최신보다 뒤인지 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ls prisma/migrations | grep -v migration_lock | tail -1
 ```
 
@@ -335,8 +335,8 @@ enum V1TournamentGroupPhase {
 - [ ] **Step 3: 스키마가 유효한지 오프라인으로 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && DATABASE_URL=postgresql://x:x@localhost:5432/x ./node_modules/.bin/prisma validate 2>&1 | tail -2
 ```
 
@@ -412,8 +412,8 @@ ALTER TABLE "v1_tournament_slots" ADD CONSTRAINT "v1_tournament_slots_registrati
 **트랜잭션 주의(Postgres 12+ / Prisma):** `prisma migrate deploy` 는 마이그레이션 파일 하나를 한 번에 실행하므로 `ALTER TYPE … ADD VALUE` 는 같은 트랜잭션 안에서 실행된다. PG 12 이상(이 저장소는 16)은 이를 허용하지만, **그 트랜잭션이 커밋되기 전에는 새 값 `'round16'` 을 쓸 수 없다**(컬럼 `DEFAULT`·`INSERT`·부분 인덱스 조건·`CHECK` 에 쓰면 `unsafe use of new value`). 그래서 이 파일은 `round16` 을 값으로 참조하는 문장이 하나도 없어야 한다. `round16` 행을 만드는 코드(PR-1c 템플릿)는 마이그레이션이 이미 커밋된 뒤에 돈다. 아래로 확인한다:
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && grep -n "round16" prisma/migrations/20261009090000_v1_tournament_slots/migration.sql
 ```
 
@@ -422,8 +422,8 @@ cd $WT/apps/v1_api && grep -n "round16" prisma/migrations/20261009090000_v1_tour
 - [ ] **Step 5: 마이그레이션이 스키마 변경분과 정확히 같은지 대조한다 (드리프트 0 의 로컬 근거)**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 (
   set -e
   mkdir -p "$ISO"
@@ -446,8 +446,8 @@ export ISO=/Users/sungjun/.cache/bracket-canvas-iso
 - [ ] **Step 6: 실패하는 테스트를 확인한다 — 스키마 바이트가 고정 해시와 달라졌다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest --maxWorkers=1 src/games/game-schema-source-snapshot.spec.ts 2>&1 | grep -E "✓|✕|Tests:|SOURCE_SNAPSHOT_DRIFT" | head
 ```
 
@@ -473,8 +473,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest --maxWorkers=1 src/games/g
 그다음 새 해시로 바꾼다 (4곳은 교체, `alpha-manifest-common.sh` 는 허용 목록에 **추가**):
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT
 OLD=f0a8ce6e02421b02b5e36772dec0f183121064a02e2a976e7f9ee8d9965c954a
 NEW=$(sha256sum apps/v1_api/prisma/schema.prisma | cut -d' ' -f1); echo "$NEW"
@@ -489,8 +489,8 @@ perl -pi -e 's/(\.database\.task168\.schemaSha256 == "\Q$ENV{OLD}\E")\) and/$1 o
 - [ ] **Step 8: 5곳이 모두 바뀌었고 이전 해시가 허용 목록 말고는 남지 않았는지 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && for f in deploy/Dockerfile.v1-api scripts/release/create-alpha-release-manifest.sh scripts/release/prepare-task168-final-steady-inputs.sh apps/v1_api/test/fixtures/game-schema.fixture.ts deploy/alpha-manifest-common.sh; do
   echo "$f new=$(grep -c "$NEW" $f) old=$(grep -c "$OLD" $f)"; done
 ```
@@ -500,8 +500,8 @@ cd $WT && for f in deploy/Dockerfile.v1-api scripts/release/create-alpha-release
 - [ ] **Step 9: 스펙이 통과한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest --maxWorkers=1 src/games/game-schema-source-snapshot.spec.ts 2>&1 | grep -E "Tests:"
 ```
 
@@ -512,8 +512,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest --maxWorkers=1 src/games/g
 공유 `node_modules` 의 Prisma 클라이언트는 건드리지 않는다. 스키마 사본을 **앱 디렉터리 안 임시 폴더**에 두고(밖에 두면 Prisma 가 auto-install 을 시도한다) 출력만 `$ISO` 로 돌린다.
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api
 mkdir -p prisma-iso-tmp
 perl -pe 's#provider = "prisma-client-js"#provider = "prisma-client-js"\n  output   = "$ENV{ISO}/prisma-client"#' prisma/schema.prisma > prisma-iso-tmp/schema.prisma
@@ -530,8 +530,8 @@ git -C $WT status --short | grep -v '^??'  # 기대: 스키마·마이그레이�
 기대: `Generated Prisma Client ... to <$ISO>/prisma-client` 줄, `generate exit 0`, `isolated client ok`, `shared client untouched` 네 줄이 모두 출력된다. 하나라도 빠지면 멈추고 `$ISO/generate.log` 를 본다(공유 client 가 바뀌었으면 즉시 사용자에게 보고).
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 python3 - <<'PY'
 import json, os
 iso, app = os.environ['ISO'], os.environ['WT'] + '/apps/v1_api'
@@ -559,8 +559,8 @@ PY
 이후 명령 형태 (이 문서에서 `HJEST` / `HTSC` 라 줄여 쓰지 않고 매번 풀어 쓴다):
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 <spec 경로>
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"     # 전체 타입 검사(느리다: 부하에 따라 2~7분)
 ```
@@ -568,8 +568,8 @@ cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isochec
 - [ ] **Step 11: 하네스가 새 타입을 보는지, 그리고 베이스라인이 깨끗한지 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"
 ```
 
@@ -578,8 +578,8 @@ cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isochec
 `round16` 이 새 enum 값으로 생겨도 `Record<V1TournamentGroupPhase, …>` 처럼 전 값을 강제하는 서버 코드가 없어 tsc 0 이 유지된다. 범위 가드 — 16강 업무 규칙이 이 PR 에 새지 않았는지 확인한다:
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git diff HEAD --name-only | grep -E '^apps/v1_(api/src|web)/' ; grep -rn "round16" apps/v1_api/src apps/v1_web/src | head -3
 ```
 
@@ -588,8 +588,8 @@ cd $WT && git diff HEAD --name-only | grep -E '^apps/v1_(api/src|web)/' ; grep -
 - [ ] **Step 12: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git add apps/v1_api/prisma/migrations/20261009090000_v1_tournament_slots/migration.sql && git commit -m "feat(v1-api): 대진 자리(V1TournamentSlot) 스키마와 마이그레이션 추가" -- \
   apps/v1_api/prisma/schema.prisma apps/v1_api/prisma/migrations/20261009090000_v1_tournament_slots/migration.sql \
   apps/v1_api/test/fixtures/game-schema.fixture.ts deploy/Dockerfile.v1-api deploy/alpha-manifest-common.sh \
@@ -693,8 +693,8 @@ describe('AdminContextService.logAdminAction 위임', () => {
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/common/admin-context.service.spec.ts 2>&1 | grep -E "TS2305|has no exported member|Tests:|Test Suites:"
 ```
 
@@ -830,8 +830,8 @@ export async function writeAdminActionLog(
 - [ ] **Step 4: 통과를 확인한다 (새 테스트 + 감사 로그를 쓰는 기존 서비스 스펙)**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/common/admin-context.service.spec.ts src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|Test Suites:"
 ```
 
@@ -840,8 +840,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.c
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "refactor(v1-api): 감사 로그 기록을 인스턴스 없이 쓸 수 있는 writeAdminActionLog 로 추출" -- \
   apps/v1_api/src/common/admin-context.service.ts apps/v1_api/src/common/admin-context.service.spec.ts && git show --stat HEAD
 ```
@@ -899,8 +899,8 @@ describe('slotLabelFromRow', () => {
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/slots/tournament-slot-label.spec.ts 2>&1 | grep -E "Cannot find module|Tests:|Test Suites:"
 ```
 
@@ -967,8 +967,8 @@ export function slotLabelFromRow(row: SlotLabelRow): string {
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git add apps/v1_api/src/tournaments/slots/tournament-slot-label.ts apps/v1_api/src/tournaments/slots/tournament-slot-label.spec.ts && git commit -m "feat(v1-api): 대진 자리 라벨 순수 함수 추가" -- \
   apps/v1_api/src/tournaments/slots/tournament-slot-label.ts apps/v1_api/src/tournaments/slots/tournament-slot-label.spec.ts && git show --stat HEAD
 ```
@@ -1017,8 +1017,8 @@ describe('revisionEntryMethod', () => {
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournament-operations/results/quick-result.constants.spec.ts 2>&1 | grep -E "Cannot find module|Tests:"
 ```
 
@@ -1047,8 +1047,8 @@ export function revisionEntryMethod(rev: { reason: string | null; supersedesId: 
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git add apps/v1_api/src/tournament-operations/results/quick-result.constants.ts apps/v1_api/src/tournament-operations/results/quick-result.constants.spec.ts && git commit -m "feat(v1-api): 빠른 결과 reason 마커와 리비전 입력 방식 판정 추가" -- \
   apps/v1_api/src/tournament-operations/results/quick-result.constants.ts apps/v1_api/src/tournament-operations/results/quick-result.constants.spec.ts && git show --stat HEAD
 ```
@@ -1151,8 +1151,8 @@ import { createGroupInTx } from './tournament-bracket-tx';
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Cannot find module|Tests:|Test Suites:"
 ```
 
@@ -1358,8 +1358,8 @@ import { createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx } 
 (c) 두 private 메서드를 지운다 (구간 삭제 — 시작·끝 표식으로 찾으므로 줄 번호가 밀려도 안전하다):
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && python3 - <<'PY'
 p = 'src/tournaments/tournament-bracket.service.ts'
 s = open(p, encoding='utf-8').read()
@@ -1377,8 +1377,8 @@ git diff --stat -- src/tournaments/tournament-bracket.service.ts
 (d) 호출부 3곳을 함수 호출로 바꾼다 (`sed` 로 정확히 세 줄):
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && perl -pi -e 's/await this\.ensureGroupPhaseTeams\(tx, admin,/await ensureGroupPhaseTeamsInTx(tx, admin,/; s/await this\.recalculateStandingsInTx\(tx, /await recalculateStandingsInTx(tx, /' src/tournaments/tournament-bracket.service.ts
 grep -n "this.ensureGroupPhaseTeams\|this.recalculateStandingsInTx" src/tournaments/tournament-bracket.service.ts   # 기대: 출력 없음
 grep -n "ensureGroupPhaseTeamsInTx\|recalculateStandingsInTx" src/tournaments/tournament-bracket.service.ts          # 기대: import 1 + 호출 3
@@ -1387,8 +1387,8 @@ grep -n "ensureGroupPhaseTeamsInTx\|recalculateStandingsInTx" src/tournaments/to
 (e) 더 이상 쓰지 않는 import 를 지운다. `V1ActiveAdmin` 이 서비스에서 안 남았으면 import 에서 뺀다:
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && grep -n "V1ActiveAdmin" src/tournaments/tournament-bracket.service.ts
 ```
 
@@ -1397,8 +1397,8 @@ import 줄만 남아 있으면 `import { AdminContextService, type V1ActiveAdmin
 - [ ] **Step 5: 통과를 확인한다 — 새 테스트 + 옮긴 코드가 걸려 있는 기존 테스트**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|Test Suites:|✕"
 ```
 
@@ -1407,8 +1407,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.c
 - [ ] **Step 6: 타입과 래칫 게이트를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json" && node scripts/v1-surface-check.mjs; echo "exit=$?"
 ```
 
@@ -1470,16 +1470,16 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
 ```
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"; echo "exit=$?"   # 타입만 확인. 실행은 CI(DATABASE_URL 있는 환경)
 ```
 
 - [ ] **Step 8: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git add apps/v1_api/src/tournaments/tournament-bracket-tx.ts apps/v1_api/test/tournaments/tournament-bracket-tx.integration-spec.ts && git commit -m "refactor(v1-api): 조 생성·순위 재계산·조 편성 보조를 tournament-bracket-tx 함수로 추출" -- \
   apps/v1_api/src/tournaments/tournament-bracket-tx.ts apps/v1_api/src/tournaments/tournament-bracket.service.ts \
   apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts apps/v1_api/test/tournaments/tournament-bracket-tx.integration-spec.ts && git show --stat HEAD
@@ -1580,8 +1580,8 @@ import { assignTournamentFixtureSideInTx } from './tournament-bracket-tx';
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "TS2305|has no exported member|Tests:|Test Suites:"
 ```
 
@@ -1769,8 +1769,8 @@ import { createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, u
 그다음 서비스에 남은 `ensureGroupPhaseTeamsInTx` 사용처를 확인한다(`createFixture` 한 곳이어야 한다):
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && grep -n "ensureGroupPhaseTeamsInTx\|updateTournamentMatchInTx\|changesTeams" src/tournaments/tournament-bracket.service.ts
 ```
 
@@ -1779,8 +1779,8 @@ cd $WT/apps/v1_api && grep -n "ensureGroupPhaseTeamsInTx\|updateTournamentMatchI
 - [ ] **Step 5: 통과를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|Test Suites:|✕"
 ```
 
@@ -1789,8 +1789,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.c
 - [ ] **Step 6: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "refactor(v1-api): 경기 수정 본문을 updateTournamentFixtureInTx 로 추출하고 사이드 배정 함수 추가" -- \
   apps/v1_api/src/tournaments/tournament-bracket-tx.ts apps/v1_api/src/tournaments/tournament-bracket.service.ts \
   apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts && git show --stat HEAD
@@ -1904,8 +1904,8 @@ export function assertSidesNotSlotLinked(
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "TS2305|has no exported member|Tests:"
 ```
 
@@ -1988,8 +1988,8 @@ import 줄에 `assertSidesNotSlotLinked` 를 더한다:
 - [ ] **Step 5: 통과를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|Test Suites:|✕"
 ```
 
@@ -1998,8 +1998,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.c
 - [ ] **Step 6: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "feat(v1-api): 자리에 연결된 사이드는 경기 수정으로 직접 바꿀 수 없게 막는다 (SLOT_LINKED)" -- \
   apps/v1_api/src/tournaments/tournament-bracket-tx.ts apps/v1_api/src/tournaments/tournament-bracket.service.ts \
   apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts && git show --stat HEAD
@@ -2089,8 +2089,8 @@ export async function softDeleteTournamentFixtureInTx(tx: Prisma.TransactionClie
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "has no exported member|Tests:|✕"
 ```
 
@@ -2147,8 +2147,8 @@ export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdm
 - [ ] **Step 4: `deleteFixture` 가 호출하게 한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && python3 - <<'PY'
 p = 'src/tournaments/tournament-bracket.service.ts'
 s = open(p, encoding='utf-8').read()
@@ -2182,16 +2182,16 @@ sed -n '/async deleteFixture(/,/^  }$/p' src/tournaments/tournament-bracket.serv
 import 를 고친다 — `import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';` 줄을 **삭제**하고, tx import 줄에 `softDeleteTournamentFixtureInTx` 를 더한다. 그리고 확인:
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && grep -n "cascadeCancelTeamMatchSchedulesInTx" src/tournaments/tournament-bracket.service.ts   # 기대: 출력 없음
 ```
 
 - [ ] **Step 5: 통과를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|Test Suites:|✕"
 cd $WT/apps/v1_api && node scripts/v1-surface-check.mjs; echo "exit=$?"
 ```
@@ -2201,8 +2201,8 @@ cd $WT/apps/v1_api && node scripts/v1-surface-check.mjs; echo "exit=$?"
 - [ ] **Step 6: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "refactor(v1-api): 경기 소프트 삭제를 softDeleteTournamentFixtureInTx 로 추출하고 자리 연결을 같이 푼다" -- \
   apps/v1_api/src/tournaments/tournament-bracket-tx.ts apps/v1_api/src/tournaments/tournament-bracket.service.ts \
   apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts && git show --stat HEAD
@@ -2300,8 +2300,8 @@ export async function deleteTournamentGroupInTx(tx: Prisma.TransactionClient, ad
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|✕" | head
 ```
 
@@ -2342,8 +2342,8 @@ export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, gr
 - [ ] **Step 4: 서비스 `deleteGroup` 을 얇게 만든다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && python3 - <<'PY'
 p = 'src/tournaments/tournament-bracket.service.ts'
 s = open(p, encoding='utf-8').read()
@@ -2374,8 +2374,8 @@ PY
 - [ ] **Step 5: 통과를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|Test Suites:|✕"
 ```
 
@@ -2422,8 +2422,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.c
 ```
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"; echo "exit=$?"
 ```
 
@@ -2432,8 +2432,8 @@ cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isochec
 - [ ] **Step 7: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "refactor(v1-api): 조 삭제를 deleteTournamentGroupInTx 로 추출하고 남은 자리가 있으면 409 로 막는다" -- \
   apps/v1_api/src/tournaments/tournament-bracket-tx.ts apps/v1_api/src/tournaments/tournament-bracket.service.ts \
   apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts apps/v1_api/test/tournaments/tournament-bracket-tx.integration-spec.ts && git show --stat HEAD
@@ -2553,8 +2553,8 @@ import 에 `createEmptyTournamentFixtureInTx` 를 더하고, 표식 위에 추�
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "has no exported member|Tests:"
 ```
 
@@ -2690,8 +2690,8 @@ export async function createEmptyTournamentFixtureInTx(
 - [ ] **Step 5: 통과를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts src/tournaments/league-fixture-generator.service.spec.ts 2>&1 | grep -E "Tests:|Test Suites:|✕"
 ```
 
@@ -2792,8 +2792,8 @@ import type { Prisma } from '@prisma/client';
 그리고 `const [reg0, reg1] = ids.registrationIds;` 를 `admin` 선언 옆에 둔다.
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"; echo "exit=$?"
 ```
 
@@ -2802,8 +2802,8 @@ cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isochec
 - [ ] **Step 7: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "feat(v1-api): 자리 id 를 받는 빈 경기 생성 createEmptyTournamentFixtureInTx 추가" -- \
   apps/v1_api/src/tournaments/tournament-match-creation.ts apps/v1_api/src/tournaments/tournament-bracket-tx.ts \
   apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts apps/v1_api/test/tournaments/tournament-bracket-tx.integration-spec.ts && git show --stat HEAD
@@ -2896,8 +2896,8 @@ describe('serializeAdminBracketGame', () => {
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/slots/admin-bracket-view.spec.ts 2>&1 | grep -E "Cannot find module|Tests:"
 ```
 
@@ -3201,8 +3201,8 @@ import { serializeAdminBracketGame } from './slots/admin-bracket-view';
 - [ ] **Step 7: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts 2>&1 | grep -E "Tests:|✕"
 ```
 
@@ -3273,8 +3273,8 @@ import 에 추가: `import { adminBracketSlotInclude, serializeAdminBracketSlot 
 - [ ] **Step 9: 통과를 확인한다 + 타입**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-bracket.service.spec.ts src/tournaments/slots 2>&1 | grep -E "Tests:|Test Suites:|✕"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"; echo "exit=$?"
 ```
@@ -3304,16 +3304,16 @@ cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isochec
 ```
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"; echo "exit=$?"
 ```
 
 - [ ] **Step 11: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git add apps/v1_api/src/tournaments/slots/admin-bracket-view.ts apps/v1_api/src/tournaments/slots/admin-bracket-view.spec.ts && git commit -m "feat(v1-api): 어드민 대진 응답에 자리 목록과 경기별 자리·게임 블록 추가" -- \
   apps/v1_api/src/tournaments/slots/admin-bracket-view.ts apps/v1_api/src/tournaments/slots/admin-bracket-view.spec.ts \
   apps/v1_api/src/tournaments/tournament-team-match-bracket.query.ts apps/v1_api/src/tournaments/tournament-bracket.service.ts \
@@ -3489,16 +3489,16 @@ describe('PublicTournamentRecordsService.getSchedule -- 자리 라벨 (homeSlotL
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-detail.presenter.spec.ts 2>&1 | grep -E "Tests:|✕|homeSlotLabel" | head
 ```
 
 기대(1단계 프레젠터 스펙): 라벨을 기대하는 3건 FAIL(`homeSlotLabel` undefined) — "팀이 있으면 null" 대조군은 `toMatchObject({ homeSlotLabel: null })` 이 undefined 와 달라 이것도 FAIL 이다. 4건 모두 빨갛다. 일정 스펙(Step 1b)도 같은 방식으로 확인한다:
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/games/public-records/public-tournament-records.schedule-scorers.spec.ts -t "자리 라벨" 2>&1 | grep -E "Tests:|✕"
 ```
 
@@ -3712,8 +3712,8 @@ import { SLOT_LABEL_SELECT, slotLabelFromRow } from '../../tournaments/slots/tou
 - [ ] **Step 4: 통과를 확인한다 + 이 select 를 쓰는 다른 스펙**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/tournament-detail.presenter.spec.ts src/tournaments/tournaments-read.service.spec.ts src/games/public-records 2>&1 | grep -E "Tests:|Test Suites:|✕"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"; echo "exit=$?"
 ```
@@ -3723,8 +3723,8 @@ cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isochec
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git commit -m "feat(v1-api): 공개 대진·일정 경기에 팀이 없을 때 쓸 자리 라벨 homeSlotLabel/awaySlotLabel 추가" -- \
   apps/v1_api/src/tournaments/tournaments-read.query.ts apps/v1_api/src/tournaments/tournament-detail.presenter.ts \
   apps/v1_api/src/tournaments/tournament-detail.presenter.spec.ts \
@@ -3743,8 +3743,8 @@ cd $WT && git commit -m "feat(v1-api): 공개 대진·일정 경기에 팀이 �
 - [ ] **Step 1: API 문서를 추가한다** — `docs/api/domains/tournaments.md` 맨 끝에 붙인다.
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && cat >> docs/api/domains/tournaments.md <<'EOF'
 
 ### 대진 자리(slot) 응답 (2026-10-09, 어드민 대진 그림 편집기 PR-1a)
@@ -3773,8 +3773,8 @@ tail -3 docs/api/domains/tournaments.md | cut -c1-80
 - [ ] **Step 3: 영향 범위 스펙을 한 번에 돌린다 (풀스위트는 돌리지 않는다)**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 \
   src/common/admin-context.service.spec.ts src/games/game-schema-source-snapshot.spec.ts \
   src/tournaments/tournament-bracket.service.spec.ts src/tournaments/tournament-detail.presenter.spec.ts \
@@ -3787,8 +3787,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.c
 - [ ] **Step 4: 타입·래칫을 마지막으로 확인한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"; echo "tsc=$?"
 cd $WT/apps/v1_api && node scripts/v1-surface-check.mjs; echo "surface=$?"
 cd $WT && git status --short | grep -v '^??'          # 기대: 커밋 안 한 변경(tracked) 없음
@@ -3796,8 +3796,8 @@ cd $WT && git status --short | grep -E 'prisma-iso-tmp|tsconfig.isocheck|jest.is
 ```
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT/apps/v1_api && for n in createGroupInTx recalculateStandingsInTx ensureGroupPhaseTeamsInTx updateTournamentFixtureInTx assignTournamentFixtureSideInTx assertSidesNotSlotLinked softDeleteTournamentFixtureInTx deleteTournamentGroupInTx createEmptyTournamentFixtureInTx; do
   printf '%s ' "$n"; grep -cE "^export (async )?function $n\b" src/tournaments/tournament-bracket-tx.ts; done
 grep -cE "^export async function writeAdminActionLog\b" src/common/admin-context.service.ts
@@ -3813,8 +3813,8 @@ grep -c "homeSlotLabel" src/tournaments/tournament-detail.presenter.ts src/games
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 cd $WT && git add .changeset/admin-bracket-canvas-foundation.md && git commit -m "docs(v1-api): 대진 자리 응답 계약 문서와 체인지셋 추가" -- \
   docs/api/domains/tournaments.md .changeset/admin-bracket-canvas-foundation.md && git show --stat HEAD
 ```
@@ -3828,8 +3828,8 @@ cd $WT && git add .changeset/admin-bracket-canvas-foundation.md && git commit -m
 dev 머지 = 즉시 alpha 배포다. 배포 창(502)에서 측정하면 멀쩡한 응답을 결함으로 오진하므로 먼저 배포 SHA 를 확인한다. 이 Step 은 **GET 만** 쓴다 — 대회·조·경기·결과를 만드는 alpha 쓰기는 하지 않는다(필요해지면 실행 전 사용자 승인).
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 set -e
 MERGE_SHA=<dev 에 머지된 커밋 SHA>   # gh pr view <N> --repo kim-song-jun/matchup-sports-platform --json mergeCommit --jq .mergeCommit.oid 로 얻는다 (PR 번호는 gh pr create 가 준 URL 에서 파싱)
 gh run list --workflow deploy-alpha.yml --branch dev --limit 1 --repo kim-song-jun/matchup-sports-platform --json headSha,status,conclusion --jq '.[0]'
@@ -3845,8 +3845,8 @@ curl -fsS https://alpha.teameet.co.kr/api/v1/health | jq -e '.data.checks.db == 
 공개 응답 스모크(비인증 GET) — 새 필드가 **키로 존재**하는지만 본다. 자리가 없는 기존 대회라 값은 전부 `null` 이 정상이다.
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 set -e
 API=https://alpha.teameet.co.kr/api/v1
 TID="${TID:?경기가 있는 alpha 대회 id 를 먼저 export TID=... 로 넣어 주세요(새로 만들지 않는다)}"
@@ -3859,8 +3859,8 @@ curl -fsS "$API/tournaments/$TID/schedule" | jq -e '[(.data.items[]?, .data.unsc
 어드민 응답 스모크 — 어드민 세션 쿠키가 필요하다. 세션은 `login` API 로만 발급되고 계정·비밀번호는 저장소 밖 비공개 메모리(`alpha-e2e-test-accounts.md`)에 있다. 쿠키는 환경변수로만 넘기고 출력·커밋하지 않는다.
 
 ```bash
-export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
-export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+export WT="$(git rev-parse --show-toplevel)"
+export ISO="$HOME/.cache/bracket-canvas-iso"
 set -e
 API=https://alpha.teameet.co.kr/api/v1
 TID="${TID:?위 블록과 같은 대회 id 를 export TID=... 로 넣어 주세요}"

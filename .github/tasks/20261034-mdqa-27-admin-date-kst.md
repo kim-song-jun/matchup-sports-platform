@@ -73,7 +73,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 
 ## Progress Snapshot
 - Phase: C / Actual Copilot findings confirmed, root true RED recorded, dedicated KST short/local restore/tournament-only caller implemented; root serial GREEN pending.
-- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-27-admin-date-kst/matchup-sports-platform
+- Worktree: <local Codex worktrees folder>/mdqa-27-admin-date-kst/matchup-sports-platform
 - Branch: fix/mdqa-27-admin-date-kst
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
 - PR/head/merge: PR #1631 / `a6db56c08a78a37b0de7f6fed65eb28239dc9889` / open, not merged. Root tracker cursor: comment40, 확인 중.

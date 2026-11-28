@@ -254,7 +254,7 @@ Expected: PASS(동작 변화 없음).
 내가 고친 18개 파일(타입 1 + 어드민 고정 데이터 5 + 공개 고정 데이터 12)만 명시 경로로 커밋한다. 대괄호 경로가 글롭으로 풀리지 않도록 `GIT_LITERAL_PATHSPECS=1` 을 붙인다.
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 TASK1_FILES=(
   'apps/v1_web/src/types/api.ts' \
   'apps/v1_web/src/app/admin/tournaments/[id]/bracket-group-helpers.test.ts' \
@@ -407,7 +407,7 @@ Expected: PASS (9 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/lib/bracket-canvas-errors.ts apps/v1_web/src/lib/bracket-canvas-errors.test.ts
 git commit -m "feat(web): 그림 편집기 서버 에러 코드 해요체 안내" -- apps/v1_web/src/lib/bracket-canvas-errors.ts apps/v1_web/src/lib/bracket-canvas-errors.test.ts apps/v1_web/src/components/tournament-result-review/result-review-copy.ts
 git show --stat HEAD
@@ -676,7 +676,7 @@ Expected: PASS (6 tests). 추가로 `./node_modules/.bin/tsc --noEmit -p tsconfi
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/hooks/use-v1-bracket-canvas.ts apps/v1_web/src/hooks/use-v1-bracket-canvas.test.tsx
 git commit -m "feat(web): 대진 캔버스 훅(템플릿·자리 배정·무작위·빠른 결과)" -- apps/v1_web/src/hooks/use-v1-bracket-canvas.ts apps/v1_web/src/hooks/use-v1-bracket-canvas.test.tsx apps/v1_web/src/hooks/use-tournament-result-review.ts
 git show --stat HEAD
@@ -1277,7 +1277,7 @@ Expected: PASS (29 tests). `./node_modules/.bin/tsc --noEmit -p tsconfig.json` 0
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/lib/bracket-canvas-layout.ts apps/v1_web/src/lib/bracket-canvas-layout.test.ts apps/v1_web/src/test/bracket-canvas-fixtures.ts
 git commit -m "feat(web): 대진 캔버스 순수 레이아웃·상태·라벨 함수" -- apps/v1_web/src/lib/bracket-canvas-layout.ts apps/v1_web/src/lib/bracket-canvas-layout.test.ts apps/v1_web/src/test/bracket-canvas-fixtures.ts
 git show --stat HEAD
@@ -1395,7 +1395,7 @@ Expected: PASS (10 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/lib/bracket-template-counts.ts apps/v1_web/src/lib/bracket-template-counts.test.ts
 git commit -m "feat(web): 템플릿 만들 개수 미리보기 계산" -- apps/v1_web/src/lib/bracket-template-counts.ts apps/v1_web/src/lib/bracket-template-counts.test.ts
 git show --stat HEAD
@@ -1623,7 +1623,7 @@ Expected: PASS (14 tests). `./node_modules/.bin/tsc --noEmit -p tsconfig.json` 0
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/lib/bracket-quick-score.ts apps/v1_web/src/lib/bracket-quick-score.test.ts
 git commit -m "feat(web): 빠른 점수 검증과 정정 payload 조립 함수" -- apps/v1_web/src/lib/bracket-quick-score.ts apps/v1_web/src/lib/bracket-quick-score.test.ts
 git show --stat HEAD
@@ -2005,7 +2005,7 @@ Expected: tsc 0 오류, 패턴 검사 `✓ v1 패턴 검사 통과`.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/lib/competition-status.ts apps/v1_web/src/lib/competition-status.test.ts apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-dnd.ts apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-node.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-node.test.tsx
 git commit -m "feat(web): 대진 캔버스 칸 컴포넌트와 칸 상태 칩" -- apps/v1_web/src/lib/competition-status.ts apps/v1_web/src/lib/competition-status.test.ts apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-dnd.ts apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-node.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-node.test.tsx
 git show --stat HEAD
@@ -2280,7 +2280,7 @@ Expected: 0 오류 / 통과. (`border: '1px solid ...'`·`borderRadius: 'var(--r
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas.test.tsx
 git commit -m "feat(web): 대진 캔버스 컨테이너(열·칸·SVG 연결선)" -- apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas.test.tsx
 git show --stat HEAD
@@ -2523,7 +2523,7 @@ Expected: PASS (7 tests). 이어서 `./node_modules/.bin/tsc --noEmit -p tsconfi
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/components/admin/bracket-canvas/bracket-team-tray.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-team-tray.test.tsx
 git commit -m "feat(web): 대진 캔버스 참가팀 트레이" -- apps/v1_web/src/components/admin/bracket-canvas/bracket-team-tray.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-team-tray.test.tsx apps/v1_web/src/test/bracket-canvas-fixtures.ts
 git show --stat HEAD
@@ -2793,7 +2793,7 @@ Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node sc
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/components/admin/bracket-canvas/bracket-quick-result-form.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-quick-result-form.test.tsx
 git commit -m "feat(web): 대진 캔버스 점수 입력 폼" -- apps/v1_web/src/components/admin/bracket-canvas/bracket-quick-result-form.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-quick-result-form.test.tsx
 git show --stat HEAD
@@ -3363,7 +3363,7 @@ Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node sc
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/components/admin/bracket-canvas/bracket-result-actions.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-result-actions.test.tsx
 git commit -m "feat(web): 대진 캔버스 결과 확정·정정·무효 동작" -- apps/v1_web/src/components/admin/bracket-canvas/bracket-result-actions.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-result-actions.test.tsx
 git show --stat HEAD
@@ -3921,7 +3921,7 @@ Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node sc
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/components/admin/bracket-canvas/bracket-node-panel.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-node-panel.test.tsx
 git commit -m "feat(web): 대진 캔버스 칸 상세 패널" -- apps/v1_web/src/components/admin/bracket-canvas/bracket-node-panel.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-node-panel.test.tsx
 git show --stat HEAD
@@ -4294,7 +4294,7 @@ Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node sc
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.test.tsx
 git commit -m "feat(web): 대진 템플릿 대화상자(토너먼트·리그, 교체 확인)" -- apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.test.tsx
 git show --stat HEAD
@@ -4845,7 +4845,7 @@ Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node sc
 - [ ] **Step 8: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/lib/bracket-fixture-tools.ts apps/v1_web/src/lib/bracket-fixture-tools.test.ts apps/v1_web/src/hooks/use-v1-bracket-canvas.ts apps/v1_web/src/hooks/use-v1-bracket-canvas.test.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-fixture-tools-dialog.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-fixture-tools-dialog.test.tsx
 git commit -m "feat(web): 대진 캔버스 경기 추가·진출 연결 대화상자" -- apps/v1_web/src/lib/bracket-fixture-tools.ts apps/v1_web/src/lib/bracket-fixture-tools.test.ts apps/v1_web/src/hooks/use-v1-bracket-canvas.ts apps/v1_web/src/hooks/use-v1-bracket-canvas.test.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-fixture-tools-dialog.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-fixture-tools-dialog.test.tsx
 git show --stat HEAD
@@ -5417,7 +5417,7 @@ Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node sc
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-workspace.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-workspace.test.tsx
 git commit -m "feat(web): 대진 캔버스 작업 영역(툴바·트레이·캔버스·패널·공개 상태)" -- apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-workspace.tsx apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-workspace.test.tsx
 git show --stat HEAD
@@ -5646,7 +5646,7 @@ Expected: 통과. 기존 목록 회귀 확인: `./node_modules/.bin/vitest run '
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 GIT_LITERAL_PATHSPECS=1 git add 'apps/v1_web/src/app/admin/tournaments/[id]/bracket/page.test.tsx'
 GIT_LITERAL_PATHSPECS=1 git commit -m "feat(web): 대진 관리 [그림|목록] 전환(기본 그림, ?view=list)" -- 'apps/v1_web/src/app/admin/tournaments/[id]/bracket/page.tsx' 'apps/v1_web/src/app/admin/tournaments/[id]/bracket/page.test.tsx'
 git show --stat HEAD
@@ -5925,7 +5925,7 @@ Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node sc
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 GIT_LITERAL_PATHSPECS=1 git add apps/v1_web/src/lib/public-fixture-side-label.ts apps/v1_web/src/lib/public-fixture-side-label.test.ts 'apps/v1_web/src/app/tournaments/[id]/fixture-card-slot-label.test.tsx'  # 신규 파일만 add, 수정 파일은 pathspec 커밋이 잡는다
 GIT_LITERAL_PATHSPECS=1 git commit -m "feat(web): 공개 대진표·일정 카드·일정 탭에서 빈 사이드에 자리 라벨 표시" -- apps/v1_web/src/lib/public-fixture-side-label.ts apps/v1_web/src/lib/public-fixture-side-label.test.ts 'apps/v1_web/src/app/tournaments/[id]/fixture-card-slot-label.test.tsx' 'apps/v1_web/src/app/tournaments/[id]/tournament-detail-client.tsx' apps/v1_web/src/components/tournaments/tournament-bracket.tsx apps/v1_web/src/components/tournaments/tournament-bracket.render.test.tsx apps/v1_web/src/components/public-game-records/types.ts apps/v1_web/src/components/public-game-records/schedule-content.tsx apps/v1_web/src/components/public-game-records/schedule-content.test.tsx apps/v1_web/src/components/public-game-records/schedule-filter-return.test.tsx apps/v1_web/src/components/public-game-records/schedule-grouping.test.ts apps/v1_web/src/components/my/my-staff-fixtures-client.test.tsx apps/v1_web/src/app/public-game-records.test.tsx 'apps/v1_web/src/app/tournaments/[id]/bracket/bracket-page-client.test.tsx' 'apps/v1_web/src/app/tournaments/[id]/bracket/bracket-schedule-permissions.test.tsx'
 git show --stat HEAD
@@ -5967,7 +5967,7 @@ Expected: `apps/v1_web/` 와 `.changeset/` 만 보인다. `apps/v1_api/` 가 보
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git add .changeset/admin-bracket-canvas-ui.md
 git commit -m "chore(changeset): 어드민 대진 그림 편집기(토너먼트) 웹" -- .changeset/admin-bracket-canvas-ui.md
 git show --stat HEAD

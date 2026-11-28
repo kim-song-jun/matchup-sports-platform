@@ -25,7 +25,7 @@ Expected:
 Preferred tmux run:
 
 ```sh
-tmux new-session -d -s ulw-qa-policy-presence 'cd /Users/sungjun/Documents/projects/matchup-sports-platform && rg -n "No useless fallback|No fake tests|Visual verification before completion|Before/after screenshot evidence|Tech-Debt Grep|committed-tree" AGENTS.md .codex/AGENTS.md .codex/qa-rules.md .codex/frontend-rules.md .codex/design-rules.md .codex/agents/prompts.md .codex/agents/workflow.md .claude/agents/AGENTS.md .claude/agents/prompts.md; printf "exit=%s\n" "$?"'
+tmux new-session -d -s ulw-qa-policy-presence 'cd "$(git rev-parse --show-toplevel)" && rg -n "No useless fallback|No fake tests|Visual verification before completion|Before/after screenshot evidence|Tech-Debt Grep|committed-tree" AGENTS.md .codex/AGENTS.md .codex/qa-rules.md .codex/frontend-rules.md .codex/design-rules.md .codex/agents/prompts.md .codex/agents/workflow.md .claude/agents/AGENTS.md .claude/agents/prompts.md; printf "exit=%s\n" "$?"'
 tmux capture-pane -pt ulw-qa-policy-presence -S -2000
 tmux kill-session -t ulw-qa-policy-presence
 ```
@@ -46,7 +46,7 @@ Current evidence:
 Run:
 
 ```sh
-tmux new-session -d -s ulw-qa-visual-rules 'cd /Users/sungjun/Documents/projects/matchup-sports-platform && rg -n "Playwright screenshot|before/after|layout rebalance|tests pass is not completion" .codex/frontend-rules.md .codex/design-rules.md .codex/qa-rules.md; printf "exit=%s\n" "$?"'
+tmux new-session -d -s ulw-qa-visual-rules 'cd "$(git rev-parse --show-toplevel)" && rg -n "Playwright screenshot|before/after|layout rebalance|tests pass is not completion" .codex/frontend-rules.md .codex/design-rules.md .codex/qa-rules.md; printf "exit=%s\n" "$?"'
 tmux capture-pane -pt ulw-qa-visual-rules -S -2000
 tmux kill-session -t ulw-qa-visual-rules
 ```

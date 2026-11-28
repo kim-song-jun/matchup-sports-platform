@@ -357,9 +357,9 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 - **작업 종료 후 정리:** dev 머지와 필요한 Alpha 검증 뒤 이번 작업 소유 worktree 및 브랜치를 확인해
   정리하고 임시 프로세스·자원을 회수한다. 다른 세션 소유 또는 미커밋·미병합 작업은 건드리지 않는다.
 - **착수 전 `fetch`, 머지 후 로컬 `dev` 동기화 (2026-08-23 사용자 지시, 양쪽 다 필수).** PR이 `origin/dev`에
-  머지되면 머지 하나당 한 번, 즉시 메인 작업트리의 로컬 `dev`를 따라잡힌다:
+  머지되면 머지 하나당 한 번, 즉시 메인 작업트리(첫 번째 worktree)의 로컬 `dev`를 따라잡힌다:
   ```bash
-  cd /Users/sungjun/Dev/projects/matchup-sports-platform
+  cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
   git fetch origin dev -q && git merge --ff-only origin/dev
   ```
   **반드시 `--ff-only`** (`git pull`·rebase·`reset` 금지). FF가 거부되면 `git status --porcelain` ∩

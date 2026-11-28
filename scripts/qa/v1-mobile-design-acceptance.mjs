@@ -159,8 +159,13 @@ await mkdir(outDir, { recursive: true });
 const results = [];
 const chromeCliExecutable = process.env.CHROME_CLI_EXECUTABLE;
 if (chromeCliExecutable) {
-  const chromeOutDirWsl = process.env.CHROME_CLI_OUT_WSL ?? `/mnt/c/Users/seungmin/codex-v1qa/${runId}`;
-  const chromeOutDirWin = process.env.CHROME_CLI_OUT_WIN ?? `C:\\Users\\seungmin\\codex-v1qa\\${runId}`;
+  const chromeOutDirWsl = process.env.CHROME_CLI_OUT_WSL?.trim();
+  const chromeOutDirWin = process.env.CHROME_CLI_OUT_WIN?.trim();
+  if (!chromeOutDirWsl || !chromeOutDirWin) {
+    throw new Error(
+      'CHROME_CLI_EXECUTABLE requires CHROME_CLI_OUT_WSL and CHROME_CLI_OUT_WIN: the same output folder as a WSL path and as a Windows path',
+    );
+  }
   await mkdir(chromeOutDirWsl, { recursive: true });
 
   for (const route of routes) {

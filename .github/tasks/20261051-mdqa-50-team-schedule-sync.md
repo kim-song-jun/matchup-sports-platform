@@ -54,7 +54,7 @@ Status: In Progress
 | 2026-10-08 | Report50 | 다른 사용자/기기 서버 원인? | 원문은 동일 계정 다중 탭만 검증. 현행 v1 실제 hook/API/consumer 조사로 범위 확정. |
 
 ## Progress Snapshot
-- WT C:/Users/kinso/.codex/worktrees/mdqa-50-team-schedule-sync/matchup-sports-platform; branch fix/mdqa-50-team-schedule-sync; base de61d66c100c44d2618a14cda1ef15949aa2557a.
+- WT <local Codex worktrees folder>/mdqa-50-team-schedule-sync/matchup-sports-platform; branch fix/mdqa-50-team-schedule-sync; base de61d66c100c44d2618a14cda1ef15949aa2557a.
 - 원문·선점 근거: 원 checkout tmp/qa/mdqa-assigned-monitor/2026-10-08-heartbeat-0550/report50-detail-before-claim.txt, report50-claimed.txt/png.
 - root claim 2026-10-08 17:26 KST. 단일 공유 hook worker의 로컬 수정·회귀 검증 완료. 아직 PR 없음.
 - 실제 원인: 전역 QueryClient focus 재조회 기본값 false, 일정 list/detail hook에 개별 override 없음. 저장·RSVP mutation은 현재 탭 QueryClient만 invalidate한다. 참석 목록·집계·본인 RSVP는 detail GET에 포함되므로 별도 attendee hook 변경은 필요하지 않다.

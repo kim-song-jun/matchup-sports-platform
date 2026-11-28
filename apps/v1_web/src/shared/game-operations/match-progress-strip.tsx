@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import type { ProgressStep } from '@/lib/match-progress-steps';
 
 /**
- * 콘솔 점수 카드의 진행 단계 줄. 단계마다 점 하나를 한 줄로 잇는다. 파랑은 지금 단계에만 쓰고 나머지는 회색이다.
+ * 콘솔 점수 카드의 진행 단계 줄. 단계마다 점 하나를 한 줄로 잇는다. 지난 단계·지나온 연결선·지금 단계는 파랑, 남은 단계는 회색이다.
  * 색만으로 전하지 않는다: 지난 단계는 체크, 지금 단계는 채운 고리와 굵은 글씨(`aria-current="step"`),
  * 남은 단계는 빈 점, 조건부 단계(승부차기)는 점선 고리다.
  *
@@ -37,7 +37,7 @@ export function MatchProgressStrip({
           >
             <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center">
               {step.state === 'done' ? (
-                <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--grey400)] text-[var(--static-white)]">
+                <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--blue500)] text-[var(--static-white)]">
                   <Check size={9} strokeWidth={3.5} />
                 </span>
               ) : isCurrent ? (
@@ -66,7 +66,10 @@ export function MatchProgressStrip({
             {isLast ? null : (
               <span
                 aria-hidden="true"
-                className="mx-0.5 h-0.5 min-w-1 flex-1 basis-0 rounded-sm bg-[var(--border)]"
+                className={[
+                  'mx-0.5 h-0.5 min-w-1 flex-1 basis-0 rounded-sm',
+                  step.state === 'done' ? 'bg-[var(--blue500)]' : 'bg-[var(--border)]',
+                ].join(' ')}
               />
             )}
           </li>

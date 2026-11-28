@@ -38,7 +38,7 @@ describe('PrizeBreakdownEditor — 모바일 내용 전체폭 (#1439 A)', () => 
     // 실제 media geometry·픽셀/가시성은 별도 alpha after 범위다.
   });
 
-  it('이름→내용→삭제→다음 이름의 기존 DOM Tab 순서를 유지한다 (jsdom focus)', async () => {
+  it('이름→내용→삭제→다음 줄의 구분→이름 순서로 Tab 이 간다 (jsdom focus)', async () => {
     const user = userEvent.setup();
     render(<ControlledEditor />);
     screen.getByRole('combobox', { name: '상금 항목 1 이름' }).focus();
@@ -46,6 +46,8 @@ describe('PrizeBreakdownEditor — 모바일 내용 전체폭 (#1439 A)', () => 
     expect(screen.getByRole('textbox', { name: '상금 항목 1 내용' })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole('button', { name: '상금 항목 1 삭제' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('combobox', { name: '상금 항목 2 구분' })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole('combobox', { name: '상금 항목 2 이름' })).toHaveFocus();
   });
@@ -82,20 +84,20 @@ describe('PrizeBreakdownEditor — 모바일 내용 전체폭 (#1439 A)', () => 
     render(<ControlledEditor />);
     const first = screen.getByRole('textbox', { name: '상금 항목 1 내용' });
     fireEvent.change(first, { target: { value: '상품권 10만원 상당' } });
-    for (let count = 3; count < 12; count += 1) await user.click(screen.getByRole('button', { name: '팀 시상 추가' }));
+    for (let count = 3; count < 12; count += 1) await user.click(screen.getByRole('button', { name: '시상 추가' }));
     expect(screen.getAllByRole('button', { name: /상금 항목 \d+ 삭제/ })).toHaveLength(12);
-    expect(screen.getByRole('button', { name: '팀 시상 추가' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '시상 추가' })).toBeDisabled();
     expect(screen.getByRole('textbox', { name: '상금 항목 1 내용' })).toBe(first);
     expect(first).toHaveValue('상품권 10만원 상당');
     await user.click(screen.getByRole('button', { name: '상금 항목 12 삭제' }));
-    expect(screen.getByRole('button', { name: '팀 시상 추가' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '시상 추가' })).toBeEnabled();
   });
 
   it('disabled는 입력·추가·삭제를 잠그고 합성 값을 보존한다', async () => {
     const user = userEvent.setup();
     render(<ControlledEditor disabled rows={[{ id: 'a', label: '1위', value: '우승 트로피' }]} />);
     for (const input of [...screen.getAllByRole('textbox'), ...screen.getAllByRole('combobox')]) expect(input).toBeDisabled();
-    const add = screen.getByRole('button', { name: '팀 시상 추가' });
+    const add = screen.getByRole('button', { name: '시상 추가' });
     const remove = screen.getByRole('button', { name: '상금 항목 1 삭제' });
     expect(add).toBeDisabled();
     expect(remove).toBeDisabled();
@@ -117,13 +119,14 @@ describe('PrizeBreakdownEditor — 모바일 내용 전체폭 (#1439 A)', () => 
 });
 
 
-it('개인 시상 구역에서 임의 이름을 입력해도 구역과 미리보기를 유지한다', async () => {
+it('구분을 개인 시상으로 고르고 임의 이름을 입력해도 구분과 미리보기를 유지한다', async () => {
   const user = userEvent.setup();
   render(<ControlledEditor rows={[]} />);
-  await user.click(screen.getByRole('button', { name: '개인 시상 추가' }));
+  await user.click(screen.getByRole('button', { name: '시상 추가' }));
+  await user.selectOptions(screen.getByRole('combobox', { name: '상금 항목 1 구분' }), '개인 시상');
   const name = screen.getByRole('combobox', { name: '상금 항목 1 이름' });
   await user.type(name, '오늘의 허슬 플레이어');
-  expect(name.closest('section')).toHaveAttribute('aria-label', '개인 시상 입력');
+  expect(screen.getByRole('combobox', { name: '상금 항목 1 구분' })).toHaveValue('개인 시상');
   expect(screen.getByRole('region', { name: '개인 시상' })).toHaveTextContent('오늘의 허슬 플레이어');
   expect(screen.queryByRole('region', { name: '기타 시상' })).not.toBeInTheDocument();
 });
@@ -135,6 +138,47 @@ it('에디터 행을 저장·복원하고 공개 미리보기를 그려도 자�
   render(<ControlledEditor rows={rows} />);
   const name = screen.getByRole('combobox', { name: '상금 항목 1 이름' });
   expect(name).toHaveValue('오늘의 허슬 플레이어');
-  expect(name.closest('section')).toHaveAttribute('aria-label', '개인 시상 입력');
+  expect(screen.getByRole('combobox', { name: '상금 항목 1 구분' })).toHaveValue('개인 시상');
   expect(screen.getByRole('region', { name: '개인 시상' })).toHaveTextContent('운동복');
+});
+
+describe('PrizeBreakdownEditor — 시상 추가 버튼 하나와 줄마다 고르는 구분', () => {
+  it('추가 버튼은 「시상 추가」 하나뿐이고, 새 줄은 팀 시상으로 시작한다', async () => {
+    const user = userEvent.setup();
+    render(<ControlledEditor rows={[]} />);
+
+    expect(screen.getAllByRole('button', { name: /추가$/ })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: '팀 시상 추가' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '개인 시상 추가' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: '시상 추가' }));
+
+    expect(screen.getByRole('combobox', { name: '상금 항목 1 구분' })).toHaveValue('팀 시상');
+  });
+
+  it('줄의 구분을 개인 시상으로 바꾸면 그 줄만 개인 시상으로 직렬화된다', async () => {
+    const user = userEvent.setup();
+    let latest: TournamentPrizeRow[] = [];
+    function Capture() {
+      const [rows, setRows] = useState<TournamentPrizeRow[]>([
+        { id: 'a', label: '우승', value: '600000' },
+        { id: 'b', label: '오늘의 선수', value: '운동복' },
+      ]);
+      latest = rows;
+      return <PrizeBreakdownEditor rows={rows} onChange={setRows} prizePool="" onPrizePoolChange={() => {}} />;
+    }
+    render(<Capture />);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '상금 항목 2 구분' }), '개인 시상');
+
+    expect(parsePrizeRows(serializeTournamentPrizeRows(latest)).map((row) => [row.category, row.label])).toEqual([
+      ['팀 시상', '우승'],
+      ['개인 시상', '오늘의 선수'],
+    ]);
+  });
+
+  it('이름으로 구분을 알 수 있는 옛 줄(MVP)은 그 구분을 고른 채로 열린다', () => {
+    render(<ControlledEditor rows={[{ id: 'a', label: 'MVP', value: '트로피' }]} />);
+
+    expect(screen.getByRole('combobox', { name: '상금 항목 1 구분' })).toHaveValue('개인 시상');
+  });
 });

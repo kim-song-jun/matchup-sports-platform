@@ -38,7 +38,7 @@ export function ByeSlotEditor({ tournamentId, slot, fixture, fixtures, groups, s
   const peer = peers.find(row => row.registrationId === team);
   return <section aria-label="부전승 자리 편집" className="flex flex-col gap-3 p-4">
     <div className="flex items-center justify-between gap-2"><h2 className="tm-text-body-lg font-bold">부전승 자리</h2>{onClose ? <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost min-h-[44px]" onClick={onClose}>닫기</button> : null}</div>
-    <p className="tm-text-caption text-[var(--text-muted)]">연결 위치: {fixtureTitle(fixture, groups)} · {home ? '홈' : '어웨이'}</p>
+    <p className="tm-text-caption text-[var(--text-muted)]">연결 위치: {fixtureTitle(fixture, groups)} · {home ? '홈' : '원정'}</p>
     <ByeSideControl selectedSlotId={slot.id} tournamentId={tournamentId} fixture={fixture} fixtures={fixtures} slots={slots} onSaved={onClose} canWrite={canWrite && !pending}
       showToast={(text, variant) => { setError(variant === 'error' ? text : null); setMessage(variant === 'error' ? null : text); }} />
     <form className="flex flex-col gap-2" onSubmit={async event => {
@@ -70,6 +70,6 @@ export function ByeSlotEditor({ tournamentId, slot, fixture, fixtures, groups, s
     </>}
     {error ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p> : null}
     {message ? <p role="status" className="tm-text-caption text-[var(--text-muted)]">{message}</p> : null}
-    <p className="tm-text-caption text-[var(--text-muted)]">경기 번호·시각·경기장은 연결된 경기에서 수정해요.</p>
+    <p className="tm-text-caption text-[var(--text-muted)]">경기 번호·시각·구장은 연결된 경기에서 수정해요.</p>
   </section>;
 }

@@ -6,15 +6,6 @@ import type { V1TournamentStatus } from '@/types/api';
  * import 하면 순환 참조가 생긴다.
  */
 
-export const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
-  draft: '초안',
-  open: '접수 중',
-  closed: '마감',
-  in_progress: '진행 중',
-  completed: '완료',
-  cancelled: '취소됨',
-};
-
 export function allowedNextStatuses(current: V1TournamentStatus): V1TournamentStatus[] {
   switch (current) {
     case 'draft':

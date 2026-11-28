@@ -21,7 +21,7 @@ type TieBreakOrderEditorProps = {
   showHeading?: boolean;
 };
 
-/** 대회 만들기·정보 수정이 함께 쓰는 「동점일 때 순서」 칸. 승점은 처음, 추첨은 마지막에 고정이다. */
+/** 「순위 정하는 순서」 를 한 칸씩 옮기는 칸. 승점은 처음, 추첨은 마지막에 고정이다. */
 export function TieBreakOrderEditor({ order, onChange, disabled = false, lockedReason = null, showHeading = true }: TieBreakOrderEditorProps) {
   const headingId = useId();
   const hintId = useId();
@@ -30,12 +30,12 @@ export function TieBreakOrderEditor({ order, onChange, disabled = false, lockedR
 
   return (
     <section
-      {...(showHeading ? { 'aria-labelledby': headingId } : { 'aria-label': '동점일 때 순서' })}
+      {...(showHeading ? { 'aria-labelledby': headingId } : { 'aria-label': '순위 정하는 순서' })}
       aria-describedby={hintId}
       className="grid gap-2"
     >
       {showHeading ? (
-        <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">동점일 때 순서</h3>
+        <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">순위 정하는 순서</h3>
       ) : null}
       <p id={hintId} className="tm-text-caption text-[var(--text-muted)]">
         승점이 같으면 위에서부터 차례로 가려요. 끝까지 같으면 추첨으로 정해요.

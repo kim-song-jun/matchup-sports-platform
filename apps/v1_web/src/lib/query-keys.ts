@@ -232,16 +232,7 @@ export const v1Keys = {
   gameEvents: (gameId: string) => [...v1Keys.game(gameId), 'events'] as const,
   fixtureLineup: (tournamentId: string, fixtureId: string) =>
     [...v1Keys.all, 'tournament-ops', tournamentId, 'fixtures', fixtureId, 'lineup'] as const,
-  tournamentOperationsBoard: (tournamentId: string, filters?: Record<string, unknown>) =>
-    [...v1Keys.all, 'tournament-ops', tournamentId, 'operations', filters ?? {}] as const,
-  /**
-   * 필터를 뺀 보드 접두사 — **무효화 전용**.
-   *
-   * 보드 쿼리 키는 마지막 원소가 항상 필터 객체이고(`limit` 이 늘 들어가 비는 일이 없다),
-   * `invalidateQueries` 는 접두사 일치라 `tournamentOperationsBoard(id)`(= 필터 `{}`)로는
-   * 실제로 떠 있는 어떤 쿼리와도 안 맞아 **조용히 아무것도 무효화하지 않는다.**
-   * 필터와 무관하게 보드를 다시 읽어야 하는 변경(경기장 배정 등)은 이 키를 쓴다.
-   */
+  /** 보드 읽기(전 페이지·끝난 경기 목록)의 공통 접두사 — 한 번에 무효화할 때 쓴다. */
   tournamentOperationsBoardAll: (tournamentId: string) =>
     [...v1Keys.all, 'tournament-ops', tournamentId, 'operations'] as const,
   tournamentOperationsStaff: (tournamentId: string) =>

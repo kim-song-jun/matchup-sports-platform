@@ -5,6 +5,7 @@ import { PeriodOverrideField, useMatchPeriodOverride } from '@/components/admin/
 
 import { useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueFixture, V1UpdateLeagueFixturePayload } from '@/types/league-match';
@@ -78,6 +79,7 @@ export function LeagueFixtureScheduleModal({
   onPeriodsSaved: () => void;
   onClose: () => void;
 }) {
+  const { confirm, ConfirmModal } = useConfirm();
   const startsAtId = useId();
   const titleId = useId();
   const homeId = useId();
@@ -163,7 +165,8 @@ export function LeagueFixtureScheduleModal({
       const conflict = scheduleFixtures.find(other => other.teamMatchId !== fixture.teamMatchId && other.status !== 'cancelled' &&
         Date.parse(other.startAt) === time && (fieldId ? other.fieldId === fieldId :
           !other.fieldId && place && !isUnsetPlace(place) && isSamePlace(place, fixtureCurrentPlace(other))));
-      if (conflict && !window.confirm(`${conflict.title} 경기와 시간·구장이 겹쳐요. 그대로 저장할까요?`)) return;
+      if (conflict && !await confirm({ title: '시간·구장이 겹쳐요', confirmLabel: '그대로 저장',
+        message: `${conflict.title} 경기와 시간·구장이 겹쳐요. 그대로 저장할까요?` })) return;
     }
     try {
       if (fixtureDirty) await onSubmit(patch);
@@ -181,6 +184,7 @@ export function LeagueFixtureScheduleModal({
   };
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 sm:items-center sm:p-4"
       onClick={onBackdropClick}
@@ -285,5 +289,7 @@ export function LeagueFixtureScheduleModal({
         </div>
       </div>
     </div>
+    {ConfirmModal}
+    </>
   );
 }

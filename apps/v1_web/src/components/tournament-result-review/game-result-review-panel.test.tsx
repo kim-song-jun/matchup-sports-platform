@@ -110,7 +110,7 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     officializeMutate = vi.fn();
 
     // 렌더 시점(마운트 직후, 아직 refetch 전)엔 캐시된 STALE 값 — 여기서
-    // 사용자가 "확인"을 누르는 시나리오를 재현한다.
+    // 사용자가 결과 확정을 누르는 시나리오를 재현한다.
     mocks.useTournamentGame.mockReturnValue({
       data: gameDetail(),
       isPending: false,
@@ -131,10 +131,10 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     });
   });
 
-  it('"확인"을 누르면 강제로 다시 불러온 최신 점수를 확인 문구에 보여준다', async () => {
+  it('결과 확정을 누르면 강제로 다시 불러온 최신 점수를 확인 문구에 보여준다', async () => {
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '1 : 1로 결과 확정' }));
 
     await waitFor(() => expect(revisionsRefetch).toHaveBeenCalled());
     await waitFor(() => expect(gameRefetch).toHaveBeenCalled());
@@ -148,9 +148,9 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
   it('확정을 누르면 화면에 보여준 것과 같은 최신 점수/버전으로 실제 제출한다', async () => {
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '1 : 1로 결과 확정' }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: '확정' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '결과 확정' }));
 
     await waitFor(() =>
       expect(officializeMutate).toHaveBeenCalledWith(
@@ -168,9 +168,9 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
   it('공식 확정 성공 콜백은 서버 성공일 때만 호출한다', async () => {
     const onOfficialized = vi.fn();
     render(<GameResultReviewPanel gameId={GAME_ID} onOfficialized={onOfficialized} />);
-    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '1 : 1로 결과 확정' }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: '확정' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '결과 확정' }));
     await waitFor(() => expect(officializeMutate).toHaveBeenCalled());
 
     expect(onOfficialized).not.toHaveBeenCalled();
@@ -318,24 +318,6 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
 
     expect(screen.getByText('승부차기 2:0, 선축 원정')).toBeInTheDocument();
   });
-
-  /**
-   * **공개 화면 링크는 이 화면의 것이 아니다.** 한 번 여기 뒀다가 도달 불가로 걷어냈다 —
-   * 확정 한 번에 `revisions`(링크를 띄운다)와 `board`(이 패널을 걷어낸다) 무효화가 같은
-   * 콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다.
-   *
-   * **이 자리에 "링크가 없다"는 단언은 두지 않는다.** 기능을 옮기면서 그 부재를 단언하는
-   * 테스트를 남기면 영영 녹색인 줄이 되고, 어디서 그 기능을 재는지도 흐려진다 —
-   * 실제 계약은 옮겨간 화면(`corrections-page-client.test.tsx`)이 **긍정으로** 잠근다.
-   */
-  it('정정 화면으로 가는 링크는 확정된 결과에 그대로 있다', () => {
-    render(<GameResultReviewPanel gameId={GAME_ID} correctionsHref="/x/records/corrections" />);
-
-    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toHaveAttribute(
-      'href',
-      '/x/records/corrections',
-    );
-  });
 });
 
 describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {
@@ -384,9 +366,8 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
       refetch: vi.fn(),
     });
     render(<GameResultReviewPanel gameId={GAME_ID} />);
-    // SUBMITTED 카드의 입구는 "고치고 확인" 이다 — 레거시 반려 카드("다시 제출")는
-    // contract 마이그레이션과 함께 사라졌고, 열리는 모달은 같은 재제출 모달이다.
-    fireEvent.click(screen.getByRole('button', { name: '고치고 확인' }));
+    // SUBMITTED 카드의 입구는 "결과 고치기" 이고, 열리는 모달은 재제출 모달이다.
+    fireEvent.click(screen.getByRole('button', { name: '결과 고치기' }));
     return screen.getByRole('dialog');
   }
 
@@ -499,7 +480,7 @@ describe('GameResultReviewPanel — 콘솔 확정 카드(variant="console")', ()
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('2:1 결과를 공식 결과로 확정해요');
     expect(officializeMutate).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '확정' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '결과 확정' }));
     await waitFor(() => expect(officializeMutate).toHaveBeenCalledTimes(1));
     expect(officializeMutate.mock.calls[0][0]).toMatchObject({ revisionId: 'revision-1', score: { home: 2, away: 1 } });
   });
@@ -515,7 +496,7 @@ describe('GameResultReviewPanel — 콘솔 확정 카드(variant="console")', ()
     render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
 
     fireEvent.click(screen.getByRole('button', { name: '2 : 1 결과 확정' }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '결과 확정' }));
 
     expect(await screen.findByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '2 : 1 결과 확정' })).toBeNull();

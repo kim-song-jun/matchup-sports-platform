@@ -100,3 +100,24 @@ describe('AdminDataTable 데스크톱 표 폭', () => {
     expect(screen.getByRole('table')).not.toHaveClass('w-max');
   });
 });
+
+describe('AdminDataTable rowTone', () => {
+  // 한쪽만 두꺼운 색 띠(R-K3)는 상태를 색으로만 말한다 — 상태는 열의 글자가 맡고 행은 배경 틴트만 쓴다.
+  it.each(['danger', 'warning'] as const)('rowTone=%s 는 배경 틴트만 쓰고 한쪽 색 띠를 만들지 않는다 — 상태는 글자로 남는다', (tone) => {
+    const { container } = render(
+      <AdminDataTable<{ id: string; name: string; status: string }>
+        columns={[
+          { key: 'n', header: '이름', render: (row) => row.name },
+          { key: 's', header: '상태', render: (row) => row.status },
+        ]}
+        rows={[{ id: 'a', name: '가', status: '취소됨' }]}
+        keyExtractor={(row) => row.id}
+        rowTone={() => tone}
+      />,
+    );
+    expect(screen.getAllByText('취소됨').length).toBeGreaterThan(0);
+    for (const element of container.querySelectorAll('tr, td, li')) expect(element.className).not.toMatch(/border-l-/);
+    expect(container.querySelector('tbody tr')!.className).toContain(tone === 'danger' ? 'bg-[var(--red50)]/40' : 'bg-[var(--tint-orange)]');
+    expect(container.querySelector('li')!.className).toContain(tone === 'danger' ? 'bg-[var(--red50)]/40' : 'bg-[var(--tint-orange)]');
+  });
+});

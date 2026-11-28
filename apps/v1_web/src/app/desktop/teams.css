@@ -232,6 +232,12 @@
     min-width: 0;
   }
 
+  /* 회원 탭 막대 — 데스크톱 본문은 좌우 여백이 없어 모바일처럼 바깥으로 넓히지 않는다. */
+  .tm-team-detail-desktop-main .tm-team-detail-tabs {
+    margin: var(--spacing-4) 0 0;
+    padding: 0;
+  }
+
   /* 팀 정보 카드는 왼쪽 본문 폭에 맞춘다(오른쪽 고정 카드와 윗선이 같다). */
   .tm-team-detail-desktop-main > .tm-team-profile {
     margin-bottom: var(--spacing-2);

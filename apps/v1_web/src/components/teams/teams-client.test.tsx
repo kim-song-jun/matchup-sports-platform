@@ -570,24 +570,53 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     return { mobile, desktop };
   }
 
-  it.each(['owner', 'manager', 'member'])('#1546 %s의 두 블록에 일정 링크를 제공하고 기존 관리·채팅을 유지한다', (role) => {
+  // 2026-11-27 사용자 확정 A안: 소속 회원은 [정보 / 일정 / 기록 / 회비] 탭으로 보고, 처음엔 일정 탭이 열린다.
+  it.each(['owner', 'manager', 'member'])('#1546 %s의 두 블록은 일정 탭으로 열리고 팀 일정 전체 보기 링크를 제공한다', (role) => {
     const { mobile, desktop } = renderScheduleEntry(role);
     for (const block of [mobile, desktop]) {
-      const link = within(block).getByRole('link', { name: /팀 일정/ });
-      expect(link).toHaveAttribute('href', '/teams/team-1/schedules');
-      expect(link).toHaveTextContent('훈련·경기·이벤트 일정을 보고 참석을 체크해요.');
+      const tablist = within(block).getByRole('tablist', { name: '팀 메뉴' });
+      expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['정보', '일정', '기록', '회비']);
+      expect(within(tablist).getByRole('tab', { name: '일정' })).toHaveAttribute('aria-selected', 'true');
+      const link = within(block).getByRole('link', { name: '팀 일정 전체 보기' });
+      expect(link).toHaveAttribute('href', '/teams/team-1/schedules?from=%2Fteams%2Fteam-1');
       expect(link.tabIndex).toBe(0);
-      expect(link).not.toHaveAttribute('aria-hidden');
-      expect(link).not.toHaveAttribute('aria-disabled');
-      // 순서(2026-11-26 개편): 상단 숫자 칸(받은 후기) → … → 팀 일정 → 주요 멤버.
+      // 탭 막대는 상단 숫자 칸(받은 후기) 아래, 팀 일정은 탭 막대 아래에 있다.
       const reviews = within(block).getByRole('link', { name: /받은 후기/ });
-      expect(reviews.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      const members = within(block).getByText('주요 멤버');
-      expect(link.compareDocumentPosition(members) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(Boolean(within(block).queryByRole('link', { name: /정보 수정/ }))).toBe(role !== 'member');
+      expect(reviews.compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(tablist.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // 운영 바로가기는 헤더 아래에서 빠지고 ⋯ 팀 관리 메뉴(운영진만)와 정보 탭으로 옮겼다.
+      expect(within(block).queryByRole('link', { name: /정보 수정/ })).toBeNull();
+      expect(Boolean(within(block).queryByRole('button', { name: '팀 관리 메뉴' }))).toBe(role !== 'member');
     }
-    expect(screen.getAllByRole('link', { name: /팀 일정/ })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: '팀 채팅' })).toHaveLength(2);
+    // 모바일 팀 채팅은 셸의 떠 있는 버튼(floatingSlot)이라 여기선 데스크톱 오른쪽 카드 버튼만 남는다.
+    expect(within(desktop).getByRole('button', { name: '팀 채팅' })).toBeInTheDocument();
+    expect(mobile.querySelector('.tm-fixed-cta')).toBeNull();
+  });
+
+  it('회원 탭을 누르면 그 탭 내용으로 바뀌고 주소에 탭을 남긴다', async () => {
+    const user = userEvent.setup();
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    const { mobile } = renderScheduleEntry('owner');
+    await user.click(within(mobile).getByRole('tab', { name: '정보' }));
+    expect(within(mobile).getByRole('tab', { name: '정보' })).toHaveAttribute('aria-selected', 'true');
+    expect(within(mobile).getAllByText('주요 멤버').length).toBeGreaterThan(0);
+    expect(within(mobile).getByRole('link', { name: /^팀 정보 수정/ })).toHaveAttribute('href', '/teams/team-1/edit?from=%2Fteams%2Fteam-1');
+    expect(replaceState).toHaveBeenLastCalledWith(expect.anything(), '', expect.stringContaining('tab=info'));
+    await user.click(within(mobile).getByRole('tab', { name: '회비' }));
+    expect(within(mobile).getByText('월 회비')).toBeInTheDocument();
+    // 처음 탭(일정)으로 돌아오면 주소에서 탭을 지운다.
+    await user.click(within(mobile).getByRole('tab', { name: '일정' }));
+    expect(replaceState).toHaveBeenLastCalledWith(expect.anything(), '', expect.not.stringContaining('tab='));
+    replaceState.mockRestore();
+  });
+
+  it('주소의 ?tab= 으로 처음 열 탭을 고른다', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=info');
+    const { mobile, desktop } = renderScheduleEntry('member');
+    for (const block of [mobile, desktop]) {
+      expect(within(block).getByRole('tab', { name: '정보' })).toHaveAttribute('aria-selected', 'true');
+      expect(within(block).queryByRole('link', { name: '팀 일정 전체 보기' })).toBeNull();
+    }
   });
 
   it.each([
@@ -597,12 +626,14 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
   ])('#1546 비소속 %s 상태는 회원용 일정 링크를 노출하지 않는다', (_mode, joinState, joinPolicy) => {
     renderScheduleEntry('none', joinState, joinPolicy);
     expect(screen.queryByRole('link', { name: /팀 일정/ })).not.toBeInTheDocument();
+    // 가입 전인 사람은 탭 없이 한 장짜리 화면 그대로다.
+    expect(screen.queryByRole('tablist', { name: '팀 메뉴' })).not.toBeInTheDocument();
   });
 
   it('#1546 mobile 일정 링크는 바로 앞 컨트롤에서 Tab 한 번으로 닿고 Enter로 현재 href를 활성화한다', async () => {
     const user = userEvent.setup();
     const { mobile } = renderScheduleEntry('owner');
-    const schedule = within(mobile).getByRole('link', { name: /팀 일정/ });
+    const schedule = within(mobile).getByRole('link', { name: '팀 일정 전체 보기' });
     const activation = vi.fn((event: Event) => event.preventDefault());
     schedule.addEventListener('click', activation);
     // 일정 링크 앞의 마지막 포커스 대상(문서 순서)에서 Tab 한 번 — 사이에 포커스를 가로채는 것이 없어야 한다.
@@ -613,12 +644,13 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     expect(schedule).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(activation).toHaveBeenCalledOnce();
-    expect(schedule).toHaveAttribute('href', '/teams/team-1/schedules');
+    expect(schedule).toHaveAttribute('href', '/teams/team-1/schedules?from=%2Fteams%2Fteam-1');
     expect(teamApiMocks.useV1CreateTeamJoinApplication().mutateAsync).not.toHaveBeenCalled();
     expect(teamApiMocks.useV1WithdrawTeamJoinApplication().mutateAsync).not.toHaveBeenCalled();
   });
 
   it('운영진이면 운영 메뉴에 "받은 컨택" 행이 팀컨택 필터 채팅 목록으로 연결되고 대기 건수가 배지로 붙는다', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=info'); // 운영 메뉴는 정보 탭에 있다.
     teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
@@ -640,6 +672,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
   });
 
   it('"팀매치 만들기" 는 이 팀 상세로 돌아오도록 항상 from= 을 담는다 (받은 출처가 없어도)', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=info');
     teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
@@ -658,7 +691,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
   });
 
   it('"팀매치 만들기" 는 팀 상세 자체가 받은 출처(selfHref 의 from)도 함께 실어 나른다', () => {
-    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams&tab=info');
     teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
@@ -728,7 +761,8 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
       expect(screen.queryByText('팀을 만들었어요')).toBeNull();
     });
 
-    it('팀장·매니저는 히어로 아래에서 멤버 관리·팀 정보 수정으로 바로 가고, 팀원에겐 없다', () => {
+    it('팀장·매니저는 정보 탭 맨 위에서 멤버 관리·팀 정보 수정으로 바로 가고, 팀원에겐 없다', () => {
+      navigationMocks.searchParams = new URLSearchParams('tab=info');
       viewAs('manager');
       const view = render(<TeamDetailPageClient teamId="team-1" />);
       expect(screen.getAllByRole('link', { name: /^멤버 관리/ })[0]).toHaveAttribute('href', '/teams/team-1/members');
@@ -751,7 +785,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     });
   });
 
-  it('cached verified owner keeps management, member CTA, and protected queries during auth background fetching', () => {
+  it('cached verified owner keeps management, member CTA, and protected queries during auth background fetching', async () => {
     teamApiMocks.useV1AuthMe.mockReturnValue({
       data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } },
       isPending: false,
@@ -770,13 +804,17 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     render(<TeamDetailPageClient teamId="team-1" />);
 
     expect(screen.queryByRole('button', { name: '로그인 상태 확인 중' })).toBeNull();
-    expect(screen.getAllByRole('link', { name: /^팀 정보 수정/ }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /받은 컨택/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '팀 관리 메뉴' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: '팀 채팅' }).length).toBeGreaterThan(0);
     expect(teamApiMocks.useV1TeamContactSummary).toHaveBeenLastCalledWith({ enabled: true });
     expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
     expect(teamApiMocks.useV1MyTeams).toHaveBeenLastCalledWith(undefined, { enabled: true });
+    // 처음 열리는 일정 탭이 다가오는 경기를 읽는다.
     expect(teamApiMocks.useV1TeamUpcomingGames).toHaveBeenCalledWith('team-1');
+    // 운영 바로가기·운영 메뉴는 정보 탭에 있다.
+    await userEvent.setup().click(screen.getAllByRole('tab', { name: '정보' })[0]);
+    expect(screen.getAllByRole('link', { name: /^팀 정보 수정/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /받은 컨택/ }).length).toBeGreaterThan(0);
   });
 
   it('총원이 미리보기(8명)보다 많으면 정확한 남은 인원 수로 "+ n명 더보기" CTA가 뜨고 전체 멤버 목록으로 연결된다', () => {
@@ -797,6 +835,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
   });
 
   it('작은 팀의 멤버에게도 전체 멤버 목록 진입점이 있다', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=info'); // 회원은 멤버 목록을 정보 탭에서 본다.
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({
         memberCount: 6,

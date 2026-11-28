@@ -11,7 +11,7 @@ import type { V1AuthMe, V1TeamDetail } from '@/types/api';
 import { TeamDetailPageClient } from './teams-client';
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/teams/team-1', useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/teams/team-1', useSearchParams: () => new URLSearchParams('tab=info'), // 회원은 탭으로 본다 — 팀 소개는 정보 탭에 있다.
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
 }));
 

@@ -28,6 +28,18 @@ import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TeamInternalMatchesSection } from '@/components/team-internal-matches/team-internal-matches-section';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
+import {
+  TeamChatFab,
+  TeamDetailTabBar,
+  TeamDetailTabPanel,
+  TeamFeeTab,
+  TeamManageMoreButton,
+  TeamRecordsTab,
+  TeamUpcomingSchedulesSection,
+  useTeamDetailTab,
+  useTeamDetailTabIds,
+  type TeamDetailTabKey,
+} from './team-detail-member-tabs';
 import { TeamCompetitionEntryList } from './team-competition-entries-section';
 import {
   TeamActivitySection,
@@ -366,54 +378,6 @@ function TeamDetailMembersCard({ team, subPageFrom }: { team: TeamDetailViewMode
   );
 }
 
-/** 팀 기록 링크 카드 — 전적·후기가 같은 모양이어야 한 묶음으로 읽힌다. 모바일·데스크톱
- *  두 레이아웃이 **같은 컴포넌트**를 쓴다(예전엔 같은 마크업이 두 벌로 복사돼 있었다). */
-function TeamRecordLinkCard({
-  href,
-  title,
-  description,
-  badge,
-}: {
-  /** 없으면 링크가 아니라 표시 전용 카드로 그린다 — 갈 곳이 없는데 눌리는 것처럼 보이면 안 된다. */
-  href?: string;
-  title: string;
-  description: ReactNode;
-  badge?: string | null;
-}) {
-  const body = (
-    <>
-      <div>
-        <div className="tm-text-label">{title}</div>
-        <div className="tm-text-caption" style={{ marginTop: 4 }}>{description}</div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {badge ? (
-          <span className="tm-badge tm-badge-blue" style={{ whiteSpace: 'nowrap' }}>{badge}</span>
-        ) : null}
-        {href ? <ChevronRightIcon size={18} aria-hidden="true" /> : null}
-      </div>
-    </>
-  );
-  const style: CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-field)',
-    padding: '16px 16px',
-    background: 'var(--bg)',
-    textDecoration: 'none',
-    color: 'inherit',
-  };
-  if (href === undefined) return <div className="tm-team-detail-record-card" style={style}>{body}</div>;
-  return (
-    <Link className="tm-pressable tm-team-detail-record-card" href={href} style={style}>
-      {body}
-    </Link>
-  );
-}
-
 /**
  * 팀 상세 로딩 셸. 목업 팀(teams.view-model.ts)을 그대로 렌더하던 자리를 대신한다.
  * 셸 승격(U29) 이후 title/activeTab/bottomNav/backHref 는 route-chrome/fragments/teams.ts
@@ -445,6 +409,9 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
   const mobileBodyRef = useRef<HTMLElement>(null);
   const mobileCtaRef = useRef<HTMLDivElement>(null);
   const mobileHeaderRef = useRef<HTMLElement>(null);
+  const [activeTab, setActiveTab] = useTeamDetailTab();
+  const desktopTabIds = useTeamDetailTabIds();
+  const mobileTabIds = useTeamDetailTabIds();
 
   useEffect(() => {
     heroActionMountedRef.current = true;
@@ -535,6 +502,10 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
     runCta();
   };
   const onShare = () => runHeroAction(model.onShare, '링크를 복사했어요');
+  // 소속 회원의 팀 채팅 — 하단 긴 버튼 대신 오른쪽 아래 동그란 버튼(모바일). 데스크톱은 오른쪽 카드 버튼 그대로.
+  useShellOverride({
+    floatingSlot: mode === 'mine' && model.onCta ? <TeamChatFab onClick={onCtaClick} pending={model.ctaPending} /> : undefined,
+  });
 
   // ── 상단 팀 정보 ──
   const chips = [
@@ -606,15 +577,41 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
   ) : ctaButton;
   // P2: 완료 메시지 .tm-complete-check 마이크로인터랙션
   const heroStatus = heroMessage ? <div className="tm-text-caption tm-complete-check tm-team-hero-message" role="status">{heroMessage}</div> : null;
-  const mineSectionsTop = mode === 'mine' ? (
-    <>
-      <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} />
-      <TeamInternalMatchesSection teamId={team.id} canManage={model.canManageInternalMatches === true} />
-    </>
-  ) : null;
-  const scheduleLink = mode === 'mine' ? (
-    <TeamRecordLinkCard href={`/teams/${team.id}/schedules`} title="팀 일정" description="훈련·경기·이벤트 일정을 보고 참석을 체크해요." />
-  ) : null;
+  // 소속 회원은 [정보 / 일정 / 기록 / 회비] 탭으로 본다(2026-11-27 사용자 확정 A안). 운영진 바로가기는
+  // 헤더 아래에서 빼고 정보 탭 맨 위와 헤더의 ⋯ 메뉴로 옮겼다. 가입 전인 사람은 한 장짜리 화면 그대로다.
+  const memberTabs = mode === 'mine';
+  const manageMore = memberTabs && model.manageShortcuts ? (
+    <TeamManageMoreButton membersHref={model.manageShortcuts.membersHref} editHref={model.manageShortcuts.editHref} onShare={onShare} />
+  ) : undefined;
+  // 탭 안에서 다른 화면으로 갔다가 돌아오면 같은 탭이 열리도록 출처에 탭을 싣는다.
+  const tabFrom = activeTab === 'schedule' ? selfHref : `${selfHref}${selfHref.includes('?') ? '&' : '?'}tab=${activeTab}`;
+  const renderMemberTab = (tab: TeamDetailTabKey, layout: 'mobile' | 'desktop') => {
+    if (tab === 'info') {
+      return (
+        <>
+          {model.manageShortcuts ? <TeamManageShortcuts shortcuts={model.manageShortcuts} /> : null}
+          <TeamIntroSection text={team.description} clamp={layout === 'mobile'} />
+          {/* 데스크톱은 가입 조건이 오른쪽 고정 카드에 있다. */}
+          {layout === 'mobile' ? <TeamJoinConditions rows={conditionRows} /> : null}
+          <TeamActivitySection rows={activityRows} />
+          <TeamOperationsSection operations={model.operations} />
+          <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
+        </>
+      );
+    }
+    if (tab === 'schedule') {
+      return (
+        <>
+          <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} />
+          <TeamUpcomingSchedulesSection teamId={team.id} from={tabFrom} />
+          <TeamInternalMatchesSection teamId={team.id} canManage={model.canManageInternalMatches === true} />
+          <TeamParticipationSection tabs={participationTabs} />
+        </>
+      );
+    }
+    if (tab === 'records') return <TeamRecordsTab teamId={team.id} from={tabFrom} />;
+    return <TeamFeeTab fee={team.membershipFee} editHref={model.manageShortcuts?.editHref} />;
+  };
 
   return (
     <>
@@ -632,15 +629,21 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
         <div className="tm-team-detail-desktop-main">
           {refreshError ? <div style={{ marginBottom: 'var(--spacing-4)' }}>{refreshError}</div> : null}
           {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
-          <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} alertChip={alertChip} stats={stats} onShare={onShare} nameAs="h2" footnote={reviewFootnote} />
-          {model.manageShortcuts ? <TeamManageShortcuts shortcuts={model.manageShortcuts} /> : null}
-          {mineSectionsTop}
-          <TeamIntroSection text={team.description} />
-          <TeamActivitySection rows={activityRows} />
-          <TeamParticipationSection tabs={participationTabs} />
-          {scheduleLink}
-          <TeamOperationsSection operations={model.operations} />
-          <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
+          <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} alertChip={alertChip} stats={stats} onShare={onShare} nameAs="h2" footnote={reviewFootnote} action={manageMore} />
+          {memberTabs ? (
+            <>
+              <TeamDetailTabBar active={activeTab} onChange={setActiveTab} ids={desktopTabIds} />
+              <TeamDetailTabPanel tab={activeTab} ids={desktopTabIds}>{renderMemberTab(activeTab, 'desktop')}</TeamDetailTabPanel>
+            </>
+          ) : (
+            <>
+              <TeamIntroSection text={team.description} />
+              <TeamActivitySection rows={activityRows} />
+              <TeamParticipationSection tabs={participationTabs} />
+              <TeamOperationsSection operations={model.operations} />
+              <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
+            </>
+          )}
         </div>
 
         <aside className="tm-team-detail-desktop-sidebar" aria-label="가입">
@@ -655,28 +658,38 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
       </div>
 
       {/* Mobile — 팀 정보가 상단바 뒤로 지나가면 한 줄 요약이 상단바 아래에 남는다. */}
-      <TeamDetailCompactBar targetRef={mobileHeaderRef} team={team} summary={compactSummary} />
+      {/* 회원 화면은 탭 막대가 상단바 아래에 붙으므로 한 줄 요약을 겹쳐 띄우지 않는다. */}
+      {memberTabs ? null : <TeamDetailCompactBar targetRef={mobileHeaderRef} team={team} summary={compactSummary} />}
       <article ref={mobileBodyRef} className="tm-team-detail-body tm-hide-desktop tm-content-enter">
         {refreshError ? <div style={{ marginBottom: 'var(--spacing-4)' }}>{refreshError}</div> : null}
         {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
-        <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} alertChip={alertChip} stats={stats} onShare={onShare} headerRef={mobileHeaderRef} footnote={reviewFootnote} />
-        {model.manageShortcuts ? <TeamManageShortcuts shortcuts={model.manageShortcuts} /> : null}
+        <TeamDetailHeader team={team} chips={chips} badge={newTeamBadge} alertChip={alertChip} stats={stats} onShare={onShare} headerRef={mobileHeaderRef} footnote={reviewFootnote} action={manageMore} />
         {mode === 'pending' ? <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} /> : null}
         {/* 이 화면은 데스크톱·모바일 JSX 를 따로 그린다 — 두 블록을 함께 고치는 것이 이 파일의 규약이다. */}
-        {mineSectionsTop}
-        <TeamIntroSection text={team.description} clamp />
-        <TeamJoinConditions rows={conditionRows} />
-        <TeamActivitySection rows={activityRows} />
-        <TeamParticipationSection tabs={participationTabs} />
-        {scheduleLink}
-        <TeamOperationsSection operations={model.operations} />
-        <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
+        {memberTabs ? (
+          <>
+            {heroStatus}
+            <TeamDetailTabBar active={activeTab} onChange={setActiveTab} ids={mobileTabIds} />
+            <TeamDetailTabPanel tab={activeTab} ids={mobileTabIds}>{renderMemberTab(activeTab, 'mobile')}</TeamDetailTabPanel>
+          </>
+        ) : (
+          <>
+            <TeamIntroSection text={team.description} clamp />
+            <TeamJoinConditions rows={conditionRows} />
+            <TeamActivitySection rows={activityRows} />
+            <TeamParticipationSection tabs={participationTabs} />
+            <TeamOperationsSection operations={model.operations} />
+            <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
+          </>
+        )}
       </article>
-      <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
-        {heroStatus}
-        {fullNotice}
-        {ctaBlock}
-      </div>
+      {memberTabs ? null : (
+        <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
+          {heroStatus}
+          {fullNotice}
+          {ctaBlock}
+        </div>
+      )}
       <ConfirmModal
         open={joinConfirmOpen}
         title={`${team.name}에 가입 신청할까요?`}

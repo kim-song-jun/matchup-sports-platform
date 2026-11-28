@@ -3310,12 +3310,21 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     state.reverseEvent.mockRejectedValueOnce(rejection('VERSION_CONFLICT', 'Expected version is stale')).mockResolvedValue(undefined);
     const { undo } = await recordedGoalWithUndo(state);
 
+    // 누른 되돌리기 버튼은 닫히는 토스트 안에 150ms 만 남는다. 진짜 타이머면 바쁜 기계에서 다시 누르기 전에 사라지므로
+    // 그 제거 타이머를 얼려 두고 시간 없이 microtask 만 흘려 보낸다(waitFor·findBy 는 얼린 setTimeout 에서 멈춘다).
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const settle = () => act(() => vi.advanceTimersByTimeAsync(0));
     fireEvent.click(undo);
-    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(1));
-    await findConsoleNotice('그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.');
+    await settle();
+    expect(state.reverseEvent).toHaveBeenCalledTimes(1);
+    expect(
+      within(openStatusSheet()).getByText('그사이 경기 기록이 바뀌어 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.'),
+    ).toBeInTheDocument();
     fireEvent.click(undo);
+    await settle();
+    expect(state.reverseEvent).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
 
-    await waitFor(() => expect(state.reverseEvent).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('되돌렸어요')).toBeInTheDocument();
     // 지난 실패 안내는 남지 않는다.
     expect(within(openStatusSheet()).queryByText(/되돌리지 못했어요/)).toBeNull();

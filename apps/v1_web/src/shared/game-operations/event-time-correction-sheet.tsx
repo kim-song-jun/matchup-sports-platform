@@ -147,7 +147,7 @@ export function EventTimeCorrectionSheet({
         clockMs,
         reason: isAdmin
           ? trimmedReason
-          : `경기 중 기록 시각 정정 (${formatMatchClock(currentClockMs)} → ${formatMatchClock(clockMs)})`,
+          : `경기 중 기록 시각 고치기 (${formatMatchClock(currentClockMs)} → ${formatMatchClock(clockMs)})`,
       });
       onClose();
     } catch (err) {
@@ -186,12 +186,12 @@ export function EventTimeCorrectionSheet({
         {showTabs ? (
           <div
             role="tablist"
-            aria-label="기록 수정 방법"
+            aria-label="기록 고치는 방법"
             className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] bg-[var(--surface-soft)] p-1"
           >
             {(
               [
-                ['time', tabIdTime, '시간 정정'],
+                ['time', tabIdTime, '시각 고치기'],
                 ['cancel', tabIdCancel, '기록 취소'],
               ] as const
             ).map(([key, id, label]) => (
@@ -271,7 +271,7 @@ export function EventTimeCorrectionSheet({
                       enterKeyHint="done"
                       value={draft}
                       maxLength={6}
-                      aria-label="정정할 시각 숫자로 입력 (예: 930은 9분 30초)"
+                      aria-label="고칠 시각 숫자로 입력 (예: 930은 9분 30초)"
                       aria-invalid={draftInvalid}
                       aria-describedby={draftMessageId}
                       placeholder={formatMatchClock(clockMs)}
@@ -300,7 +300,7 @@ export function EventTimeCorrectionSheet({
                     type="button"
                     onClick={beginTyping}
                     disabled={pending}
-                    aria-label={`정정할 시각 ${formatMatchClock(clockMs)}. 눌러서 숫자로 직접 입력`}
+                    aria-label={`고칠 시각 ${formatMatchClock(clockMs)}. 눌러서 숫자로 직접 입력`}
                     style={CLOCK_FONT}
                     className="min-h-[56px] rounded-xl px-3 leading-none tracking-tight tabular-nums text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
                   >
@@ -338,7 +338,7 @@ export function EventTimeCorrectionSheet({
               {isAdmin ? (
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor={reasonId} className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">
-                    정정 사유 <span className="font-medium text-[var(--text-muted)]">(필수)</span>
+                    고친 이유 <span className="font-medium text-[var(--text-muted)]">(필수)</span>
                   </label>
                   <textarea
                     id={reasonId}
@@ -371,7 +371,7 @@ export function EventTimeCorrectionSheet({
                 aria-describedby={hintId}
                 onClick={() => void submit()}
               >
-                {unchanged ? '시각을 바꾸면 정정할 수 있어요' : correctionCtaLabel(currentClockMs, clockMs)}
+                {unchanged ? '시각을 바꾸면 고칠 수 있어요' : correctionCtaLabel(currentClockMs, clockMs)}
               </Button>
             </>
           )}

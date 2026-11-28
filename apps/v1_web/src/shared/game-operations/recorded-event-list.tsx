@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { ChevronDown, Handshake, Pencil, Undo2 } from 'lucide-react';
 import { isBackfilledEvent, isBackfilledMinuteUnknown } from '@/lib/backfilled-goal-event';
 import { formatKstMeridiemTime } from '@/lib/date-utils';
@@ -94,6 +94,8 @@ export function RecordedEventList({
   disabled = false,
   order = 'chronological',
   periodCount,
+  maxRows,
+  renderMore,
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -134,6 +136,10 @@ export function RecordedEventList({
    * 시간순(`chronological`, 기본값)을 유지한다. 순서는 서버가 준 `sequence` 순서를 뒤집기만 한다.
    */
   readonly order?: 'chronological' | 'newest-first';
+  /** 보이는 순서에서 위 N줄만 그린다. 경고 누적 퇴장처럼 합친 줄은 한 줄로 센다. */
+  readonly maxRows?: number;
+  /** `maxRows` 로 줄이 가려졌을 때만 목록 아래에 그린다. 인자는 가려진 것까지 합친 전체 줄 수다. */
+  readonly renderMore?: (totalRows: number) => ReactNode;
 }) {
   const lastReset = history.reduce((sequence, event) =>
     event.type === 'CORRECTION' && event.payload?.reason === '경기 시작 취소' && typeof event.payload.commandId === 'string'
@@ -201,7 +207,8 @@ export function RecordedEventList({
     };
   });
   const listedEvents = visibleEvents.filter((event) => !secondYellowRed.absorbedYellows.has(event));
-  const orderedEvents = order === 'newest-first' ? [...listedEvents].reverse() : listedEvents;
+  const sortedEvents = order === 'newest-first' ? [...listedEvents].reverse() : listedEvents;
+  const orderedEvents = maxRows === undefined ? sortedEvents : sortedEvents.slice(0, maxRows);
   const reverseHandler = onReverseEvent ?? onReverseSubstitution;
 
   /**
@@ -223,6 +230,8 @@ export function RecordedEventList({
       (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
       ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
       !reversedIds.has(event.id);
+    const reverseLabel =
+      event.type === 'SUBSTITUTION' ? '되돌리기' : actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`;
     const canEditTime =
       onEditEvent !== undefined &&
       resultOfficialized !== true &&
@@ -258,21 +267,23 @@ export function RecordedEventList({
             type="button"
             disabled={disabled}
             onClick={() => onEditEvent?.(listedEvent)}
-            aria-label={`기록 수정 (${eventTypeLabel(event)})`}
+            aria-label={`기록 고치기 (${eventTypeLabel(event)})`}
             className={EDIT_BUTTON_CLASS}
           >
             <Pencil size={12} aria-hidden="true" />
-            {actionPrefix === null ? '수정' : `${actionPrefix} 수정`}
+            {actionPrefix === null ? '고치기' : `${actionPrefix} 고치기`}
           </button>
         ) : canReverse ? (
           <button
             type="button"
             disabled={disabled}
             onClick={() => reverseHandler?.(event)}
-              className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            // 보이는 글자는 「고치기」지만 누르면 기록 취소 확인으로 이어진다 — 보이는 글자를 이름 앞에 두어 음성 조작도 맞춘다.
+            aria-label={event.type === 'SUBSTITUTION' ? undefined : `${reverseLabel} · 기록 취소 (${eventTypeLabel(event)})`}
+            className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             <Undo2 size={12} aria-hidden="true" />
-            {event.type === 'SUBSTITUTION' ? '되돌리기' : actionPrefix === null ? '수정·취소' : `${actionPrefix} 수정·취소`}
+            {reverseLabel}
           </button>
         ) : null}
       </>
@@ -280,6 +291,7 @@ export function RecordedEventList({
   };
 
   return (
+    <>
     <ul
       className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)]"
       aria-label="기록된 이벤트 목록"
@@ -355,11 +367,11 @@ export function RecordedEventList({
                     type="button"
                     disabled={disabled}
                     onClick={() => onEditEvent(listedEvent, [mergedYellow])}
-                    aria-label={`기록 수정 (${SECOND_YELLOW_RED_LABEL})`}
+                    aria-label={`기록 고치기 (${SECOND_YELLOW_RED_LABEL})`}
                     className={EDIT_BUTTON_CLASS}
                   >
                     <Pencil size={12} aria-hidden="true" />
-                    수정
+                    고치기
                   </button>
                 ) : (
                   /* 시각 수정이 없는 화면(취소만 되는 곳)은 옐로·레드를 각각 취소할 수 있게 둘을 낸다. */
@@ -402,6 +414,8 @@ export function RecordedEventList({
         );
       })}
     </ul>
+    {orderedEvents.length < sortedEvents.length ? renderMore?.(sortedEvents.length) : null}
+    </>
   );
 }
 
@@ -431,7 +445,7 @@ function EventTimeCorrectionDisclosure({
         onClick={() => setOpen((value) => !value)}
         className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
       >
-        정정됨
+        고친 기록
         <ChevronDown
           size={14}
           aria-hidden="true"
@@ -498,9 +512,9 @@ export function eventTypeLabel(event: GameEventRecord): string {
     case 'SUBSTITUTION':
       return '교체';
     case 'CORRECTION':
-      return '정정';
+      return '기록 취소';
     case 'TIME_CORRECTION':
-      return '시각 정정';
+      return '시각 고치기';
     default:
       return event.type;
   }

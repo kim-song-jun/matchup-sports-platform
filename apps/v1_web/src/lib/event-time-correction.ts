@@ -124,9 +124,9 @@ export function parseTypedClock(raw: string): number | null {
   return minutes * 60_000 + seconds * 1000;
 }
 
-/** CTA 문구 — "11:00 → 9:00으로 정정". */
+/** CTA 문구 — "11:00 → 9:00으로 고치기". */
 export function correctionCtaLabel(fromClockMs: number, toClockMs: number): string {
-  return `${formatMatchClock(fromClockMs)} → ${josa(formatMatchClock(toClockMs), ['으로', '로'])} 정정`;
+  return `${formatMatchClock(fromClockMs)} → ${josa(formatMatchClock(toClockMs), ['으로', '로'])} 고치기`;
 }
 
 /** 범위 안내 문구. 상한을 모르면 서버가 판정하므로 하한만 말한다. */
@@ -146,12 +146,12 @@ export function correctionRangeError(periodLabel: string, maxClockMs: number | n
 
 const CORRECTION_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   EVENT_TIME_UNCHANGED: '지금 기록된 시각과 같아요. 다른 시각으로 골라 주세요.',
-  EVENT_CLOCK_OUT_OF_RANGE: '이 피리어드 안의 시각으로 골라 주세요.',
+  EVENT_CLOCK_OUT_OF_RANGE: '이 경기 시간 안의 시각으로 골라 주세요.',
   EVENT_ALREADY_REVERSED: '이미 취소된 기록은 시각을 고칠 수 없어요.',
   EVENT_TIME_NOT_CORRECTABLE: '시각을 고칠 수 있는 기록이 아니에요.',
-  EVENT_TIME_REASON_REQUIRED: '정정 사유를 적어 주세요.',
+  EVENT_TIME_REASON_REQUIRED: '고친 이유를 적어 주세요.',
   GAME_EVENT_NOT_FOUND: '기록을 찾지 못했어요. 화면을 새로 고쳐 주세요.',
-  RESULT_ALREADY_OFFICIAL: '결과가 이미 확정돼서 운영 콘솔에서는 고칠 수 없어요. 플랫폼 관리자에게 정정을 요청해 주세요.',
+  RESULT_ALREADY_OFFICIAL: '결과가 이미 확정돼서 운영 콘솔에서는 고칠 수 없어요. 플랫폼 관리자에게 고쳐 달라고 요청해 주세요.',
   RESULT_NOT_OFFICIAL: '아직 확정되지 않은 결과예요. 운영 콘솔에서 고쳐 주세요.',
   TERMINAL_GAME_IMMUTABLE: '취소된 경기는 기록을 고칠 수 없어요.',
   VERSION_CONFLICT: '다른 곳에서 기록이 바뀌었어요. 최신 기록을 불러온 뒤 다시 시도해 주세요.',
@@ -162,5 +162,5 @@ const CORRECTION_ERROR_MESSAGES: Readonly<Record<string, string>> = {
 export function eventTimeCorrectionErrorMessage(err: unknown): string {
   const code = extractErrorCode(err);
   if (code !== null && CORRECTION_ERROR_MESSAGES[code] !== undefined) return CORRECTION_ERROR_MESSAGES[code];
-  return extractErrorMessage(err, '시각을 정정하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  return extractErrorMessage(err, '시각을 고치지 못했어요. 잠시 후 다시 시도해 주세요.');
 }

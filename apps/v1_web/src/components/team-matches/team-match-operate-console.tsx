@@ -214,7 +214,6 @@ function TeamMatchOperateConsoleRuntime({
       operatorScopeKey={JSON.stringify(teamMatchContext)}
       operationContextKey={teamMatchContext.teamMatchId}
       headerTopClass="top-[52px] lg:top-0"
-      showEmptyRosterNotice={false}
       allowPenaltyShootout={false}
       resultReviewEnabled={false}
       hostContext={teamMatchContext}

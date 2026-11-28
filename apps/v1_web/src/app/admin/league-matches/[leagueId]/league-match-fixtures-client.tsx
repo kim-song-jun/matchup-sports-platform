@@ -422,7 +422,7 @@ export default function LeagueMatchFixturesClient({
       description: LEAGUE_FIXTURE_CANCEL_HINT,
       destructive: true,
       disabled: gameInProgress,
-      disabledReason: gameInProgress ? '경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요' : null,
+      disabledReason: gameInProgress ? '경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 끝내기’로 먼저 끝내 주세요' : null,
       onSelect: () => {
         setMenuFixture(null);
         setCancelTarget(row);
@@ -1290,7 +1290,7 @@ export default function LeagueMatchFixturesClient({
             </ul>
             {inProgressFixtures.length > 0 ? (
               <p className="mb-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-                경기가 진행 중인 팀은 콘솔의 ‘몰수·중단으로 종료’로 경기를 먼저 끝낸 뒤 제외할 수 있어요.
+                경기가 진행 중인 팀은 콘솔의 ‘몰수·중단으로 끝내기’로 경기를 먼저 끝낸 뒤 제외할 수 있어요.
               </p>
             ) : null}
             <label htmlFor="league-team-picker" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
@@ -1429,7 +1429,7 @@ export default function LeagueMatchFixturesClient({
                 ) : null}
                 {inProgressFixtures.length > 0 ? (
                   <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
-                    진행 중인 경기가 있어 대진을 다시 만들 수 없어요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.
+                    진행 중인 경기가 있어 대진을 다시 만들 수 없어요. 콘솔의 ‘몰수·중단으로 끝내기’로 먼저 끝내 주세요.
                   </p>
                 ) : null}
                 {hasSlotFixtures ? (

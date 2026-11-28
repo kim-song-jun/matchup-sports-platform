@@ -32,7 +32,7 @@
 | File | Responsibility |
 |---|---|
 | `lib/sequential-save.ts` | `SaveStep`, `runSaveSteps`, `partialSaveMessage` (pure) |
-| `[id]/info-sections.ts` | **C-3 owner**: `TOURNAMENT_INFO_SECTIONS`, meta, `parseInfoEditParam`, `infoEditHref`, `tournamentInfoNeeds`, `TOURNAMENT_FORMAT_NAMES` |
+| `[id]/info-sections.ts` | **C-3 owner**: `TOURNAMENT_INFO_SECTIONS`, meta, `parseInfoEditParam`, `infoEditHref`, `tournamentInfoNeeds` (진행 방식 이름은 L0 C-6 의 `TOURNAMENT_FORMAT_NAMES` 를 `lib/tournament-format-labels` 에서 import — 여기서 다시 만들지 않는다) |
 | `[id]/use-info-edit-param.ts` | URL ↔ open section (`replace`, keeps other params) |
 | `hooks/use-tournament-save-context.ts`, `hooks/use-tournament-period-settings.ts` (+`usePatchPeriods`) | `SaveContext`: fresh-version PATCHes |
 | `[id]/info-forms/types.ts` | `InfoSectionDefinition`, form props/handle, summary row/context types |
@@ -75,7 +75,7 @@ export type InfoNeedField = 'venue' | 'rosterDeadlineAt' | 'bankAccount';
 export interface InfoNeed { section: TournamentInfoSectionKey; field: InfoNeedField; label: string }
 export function tournamentInfoNeeds(t: V1Tournament): InfoNeed[];
 export const infoFieldId: (field: string) => string;                                      // `info-${field}`
-export const TOURNAMENT_FORMAT_NAMES: Record<V1TournamentFormat, string>;
+import { TOURNAMENT_FORMAT_NAMES } from '@/lib/tournament-format-labels'; // L0 C-6 소유 — 재정의하지 않는다
 // group_knockout '조별리그 → 토너먼트' · knockout '토너먼트만' · league '리그전' · league_knockouts '여러 단계'
 export function useInfoEditParam(): { section: TournamentInfoSectionKey | null; open(key): void; close(): void };
 ```
@@ -174,4 +174,4 @@ Page: reads `useV1AdminTournament`, `useV1MasterSports`, `useV1LineupSizeOptions
 ## Self-Review
 - Spec coverage: six sections + exact fields (T3–T9), C-2 consumer (T3), C-3 owner (T2, T10), Q5 (T5 minMatches, T7 6강), Q7 needs (T2), Q9 sequential save + partial message + fresh version + remaining-only retry (T1, T3, T7), M3-1 (verification only, shell is L1), M3-2 (T10 test), M3-3 (T3 test via `dirty`), old modal + 5 edit patterns removed (T10), format/field locks (T3, T7), PATCH-only-sent-fields assertions (every section task).
 - Plan decisions: 6강 방식 lives in 「경기 규칙」; 팀당 최소 경기 수 lives in 「참가」; needs follow Q7 over the mockup; stage rows come from bracket groups (a draft without bracket shows no stage rows, so per-stage times can only be set after the bracket exists); 「취소」 re-implements the dirty confirm; format names defined in `info-sections.ts`.
-- **needs head:** (1) L0 `requestClose`/confirm export; (2) L1 sticky tab row (M3-1) and `buildTournamentChecklist` should reuse `tournamentInfoNeeds` so 개요 and 정보 agree; (3) L2 must keep the four period helpers and share/dedupe `TOURNAMENT_FORMAT_NAMES`; (4) L4 also edits `tournament-detail-shared.tsx` (filters/`ActionButton`); T10 touches only `substitutionPolicyLabel`, a different region.
+- **needs head:** (1) L0 `requestClose`/confirm export; (2) L1 sticky tab row (M3-1) and `buildTournamentChecklist` should reuse `tournamentInfoNeeds` so 개요 and 정보 agree; (3) L2 must keep the four period helpers, and both L2 and L3 import `TOURNAMENT_FORMAT_NAMES` from `lib/tournament-format-labels` (L0 C-6); (4) L4 also edits `tournament-detail-shared.tsx` (filters/`ActionButton`); T10 touches only `substitutionPolicyLabel`, a different region.

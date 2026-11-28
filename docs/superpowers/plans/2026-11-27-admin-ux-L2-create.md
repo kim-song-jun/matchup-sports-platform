@@ -50,7 +50,7 @@
   export type CreateFormatChoice = 'group_knockout' | 'knockout' | 'league' | 'staged';
   export const CREATE_FORMAT_OPTIONS: ReadonlyArray<{ value: CreateFormatChoice; label: string; description: string }>;
   // label/description: 목업 문구 그대로. 「조별리그 → 토너먼트」 조별로 겨룬 뒤 상위 팀끼리 토너먼트를 해요 / 「토너먼트만」 한 번 지면 탈락해요 / 「리그전」 모든 팀과 한 번씩 겨뤄 순위를 정해요 / 「여러 단계(예선 → 결선 여러 개)」 예선 순위대로 상위·하위 결선을 따로 열어요
-  export const DEFAULT_GENDER_CATEGORY: GenderChoice = 'none';  // G2 확정 전 목업 기본값. 바꾸려면 이 한 줄(+ 화면 「기본」 표시는 따라감)
+  export const DEFAULT_GENDER_CATEGORY: GenderChoice = 'none';  // G2 확정(2026-11-28): 「구분 없음」이 기본. 화면 「기본」 표시는 이 값을 따라감
   export const SERVER_DEFAULT_MAX_PLAYERS = 10; export const TEAM_COUNT_MIN = 2; export const TEAM_COUNT_MAX = 64;
   export type CreateFormState = { sportId: string; title: string; format: CreateFormatChoice; scheduledAt: string; registrationDeadlineAt: string;
     registrationDeadlineDirty: boolean; teamCount: string; genderCategory: GenderChoice;
@@ -198,7 +198,7 @@
 - 옛 `tournament-create-model.ts` 를 제자리 재작성하지 않고 `create-form-model.ts` 로 새로 만든 뒤 삭제 — 커밋마다 tsc 가 초록이도록.
 
 **needs head:**
-1. **G2** 성별 기본값 — `DEFAULT_GENDER_CATEGORY` 현재 `'none'`(목업). 운영 집계 뒤 한 줄로 바꾼다.
+1. **G2** 성별 기본값 — 확정(2026-11-28 사용자 결정): `DEFAULT_GENDER_CATEGORY = 'none'`(「구분 없음」). 바꿀 일이 생기면 이 한 줄만 고친다.
 2. **개요 도착 띠** — 목업 (e) 의 「초안을 만들었어요. 접수를 시작하기 전까지…」 띠를 개요(L1)가 그리려면 도착 주소 신호가 필요하다. 이 계획은 브리프대로 `/overview` 로만 보낸다. 승인되면 `?created=1`(T4 의 한 줄 + T4-4 단언 한 줄)과 L1 의 소비를 함께 추가.
 3. **`minMatchesPerTeam`** 편집이 현재 만들기에만 있다 → L3 가 먼저(또는 함께) 넣어야 이 PR 을 머지할 수 있다(T7-1).
 4. **「여러 단계」 후속 입구** — 개요 「채워야 할 설정」의 「단계 구성」 항목(→ 대진 탭 「구성 수정」)은 L1 몫이다. 이 PR 은 만들기만 바꾼다.

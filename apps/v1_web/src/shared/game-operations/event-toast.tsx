@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
 
 export interface EventToastAction {
   readonly label: string;
@@ -101,13 +100,12 @@ export function EventToasts({
         <div
           key={toast.id}
           role="status"
-          className={`tm-native-toast-card pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-[length:var(--font-size-body-sm)] font-semibold text-white shadow-lg sm:max-w-[400px] ${
+          className={`tm-native-toast-card pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-[var(--radius-container)] bg-[var(--static-ink)] px-5 py-3 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--static-white)] shadow-[var(--shadow-modal)] sm:max-w-[400px] ${
             toast.exiting
               ? 'motion-safe:animate-[fade-in_0.15s_ease-in_reverse_both]'
               : 'motion-safe:animate-[fade-in_0.15s_ease-out]'
           }`}
         >
-          <CheckCircle2 size={16} aria-hidden="true" className="shrink-0" />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span>{toast.message}</span>
             {toast.description !== null ? (

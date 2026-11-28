@@ -90,8 +90,9 @@ function disconnectedBody(input: ConsoleStatusInput): string {
 function okHeadline(input: ConsoleStatusInput): string {
   if (input.sampleMode) return '체험 중 · 서버 연결 없음';
   const held = input.leaseRequired && input.takeoverEnabled && input.takeover.status === 'held';
-  if (held && input.gameState === 'SCHEDULED') return '이 기기에서 기록할 수 있어요 · 연결됨';
-  if (held && (input.gameState === 'LIVE' || input.gameState === 'PAUSED')) return '이 기기에서 기록 중 · 연결됨';
+  // 끊기면 이 줄이 경고로 바뀌므로, 기록 중일 때는 「연결됨」을 덧붙이지 않는다(자세히 시트의 연결 줄이 그대로 말한다).
+  if (held && input.gameState === 'SCHEDULED') return '이 기기에서 기록할 수 있어요';
+  if (held && (input.gameState === 'LIVE' || input.gameState === 'PAUSED')) return '이 기기에서 기록 중';
   return '연결됨';
 }
 

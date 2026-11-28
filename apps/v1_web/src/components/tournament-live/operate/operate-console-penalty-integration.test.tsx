@@ -226,7 +226,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-    expect(screen.getByText('무승부예요. 승부차기 결과를 입력해 주세요.')).toBeInTheDocument();
+    expect(screen.getByText('무승부예요.')).toBeInTheDocument();
     expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
     // 단계 줄도 같은 말을 한다 — 승부차기가 지금 단계다.
     expect(stages()).toMatchObject({ current: '승부차기', penalty: null });

@@ -171,6 +171,11 @@ beforeEach(() => {
 // 진행 명령은 응답 제한 시간을 걸 수 있게 abort 신호를 함께 넘긴다.
 const COMMAND_OPTIONS = { signal: expect.any(AbortSignal) };
 
+/** 쉬는 시간 카드의 「MM:SS 남았어요」 — 숫자와 「남았어요」가 다른 크기의 두 글자라 한 문단의 글자로 찾는다. */
+function restCountdown(text: string, root: Pick<typeof screen, 'getByText'> = screen) {
+  return root.getByText((_, element) => element?.tagName === 'P' && element.textContent === text);
+}
+
 /** 상태 줄의 「자세히」 시트를 연다(이미 열려 있으면 그대로). */
 function openStatusSheet() {
   const existing = screen.queryByRole('dialog', { name: '경기 상태' });
@@ -386,7 +391,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
 
   it('실제 콘솔은 소켓 연결 상태를 상태 줄에 그대로 보여 준다', () => {
     render(<CoreHarness />);
-    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(statusRow()).toHaveTextContent(/^이 기기에서 기록 중자세히$/);
     expect(screen.queryByText('체험 중 · 서버 연결 없음')).not.toBeInTheDocument();
   });
 
@@ -473,7 +478,8 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     // 폰 첫 화면은 한 줄짜리 두 줄까지만 둔다.
     const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
     expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9']);
-    expect(screen.getByRole('heading', { name: /^최근 기록/ })).toHaveTextContent('최신순');
+    // 순서는 목록이 보여 주므로 제목에 「· 최신순」을 덧붙이지 않는다.
+    expect(screen.getByRole('heading', { name: '최근 기록' })).toBeInTheDocument();
   });
 
   it('takeover가 허용되고 보유 중이면 기록을 고치는 액션을 노출한다', () => {
@@ -595,7 +601,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     render(<CoreHarness />);
 
     expect(statusRow()).toHaveAttribute('role', 'status');
-    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(statusRow()).toHaveTextContent(/^이 기기에서 기록 중자세히$/);
     expect(within(openStatusSheet()).queryByText('보낼 기록')).toBeNull();
   });
 
@@ -635,7 +641,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
 
     render(<CoreHarness />);
 
-    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(statusRow()).toHaveTextContent(/^이 기기에서 기록 중자세히$/);
     expect(within(openStatusSheet()).queryByText('보낼 기록')).toBeNull();
     // 확정 로그는 그대로다 — 큐를 숨긴 것이지 기록을 숨긴 게 아니다.
     expect(screen.getByRole('list', { name: '기록 목록' })).toBeInTheDocument();
@@ -752,7 +758,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(teamColumn('성수 풋살 클럽')).toHaveTextContent(/팀 파울 1$/);
     expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 0$/);
     // 마지막 경기 시간 뒤에는 다시 셀 구간이 없다.
-    expect(screen.getByRole('banner')).not.toHaveTextContent('0부터 다시 세요');
+    expect(screen.getByRole('banner')).not.toHaveTextContent('0부터 세요');
   });
 
   // 2026-11-18 사용자 결정: 옐로·레드카드도 팀 파울 1개로 세고, 경고 누적 퇴장(옐로 2장 뒤 레드)은 세지 않는다.
@@ -852,7 +858,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     render(<CoreHarness />);
 
     expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 1$/);
-    expect(screen.getByRole('banner')).toHaveTextContent('후반에는 팀 파울을 0부터 다시 세요.');
+    expect(screen.getByRole('banner')).toHaveTextContent('후반 팀 파울은 0부터 세요.');
   });
 
   it('뛰는 동안에는 다음 경기 시간이 있어도 팀 파울을 0부터 다시 센다는 안내가 점수 카드에 없다', () => {
@@ -862,7 +868,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     ]);
     render(<CoreHarness />);
 
-    expect(screen.getByRole('banner')).not.toHaveTextContent('0부터 다시 세요');
+    expect(screen.getByRole('banner')).not.toHaveTextContent('0부터 세요');
     expect(teamColumn('강남 풋살 클럽')).toHaveTextContent(/팀 파울 0$/);
   });
 
@@ -1321,7 +1327,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
       expect(screen.queryByRole('button', { name: '일시 중지' })).toBeNull();
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
-      expect(within(screen.getByRole('banner')).getByText(/빠진 기록은 지금도 전반 끝 시각으로 남길 수 있어요/)).toBeInTheDocument();
+      expect(within(screen.getByRole('banner')).getByText(/빠진 기록은 지금 남겨도 전반 끝 시각이에요/)).toBeInTheDocument();
       // 다음 행동 이름은 진행 바가 말하므로 안내 문구에 다시 적지 않는다.
       expect(screen.getByRole('banner')).not.toHaveTextContent('‘후반 시작’');
       // 시작 안내가 하프타임 안내와 겹치지 않아야 한다.
@@ -1339,7 +1345,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       for (const name of ['골', '자책골', '옐로카드', '레드카드', '파울']) {
         expect(screen.getByRole('button', { name })).toBeEnabled();
       }
-      expect(screen.getByText(/빠진 기록은 지금도 전반 끝 시각으로 남길 수 있어요/)).toBeInTheDocument();
+      expect(screen.getByText(/빠진 기록은 지금 남겨도 전반 끝 시각이에요/)).toBeInTheDocument();
     });
 
     it('하프타임에 누른 골은 전반이 실제로 뛴 시간(20:00)에 고정해 기록한다', async () => {
@@ -2674,7 +2680,7 @@ describe('OperateConsole — 기록 권한 요청 중 안내 (UX 감사 item 4)'
     render(<CoreHarness />);
 
     expect(statusRow()).not.toHaveTextContent('준비를 하는 중');
-    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(statusRow()).toHaveTextContent(/^이 기기에서 기록 중자세히$/);
   });
 });
 
@@ -3307,7 +3313,7 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
     testFixtures.sendCommand.mockRejectedValue(rejection('INVALID_COMMAND', '명령을 처리하지 못했어요.', 400));
     const { undo } = await recordedGoalWithUndo(state);
 
-    fireEvent.click(within(screen.getByRole('group', { name: '경기 진행 조작' })).getByRole('button', { name: '일시 중지' }));
+    fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: '일시 중지' }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '일시 중지' }));
     await findConsoleNotice('명령을 처리하지 못했어요.');
     fireEvent.click(undo);
@@ -3599,7 +3605,7 @@ describe('OperateConsole — 기록은 확인 없이 저장하고 5초 되돌리
 
     expect(await screen.findByText(RECORDED)).toBeInTheDocument();
     expect(statusRow()).toHaveAttribute('role', 'status');
-    expect(statusRow()).toHaveTextContent('이 기기에서 기록 중 · 연결됨');
+    expect(statusRow()).toHaveTextContent(/^이 기기에서 기록 중자세히$/);
   });
 
   it('선수 모름 골은 anonymous 로 저장되고 토스트에 선수 모름', async () => {
@@ -3836,6 +3842,9 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
   const commandBar = () => screen.getByRole('group', { name: '경기 진행 조작' });
   const barLabels = () =>
     within(commandBar()).getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent);
+  // 폰에서 일시 중지는 시계 옆(점수 카드)에, 다음 걸음은 화면 아래 진행 바에 있다.
+  const commandButton = (label: string) =>
+    within(label === '일시 중지' ? screen.getByRole('banner') : commandBar()).getByRole('button', { name: label });
 
   describe('진행 명령은 확인을 거친다', () => {
     const CASES = [
@@ -3852,7 +3861,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       setup(game);
       render(<CoreHarness />);
 
-      fireEvent.click(within(commandBar()).getByRole('button', { name: label }));
+      fireEvent.click(commandButton(label));
       const dialog = await screen.findByRole('dialog');
       expect(testFixtures.sendCommand).not.toHaveBeenCalled();
 
@@ -3865,7 +3874,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       setup(game);
       render(<CoreHarness />);
 
-      fireEvent.click(within(commandBar()).getByRole('button', { name: label }));
+      fireEvent.click(commandButton(label));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '취소' }));
 
       expect(screen.queryByRole('dialog')).toBeNull();
@@ -3882,7 +3891,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
         '골', '자책골', '옐로카드', '레드카드', '파울', '더보기',
       ]);
       // 교체를 기록하지 않는 종목은 더보기가 격자에만 있다.
-      expect(barLabels()).toEqual(['일시 중지', '전반 종료']);
+      expect(barLabels()).toEqual(['전반 종료']);
     });
 
     it('교체 추적 종목은 격자에 교체가 있고 더보기는 진행 바 ⋯ 로 간다', () => {
@@ -3892,22 +3901,25 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       expect(within(recordGrid()).getAllByRole('button').map((button) => button.textContent)).toEqual([
         '골', '자책골', '옐로카드', '레드카드', '파울', '교체',
       ]);
-      expect(barLabels()).toEqual(['일시 중지', '전반 종료', '더보기']);
+      expect(barLabels()).toEqual(['전반 종료', '더보기']);
       const more = within(commandBar()).getByRole('button', { name: '더보기' });
       expect(more).toHaveClass('h-11', 'w-11');
       fireEvent.click(more);
       expect(screen.getByRole('dialog', { name: '더보기' })).toBeInTheDocument();
     });
 
-    it('진행 바: LIVE 는 일시 중지·전반 종료 둘뿐, PAUSED 재개, 하프타임 후반 시작, 단판은 정규 시간 종료', () => {
+    it('진행 바: LIVE 는 전반 종료 하나(일시 중지는 시계 옆), PAUSED 재개, 하프타임 후반 시작, 단판은 정규 시간 종료', () => {
       setup();
       const live = render(<CoreHarness />);
-      expect(barLabels()).toEqual(['일시 중지', '전반 종료']);
+      expect(barLabels()).toEqual(['전반 종료']);
+      // 일시 중지는 진행 바가 아니라 시계 옆에 있다 — 다음 걸음(전반 종료)과 떨어져 잘못 누르지 않는다.
+      expect(within(screen.getByRole('banner')).getByRole('button', { name: '일시 중지' })).toBeInTheDocument();
       live.unmount();
 
       setup({ state: 'PAUSED', periods: [{ ...PERIODS.firstHalf[0], pausedAt: '2026-08-07T00:05:00.000Z' }, PERIODS.firstHalf[1]] });
       const paused = render(<CoreHarness />);
       expect(barLabels()).toEqual(['재개']);
+      expect(screen.queryByRole('button', { name: '일시 중지' })).toBeNull();
       paused.unmount();
 
       setup({ periods: PERIODS.halftime });
@@ -3922,7 +3934,22 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
 
       setup({ periods: PERIODS.single, periodDurations: [{ durationMinutes: 40, extraTime: false }] });
       render(<CoreHarness />);
-      expect(barLabels()).toEqual(['일시 중지', '정규 시간 종료']);
+      expect(barLabels()).toEqual(['정규 시간 종료']);
+    });
+
+    it('640 이상(태블릿·데스크톱)에서는 아래 진행 바가 없고 진행 버튼이 모두 시계 줄에 있다', () => {
+      const restore = installViewport(768);
+      try {
+        setup();
+        render(<CoreHarness />);
+        const groups = screen.getAllByRole('group', { name: '경기 진행 조작' });
+        expect(groups).toHaveLength(1);
+        expect(screen.getByRole('banner')).toContainElement(groups[0]);
+        expect(barLabels()).toEqual(['일시 중지', '전반 종료']);
+        expect(commandBar()).toHaveAttribute('data-console-guide', 'commands');
+      } finally {
+        restore();
+      }
     });
 
     it('기록 권한이 없으면 기록 칸은 잠기지만 더보기 칸은 눌린다', () => {
@@ -4054,7 +4081,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       render(<CoreHarness />);
       expect(visibleRows()).toHaveLength(6);
       expect(screen.queryByRole('button', { name: '전체 보기' })).toBeNull();
-      expect(screen.getByRole('heading', { name: /^기록 ·/ })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '기록' })).toBeInTheDocument();
     });
 
     it('기록이 없으면 전체 보기 버튼도 없고, 한 건이라도 있으면 둔다', () => {
@@ -4412,11 +4439,20 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       expect(badge('진행 중')).toBeInTheDocument();
     });
 
-    it('일시 중지 중에는 「일시 중지」 배지가 남는다', () => {
+    it('일시 중지 중에는 「일시 중지」 배지가 남는다 — 상세가 아직 멈춘 구간을 못 받았을 때도', () => {
       setup({ state: 'PAUSED', periods: PERIODS.firstHalf });
       render(<CoreHarness />);
 
       expect(badge('일시 중지')).toBeInTheDocument();
+    });
+
+    it('시계가 멈춘 구간을 그리면 「일시 중지」는 시계 옆에 한 번만 보인다', () => {
+      setup({ state: 'PAUSED', periods: [{ ...PERIODS.firstHalf[0], pausedAt: '2026-08-07T00:05:00.000Z' }, PERIODS.firstHalf[1]] });
+      render(<CoreHarness />);
+
+      const card = screen.getByRole('banner');
+      expect(within(card).getAllByText('일시 중지')).toHaveLength(1);
+      expect(within(card).getByLabelText(/경과 시간 .*\(일시 중지됨\)/)).toBeInTheDocument();
     });
 
     it('시작 전 · 종료에는 상태 배지가 남는다', () => {
@@ -4444,9 +4480,10 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
     it('하프타임 — 늦은 기록과 팀 파울 재시작만 짧게, 다음 행동 이름은 진행 바가 말한다', () => {
       setup({ periods: PERIODS.halftime });
       render(<CoreHarness />);
-      expect(
-        caption('빠진 기록은 지금도 전반 끝 시각으로 남길 수 있어요. 후반에는 팀 파울을 0부터 다시 세요.'),
-      ).toBeInTheDocument();
+      // 두 문장은 폰에서 한 줄씩 놓이도록 따로 감싸 있다.
+      expect(caption('빠진 기록은 지금 남겨도 전반 끝 시각이에요.').closest('p')).toHaveTextContent(
+        /^빠진 기록은 지금 남겨도 전반 끝 시각이에요\. 후반 팀 파울은 0부터 세요\.$/,
+      );
       expect(screen.getByRole('banner')).not.toHaveTextContent('‘후반 시작’');
     });
 
@@ -4458,22 +4495,24 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       expect(screen.getByRole('banner')).not.toHaveTextContent('정규 시간이 끝났어요');
     });
 
-    it('정규 시간 종료 — 결선이 무승부면 승부차기 결과를 입력하라고만 한다', () => {
+    it('정규 시간 종료 — 결선이 무승부면 무승부라고만 한다(다음 행동은 「승부차기 시작」 버튼이 말한다)', () => {
       setup({ periods: PERIODS.regulationEnded });
       testFixtures.game.mockReturnValue({
         ...testFixtures.game(),
         data: { ...testFixtures.game().data, isKnockoutFixture: true },
       });
       render(<CoreHarness />);
-      expect(caption('무승부예요. 승부차기 결과를 입력해 주세요.')).toBeInTheDocument();
+      expect(caption('무승부예요.')).toBeInTheDocument();
+      expect(screen.getByRole('banner')).not.toHaveTextContent('입력해 주세요');
     });
 
-    it('정규 시간 종료 — 콘솔에서 끝낼 수 없는 호스트는 결과 제출 화면 링크를 준다', () => {
+    it('정규 시간 종료 — 콘솔에서 끝낼 수 없는 호스트는 결과 제출 화면으로 가는 버튼 하나를 준다', () => {
       setup({ periods: PERIODS.regulationEnded });
       render(<CoreHarness leaseRequired={false} resultHref="/team-matches/tm-1/result" />);
 
       expect(caption(/기록을 확인한 뒤 결과를 보내 주세요\./)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '결과 제출 화면 열기' })).toHaveAttribute('href', '/team-matches/tm-1/result');
+      // 문구 안의 링크와 카드 바닥의 버튼이 같은 곳을 두 번 가리키지 않는다.
+      expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href') === '/team-matches/tm-1/result')).toHaveLength(1);
       expect(within(screen.getByRole('banner')).getByRole('link', { name: '결과 보내기' })).toHaveAttribute('href', '/team-matches/tm-1/result');
       // 이 호스트는 콘솔에서 경기를 끝낼 수 없다.
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
@@ -4483,7 +4522,7 @@ describe('OperateConsole — 첫 화면 조립(점수 카드 · 상태 줄 · �
       setup();
       render(<CoreHarness />);
       expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
-      expect(screen.queryByText(/빠진 기록은 지금도/)).toBeNull();
+      expect(screen.queryByText(/빠진 기록은/)).toBeNull();
       expect(screen.queryByText(/기록을 확인한 뒤/)).toBeNull();
     });
   });
@@ -4546,12 +4585,12 @@ describe('OperateConsole — 쉬는 시간', () => {
     render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '쉬는 시간 10분' })).toBeInTheDocument();
-    expect(screen.getByText('10:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('10:00 남았어요')).toBeInTheDocument();
     advance(3_000);
-    expect(screen.getByText('09:57 남았어요')).toBeInTheDocument();
+    expect(restCountdown('09:57 남았어요')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '1분 추가' }));
-    expect(screen.getByText('10:57 남았어요')).toBeInTheDocument();
+    expect(restCountdown('10:57 남았어요')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '쉬는 시간 끝내기' }));
     expect(screen.queryByText(/남았어요/)).toBeNull();
     expect(screen.queryByText(/새로고침/)).toBeNull();
@@ -4565,7 +4604,7 @@ describe('OperateConsole — 쉬는 시간', () => {
 
     setup(HALFTIME);
     const second = render(<CoreHarness />);
-    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('06:00 남았어요')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '쉬는 시간 끝내기' }));
     second.unmount();
 
@@ -4588,7 +4627,7 @@ describe('OperateConsole — 쉬는 시간', () => {
     setup(HALFTIME);
     view.rerender(<CoreHarness />);
 
-    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('06:00 남았어요')).toBeInTheDocument();
   });
 
   it('하프타임에 늦은 기록으로 상세가 잠깐 뒤처져도 쉬는 시간은 이어진다', () => {
@@ -4599,17 +4638,17 @@ describe('OperateConsole — 쉬는 시간', () => {
     // 늦은 골이 확정돼 소켓 버전이 먼저 오르고, 상세는 아직 옛 버전이다.
     setup(HALFTIME, { snapshotVersion: 3 });
     view.rerender(<CoreHarness />);
-    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('06:00 남았어요')).toBeInTheDocument();
 
     setup(HALFTIME, { detailVersion: 3, snapshotVersion: 3 });
     view.rerender(<CoreHarness />);
-    expect(screen.getByText('06:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('06:00 남았어요')).toBeInTheDocument();
   });
 
   it('후반 시작하면 카드가 사라진다', () => {
     setup(HALFTIME);
     const view = render(<CoreHarness />);
-    expect(screen.getByText('10:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('10:00 남았어요')).toBeInTheDocument();
 
     setup(SECOND_HALF);
     view.rerender(<CoreHarness />);
@@ -4639,9 +4678,9 @@ describe('OperateConsole — 쉬는 시간', () => {
     expect(screen.queryByRole('dialog', { name: '더보기' })).toBeNull();
     fireEvent.click(within(sheet).getByRole('button', { name: '5분' }));
 
-    expect(within(sheet).getByText('05:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('05:00 남았어요', within(sheet))).toBeInTheDocument();
     advance(60_000);
-    expect(within(sheet).getByText('04:00 남았어요')).toBeInTheDocument();
+    expect(restCountdown('04:00 남았어요', within(sheet))).toBeInTheDocument();
 
     // 시트를 닫아도 첫 화면에는 쉬는 시간이 나오지 않고, 더보기 항목이 남은 시간을 말한다.
     fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));

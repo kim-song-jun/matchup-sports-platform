@@ -12,6 +12,7 @@ import {
   Target,
   Timer,
   Ellipsis,
+  ChevronRight,
 } from 'lucide-react';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
@@ -347,9 +348,13 @@ function startUndoWaitLimit(): UndoWaitLimit {
 /** 뛰는 동안 폰 첫 화면에 두는 한 줄짜리 최근 기록 줄 수. 390×844 에서 기록 격자가 진행 바 위에 남는 한도이고, 나머지는 전체 보기 시트에 있다. */
 const COMPACT_RECORD_ROWS = 2;
 
-const STAGE_CAPTION_CLASS = 'break-keep text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-body)]';
+/** 콘솔의 링크성 글자 버튼(전체 보기 등). 글자 크기는 안쪽 span 이 정한다 — 전역 `button { font: inherit }` 가 버튼에 단 글자 유틸리티를 이긴다. */
+const CONSOLE_TEXT_BUTTON_CLASS =
+  '-mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-0.5 rounded-[var(--radius-control)] px-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]';
+
+const STAGE_CAPTION_CLASS = 'break-keep text-[length:var(--font-size-label)] font-medium leading-relaxed text-[var(--text-body)]';
 const STAGE_CHIP_CLASS =
-  'flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-[length:var(--font-size-body-sm)] font-bold text-[var(--blue700)] dark:bg-blue-500/10';
+  'flex items-center gap-1.5 rounded-lg bg-[var(--surface-soft)] px-3 py-1.5 text-[length:var(--font-size-label)] font-bold text-[var(--text-body)]';
 
 const RECORD_SAVE_FAILED = '기록을 저장하지 못했어요. 연결과 기록 권한을 확인한 뒤 다시 눌러 주세요.';
 const UNDO_FAILED = '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.';
@@ -498,6 +503,8 @@ export function OperateConsoleCore({
   const [allRecordsOpen, setAllRecordsOpen] = useState(false);
   const [restSheetOpen, setRestSheetOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  // 폰(640 미만)만 진행 버튼을 화면 아래에 고정한다. 그보다 넓으면 아래 바가 떠 보이므로 시계 줄로 올린다.
+  const isWide = useMediaQuery('(min-width: 640px)');
 
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
@@ -2149,29 +2156,22 @@ export function OperateConsoleCore({
     stageCaption = <MatchProgressStrip steps={resultProgressSteps({ official: resultOfficialized })} label="경기 진행 단계" labels="all" />;
   } else if (halftime && halftimePeriod !== null) {
     stageCaption = (
+      // 폰에서는 한 문장씩 줄을 나눠 뒷문장 끝이 혼자 다음 줄로 떨어지지 않게 한다.
       <p className={STAGE_CAPTION_CLASS}>
-        빠진 기록은 지금도 {periodLabel(halftimePeriod.number - 1, periodCount)} 끝 시각으로 남길 수 있어요.{' '}
-        {periodLabel(halftimePeriod.number, periodCount)}에는 팀 파울을 0부터 다시 세요.
+        <span className="block sm:inline">
+          빠진 기록은 지금 남겨도 {periodLabel(halftimePeriod.number - 1, periodCount)} 끝 시각이에요.
+        </span>{' '}
+        <span className="block sm:inline">{periodLabel(halftimePeriod.number, periodCount)} 팀 파울은 0부터 세요.</span>
       </p>
     );
   } else if (regulationEnded) {
     stageCaption = penaltyShootoutEligible ? (
-      <p className={STAGE_CAPTION_CLASS}>무승부예요. 승부차기 결과를 입력해 주세요.</p>
+      <p className={STAGE_CAPTION_CLASS}>무승부예요.</p>
     ) : leaseRequired ? (
       <p className={STAGE_CAPTION_CLASS}>기록을 확인한 뒤 경기를 끝내 주세요.</p>
     ) : (
-      <p className={STAGE_CAPTION_CLASS}>
-        기록을 확인한 뒤 결과를 보내 주세요.
-        {resultHref ? (
-          <Link
-            href={resultHref}
-            className="ml-1 inline-flex items-center font-semibold underline underline-offset-2"
-            style={{ minHeight: 'var(--size-touch-min)' }}
-          >
-            결과 제출 화면 열기
-          </Link>
-        ) : null}
-      </p>
+      // 결과 제출 화면으로 가는 버튼은 카드 바닥의 「결과 보내기」 하나다.
+      <p className={STAGE_CAPTION_CLASS}>기록을 확인한 뒤 결과를 보내 주세요.</p>
     );
   } else if (
     currentPeriod === null &&
@@ -2221,9 +2221,16 @@ export function OperateConsoleCore({
       </span>
     ) : null;
 
-  // 경기가 정상으로 흐르는 동안은 시계(초록 점)·단계 줄·정규 종료 칩이 지금 상태를 말하므로 「진행 중」 배지를 숨긴다.
-  // 시작 전·일시 중지·종료·취소와 시계도 칩도 단계 줄도 없는 진행 중은 이 배지가 유일한 표시라 그대로 둔다.
-  const stateBadge = gameState === 'LIVE' && (clockSlot !== null || progressStrip !== null) ? null : gameState ? STATE_LABEL[gameState] : '-';
+  // 경기가 정상으로 흐르는 동안은 시계·단계 줄·정규 종료 칩이 지금 상태를 말하므로 「진행 중」 배지를 숨긴다.
+  // 일시 중지는 시계가 멈춘 구간을 그리고 있으면 시계 옆 「일시 중지」 배지가 말한다(상세가 아직 멈춤을 못 받았으면 이 배지가 남는다).
+  // 시작 전·종료·취소와 시계도 칩도 단계 줄도 없는 진행 중은 이 배지가 유일한 표시라 그대로 둔다.
+  const clockShowsPause = clockSlot !== null && currentPeriod?.pausedAt != null;
+  const stateBadge =
+    (gameState === 'LIVE' && (clockSlot !== null || progressStrip !== null)) || (gameState === 'PAUSED' && clockShowsPause)
+      ? null
+      : gameState
+        ? STATE_LABEL[gameState]
+        : '-';
 
   // 승부차기는 정규 시간 점수와 다른 값이라 스코어에 섞지 않고 따로 적는다. 선축을 모르는 옛 기록은 그 조각을 생략한다.
   const penaltyChip = confirmedPenalties ? (
@@ -2241,17 +2248,15 @@ export function OperateConsoleCore({
     </span>
   ) : null;
 
+  // 주 버튼은 파란 채움 하나(`tm-console-primary`), 일시 중지는 회색 채움이다.
   const renderCommandButton = (command: GameCommandName, primary: boolean) => {
     const Icon = COMMAND_ICON[command];
     return (
       <Button
         key={command}
         size="md"
-        variant={primary ? 'primary' : 'outline'}
-        className={[
-          'whitespace-nowrap max-sm:!min-h-12',
-          primary ? 'flex-1 enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 sm:flex-none' : '',
-        ].join(' ')}
+        variant={primary ? 'primary' : 'neutral'}
+        className={['whitespace-nowrap', primary ? 'tm-console-primary flex-1 max-sm:!min-h-12 sm:flex-none' : ''].join(' ')}
         // 빈 명단은 선수 모름으로 기록한다. 시작에는 양 팀 배정만 필요하다.
         disabled={commandUnavailable || (command === 'start' && startBlockedByTeams)}
         loading={commandPending}
@@ -2263,57 +2268,73 @@ export function OperateConsoleCore({
     );
   };
 
-  // 폰(sm 미만)에서는 화면 아래에 고정한다. sm 부터는 운영 셸의 사이드바를 덮지 않게 상태 줄 아래에 그대로 둔다.
-  const commandBar = commandBarVisible ? (
-    <div
-      role="group"
-      aria-label="경기 진행 조작"
-      data-console-guide="commands"
-      className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-[var(--border)] bg-[var(--card-surface)] px-4 pt-3 pb-[calc(1rem+var(--v1-shell-safe-bottom))] sm:static sm:z-auto sm:justify-end sm:border-0 sm:bg-transparent sm:py-0"
-    >
-      {stepCommands.includes('pause') ? renderCommandButton('pause', false) : null}
-      {nextStepCommand !== null ? renderCommandButton(nextStepCommand, true) : null}
-      {nextStepCommand === null && regulationEnded ? (
-        penaltyShootoutEligible ? (
-          <Button
-            key="penalty-start"
-            size="md"
-            variant="primary"
-            className="flex-1 whitespace-nowrap enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
-            disabled={commandUnavailable}
-            onClick={() => void handleStartPenaltyShootout()}
-          >
-            <Target size={14} aria-hidden="true" />
-            승부차기 시작
-          </Button>
-        ) : endAvailable ? (
-          <Button
-            key="end"
-            size="md"
-            variant="danger"
-            className="flex-1 whitespace-nowrap enabled:!bg-[var(--red700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
-            disabled={commandUnavailable || endBlockedReason !== null}
-            loading={commandPending}
-            onClick={() => void confirmAndRunCommand('end')}
-          >
-            {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
-            {labelOf('end')}
-          </Button>
-        ) : null
-      ) : null}
-      {substitutionTracked && moreActions.length > 0 ? (
-        <button
-          type="button"
-          aria-label="더보기"
-          aria-haspopup="dialog"
-          onClick={() => setMoreOpen(true)}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 max-sm:h-12 max-sm:w-12"
-        >
-          <Ellipsis size={18} aria-hidden="true" />
-        </button>
-      ) : null}
+  const pauseButton = stepCommands.includes('pause') ? renderCommandButton('pause', false) : null;
+  const nextStepButton =
+    nextStepCommand !== null ? (
+      renderCommandButton(nextStepCommand, true)
+    ) : regulationEnded && penaltyShootoutEligible ? (
+      <Button
+        key="penalty-start"
+        size="md"
+        variant="primary"
+        className="tm-console-primary flex-1 whitespace-nowrap max-sm:!min-h-12 sm:flex-none"
+        disabled={commandUnavailable}
+        onClick={() => void handleStartPenaltyShootout()}
+      >
+        <Target size={14} aria-hidden="true" />
+        승부차기 시작
+      </Button>
+    ) : regulationEnded && endAvailable ? (
+      // 정규 시간 뒤의 경기 종료도 지금 누를 다음 걸음이라 같은 파랑이다. 되돌릴 수 없다는 경고는 확인 창이 맡는다.
+      <Button
+        key="end"
+        size="md"
+        variant="primary"
+        className="tm-console-primary flex-1 whitespace-nowrap max-sm:!min-h-12 sm:flex-none"
+        disabled={commandUnavailable || endBlockedReason !== null}
+        loading={commandPending}
+        onClick={() => void confirmAndRunCommand('end')}
+      >
+        {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
+        {labelOf('end')}
+      </Button>
+    ) : null;
+  const moreCommandButton =
+    substitutionTracked && moreActions.length > 0 ? (
+      <button
+        type="button"
+        aria-label="더보기"
+        aria-haspopup="dialog"
+        onClick={() => setMoreOpen(true)}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--button-fill-neutral)] text-[var(--button-text-neutral)] transition-colors hover:bg-[var(--grey150)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 max-sm:h-12 max-sm:w-12"
+      >
+        <Ellipsis size={18} aria-hidden="true" />
+      </button>
+    ) : null;
+
+  // 폰(640 미만)에서는 일시 중지만 시계 옆에 두고 다음 걸음은 화면 아래 바에 고정한다(엄지 자리).
+  // 그보다 넓으면 아래 바가 혼자 떠 보이므로 진행 버튼을 모두 시계 줄에 모은다 — 카드가 화면 위에 붙어 있어 늘 보인다.
+  const commandBar =
+    commandBarVisible && !isWide && (nextStepButton !== null || moreCommandButton !== null) ? (
+      <div
+        role="group"
+        aria-label="경기 진행 조작"
+        data-console-guide="commands"
+        className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-[var(--border)] bg-[var(--card-surface)] px-4 pt-3 pb-[calc(1rem+var(--v1-shell-safe-bottom))]"
+      >
+        {nextStepButton}
+        {moreCommandButton}
+      </div>
+    ) : null;
+  const clockActions = !commandBarVisible ? null : isWide ? (
+    <div role="group" aria-label="경기 진행 조작" data-console-guide="commands" className="flex shrink-0 items-center gap-2">
+      {pauseButton}
+      {nextStepButton}
+      {moreCommandButton}
     </div>
-  ) : null;
+  ) : (
+    pauseButton
+  );
 
   // 기록 목록 하나를 첫 화면(최근 몇 줄)과 전체 보기 시트가 같이 쓴다. 시트에서 고치기를 누르면 시트를 먼저 닫는다.
   const renderEventList = (options: { compact?: boolean; fromSheet?: boolean } = {}) => {
@@ -2322,6 +2343,7 @@ export function OperateConsoleCore({
     };
     return (
       <RecordedEventList
+        appearance="plain"
         order="newest-first"
         events={ops.liveEvents}
         sides={sides}
@@ -2362,21 +2384,20 @@ export function OperateConsoleCore({
   // 뛰는 동안 폰·태블릿 첫 화면에는 한 줄짜리 최근 기록만 둔다 — 넓은 화면(오른쪽 열)과 끝난 경기는 전부 보여 준다.
   const recentOnly = matchInPlay && !isDesktop;
   const showAllRecords = recentOnly && ops.liveEvents.length > 0;
+  // 흰 카드 한 장. 순서(최신이 위)는 목록이 보여 주므로 제목에 적지 않는다. 링크성 버튼은 회색 글자 + › 다(파랑은 지금 할 일에만).
   const recordsSection = (
-    <section data-console-guide="history" className="px-4">
-      <div className={showAllRecords ? 'mb-1 flex min-h-[44px] items-center justify-between gap-2' : 'mb-2'}>
-        <h3 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
-          {recentOnly ? '최근 기록' : '기록'}{' '}
-          <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
-        </h3>
+    <section data-console-guide="history" className="rounded-[var(--radius-container)] bg-[var(--card-surface)] px-4 pb-1 pt-2">
+      <div className="flex min-h-11 items-center justify-between gap-2">
+        <h3 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{recentOnly ? '최근 기록' : '기록'}</h3>
         {showAllRecords ? (
           <button
             type="button"
             aria-haspopup="dialog"
             onClick={() => setAllRecordsOpen(true)}
-            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg px-2 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
+            className={CONSOLE_TEXT_BUTTON_CLASS}
           >
-            전체 보기
+            <span className="text-[length:var(--font-size-label)] font-semibold">전체 보기</span>
+            <ChevronRight size={14} aria-hidden="true" />
           </button>
         ) : null}
       </div>
@@ -2387,16 +2408,17 @@ export function OperateConsoleCore({
   return (
     <div
       className={[
-        'tm-content-enter mx-auto flex max-w-3xl flex-col gap-4 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6',
+        // 카드 사이는 12px(--spacing-3) 하나로 맞춘다. 넓은 화면의 두 열 사이만 24px 다.
+        'tm-content-enter mx-auto flex max-w-3xl flex-col gap-3 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6',
         // 폰에서는 고정 진행 바가 본문 끝을 가리지 않게 바 높이만큼 비운다.
-        commandBarVisible ? 'pb-[calc(6rem+var(--v1-shell-safe-bottom))] sm:pb-8' : 'pb-8',
+        commandBar !== null ? 'pb-[calc(6rem+var(--v1-shell-safe-bottom))]' : 'pb-8',
         // 기록이 몇 줄 없을 때도 기록 격자가 진행 바 가까이에 머물게 한다(격자의 `mt-auto` 와 짝).
         matchInPlay ? 'max-sm:min-h-[calc(100dvh-12rem)]' : '',
       ].join(' ')}
     >
       {/* lg 미만에서는 이 래퍼가 `contents` 라 바깥 세로 스택이 스크롤 흐름을 갖는다 — 래퍼가 점수 카드의
           sticky 기준 상자가 되면 첫 열이 끝나는 곳에서 카드가 밀려 올라간다. lg 부터는 왼쪽 열이 된다. */}
-      <div className="contents lg:flex lg:flex-col lg:gap-4">
+      <div className="contents lg:flex lg:flex-col lg:gap-3">
         <ConsoleScoreCard
           sides={sides}
           scoreBySideId={headerScoreBySideId}
@@ -2406,11 +2428,12 @@ export function OperateConsoleCore({
           stateLabel={stateBadge}
           clock={clockSlot}
           penaltyChip={penaltyChip}
+          actions={clockActions}
           progress={progressStrip}
           caption={stageCaption}
           footer={
             !leaseRequired && resultHref ? (
-              <Link className="tm-btn tm-btn-md tm-btn-outline" href={resultHref}>
+              <Link className="tm-btn tm-btn-md tm-btn-neutral" href={resultHref}>
                 결과 보내기
               </Link>
             ) : null
@@ -2453,11 +2476,7 @@ export function OperateConsoleCore({
 
         {commandBar}
 
-        {restCardVisible ? (
-          <div className="px-4">
-            <RestTimerCard api={rest} />
-          </div>
-        ) : null}
+        {restCardVisible ? <RestTimerCard api={rest} /> : null}
 
         {/* 폰·태블릿에서는 최근 기록이 기록 격자 바로 위에 온다. 넓은 화면에서는 오른쪽 열로 간다(아래). */}
         {isDesktop ? null : recordsSection}
@@ -2478,7 +2497,7 @@ export function OperateConsoleCore({
 
         {/* 경기가 끝나면 콘솔이 그 자리에서 결과 확정 카드로 이어진다. 권한 안내와 서버 권한 검사는 패널이 맡는다. */}
         {gameEnded && resultReviewEnabled && renderResultReview && gameId !== null
-          ? <div className="px-4">{renderResultReview(gameId)}</div>
+          ? renderResultReview(gameId)
           : null}
       </div>
 

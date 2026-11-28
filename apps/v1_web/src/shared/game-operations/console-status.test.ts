@@ -239,11 +239,11 @@ describe('deriveConsoleStatus — 문구', () => {
 });
 
 describe('deriveConsoleStatus — 정상 줄', () => {
-  it('조건이 없으면 tone ok 와 정상 줄 문구 4종', () => {
+  it('조건이 없으면 tone ok 와 정상 줄 문구 4종 — 기록 중이면 「연결됨」을 덧붙이지 않는다', () => {
     const ok = (overrides: Partial<ConsoleStatusInput>) => deriveConsoleStatus(input(overrides));
-    expect(ok({ gameState: 'SCHEDULED' })).toMatchObject({ tone: 'ok', headline: '이 기기에서 기록할 수 있어요 · 연결됨', items: [] });
-    expect(ok({ gameState: 'LIVE' }).headline).toBe('이 기기에서 기록 중 · 연결됨');
-    expect(ok({ gameState: 'PAUSED' }).headline).toBe('이 기기에서 기록 중 · 연결됨');
+    expect(ok({ gameState: 'SCHEDULED' })).toMatchObject({ tone: 'ok', headline: '이 기기에서 기록할 수 있어요', items: [] });
+    expect(ok({ gameState: 'LIVE' }).headline).toBe('이 기기에서 기록 중');
+    expect(ok({ gameState: 'PAUSED' }).headline).toBe('이 기기에서 기록 중');
     expect(ok({ gameState: 'ENDED' }).headline).toBe('연결됨');
     expect(ok({ leaseRequired: false, takeover: { status: 'none' } }).headline).toBe('연결됨');
     expect(ok({ sampleMode: true })).toMatchObject({ tone: 'ok', headline: '체험 중 · 서버 연결 없음' });

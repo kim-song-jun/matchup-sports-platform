@@ -304,11 +304,9 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
 
     expect(screen.getByText(/기록을 확인한 뒤 결과를 보내 주세요\./)).toBeInTheDocument();
     expect(screen.queryByText(/‘경기 종료’를 눌러주세요/)).not.toBeInTheDocument();
-    const resultLink = screen.getByRole('link', { name: '결과 제출 화면 열기' });
-    expect(resultLink).toHaveAttribute(
-      'href',
-      '/team-matches/team-match-1/result',
-    );
-    expect(resultLink).toHaveStyle({ minHeight: 'var(--size-touch-min)' });
+    // 결과 제출 화면으로 가는 길은 점수 카드 바닥의 「결과 보내기」 하나다.
+    const resultLinks = screen.getAllByRole('link').filter((link) => link.getAttribute('href') === '/team-matches/team-match-1/result');
+    expect(resultLinks).toHaveLength(1);
+    expect(resultLinks[0]).toHaveAccessibleName('결과 보내기');
   });
 });

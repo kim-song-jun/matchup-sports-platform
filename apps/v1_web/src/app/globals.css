@@ -2436,6 +2436,13 @@ button:disabled {
   color: var(--static-white);
 }
 
+/* 경기 콘솔의 다음 걸음 버튼. 흰 글씨 위의 파랑이라 테마가 뒤집혀도 밝아지지 않는 --static-blue 를 쓴다
+ * (--blue700 은 다크에서 #6ba8ff 가 되어 흰 글씨가 2.42:1, --blue500 은 라이트에서 3.7:1). */
+.tm-btn.tm-console-primary:not(:disabled) {
+  background: var(--static-blue);
+  color: var(--static-white);
+}
+
 /* ── [P1 Interaction states] 버튼 hover / active / transition ─────────────────
  * - transition-all 금지 → 필요한 속성만 명시 (성능 규칙)
  * - @media(hover:hover) 가드로 터치기기에서 hover 억제 (ghost hover 방지)
@@ -2468,6 +2475,12 @@ button:disabled {
 
   .tm-btn-danger:hover:not(:disabled) {
     background: #d93040; /* red500(#f04452) 보다 한 단계 진함 */
+  }
+
+  /* .tm-btn-primary 의 hover 파랑은 다크에서 밝아지므로 콘솔 주 버튼은 같은 고정 파랑을 조금 어둡게만 한다. */
+  .tm-btn.tm-console-primary:hover:not(:disabled) {
+    background: var(--static-blue);
+    filter: brightness(0.92);
   }
 }
 

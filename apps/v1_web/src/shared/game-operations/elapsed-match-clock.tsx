@@ -41,8 +41,7 @@ export interface ElapsedMatchClockProps {
  * 별도 계층(`formatStopwatchClock`)이다 — alpha 실측에서 "전반 584:23"처럼
  * 분이 무한히 커져 스톱워치로 못 읽히던 문제를 자릿수 고정 + 시:분:초
  * 롤오버로 고쳤다. 멈춘 숫자만 보여주면 "고장 났나?"로 읽히므로, 일시정지
- * 중에는 색상뿐 아니라 아이콘+텍스트 배지를 함께 보여준다. 진행 중일 때는
- * 초록 점을 깜빡여 "지금 이 순간에도 흐르고 있다"는 스톱워치 감각을 준다.
+ * 중에는 숫자를 회색으로 낮추고 아이콘+텍스트 배지를 함께 보여준다.
  */
 export function ElapsedMatchClock({
   periodNumber,
@@ -76,30 +75,15 @@ export function ElapsedMatchClock({
 
   return (
     <div className="flex items-center gap-2" aria-live="off">
-      {/* 스톱워치 다이얼 — 자릿수가 고정된 큰 숫자를 살짝 어두운 배경 칩 안에
-          담아 "지금 흐르고 있는 시각"과 주변 텍스트를 시각적으로 분리한다.
-          초록 점(진행 중)/일시정지 아이콘을 숫자 바로 옆에 붙여 한눈에 상태를
-          읽게 한다 — 경기장에서 흘끗 봐도 파악되는 게 요건이다. */}
       <span
-        className={`flex items-center gap-2 rounded-lg px-3 py-1 font-mono text-3xl font-extrabold leading-none tabular-nums tracking-tight ${
-          isPaused
-            ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300'
-            : 'bg-gray-900/[0.04] text-[var(--text-strong)] dark:bg-white/10'
-        }`}
+        className={`text-3xl font-extrabold leading-none tabular-nums ${isPaused ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
         aria-label={`${isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber, periodCount)} `}경과 시간 ${formatStopwatchClock(elapsedMs)}${isPaused ? ' (일시 중지됨)' : ''}`}
       >
-        {isPaused ? (
-          <Pause size={18} aria-hidden="true" className="shrink-0" />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="h-2 w-2 shrink-0 rounded-full bg-green-500 motion-safe:animate-pulse"
-          />
-        )}
         {formatStopwatchClock(elapsedMs)}
       </span>
       {isPaused ? (
-        <span className="flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-600 dark:bg-orange-500/10 dark:text-orange-300">
+        <span className="flex items-center gap-1 rounded-full bg-[var(--surface-soft)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-body)]">
+          <Pause size={12} aria-hidden="true" className="shrink-0" />
           일시 중지
         </span>
       ) : null}

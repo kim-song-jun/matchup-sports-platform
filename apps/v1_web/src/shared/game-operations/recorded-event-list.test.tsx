@@ -854,3 +854,30 @@ describe('RecordedEventList — 한 줄 표시(compact)', () => {
     expect(within(second).getByRole('button', { name: /^기록 고치기/ })).toBeInTheDocument();
   });
 });
+
+describe('RecordedEventList — 콘솔 표시(plain)', () => {
+  const handlers = { onAttachAssist: vi.fn(), onEditEvent: vi.fn(), onReverseEvent: vi.fn() };
+
+  it('전체 목록도 한 줄에 시각·무엇을·팀·버튼을 두고, 색 점과 버튼 아이콘 없이 글자로만 말한다', () => {
+    render(
+      <RecordedEventList
+        appearance="plain"
+        events={[goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000), goal(2, AWAY_SIDE_ID, null, 11 * 60000)]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        order="newest-first"
+        {...handlers}
+      />,
+    );
+    const [latest, earlier] = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
+    // 팀 이름은 기록 글자 끝에 이어 붙는다(따로 쌓는 줄이 없다).
+    expect(latest.querySelector('p')).toHaveTextContent('골 · 선수 모름 · 성수 풋살 클럽');
+    expect(earlier.querySelector('p')).toHaveTextContent('골 · 10 정우진 · 강남 풋살 클럽');
+    for (const row of [latest, earlier]) {
+      expect(row.querySelector('svg')).toBeNull();
+      expect(row.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
+    }
+    expect(within(earlier).getByRole('button', { name: '이 골에 어시스트 추가' })).toHaveTextContent('어시스트');
+    expect(within(latest).getByRole('button', { name: '기록 고치기 (골)' })).toHaveTextContent('고치기');
+  });
+});

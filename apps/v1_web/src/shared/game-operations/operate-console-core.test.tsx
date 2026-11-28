@@ -584,7 +584,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
     render(<CoreHarness />);
 
     expect(screen.queryByRole('button', { name: '기록 고치기 (골)' })).toBeNull();
-    expect(screen.getByRole('button', { name: '고치기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^고치기 · 기록 취소/ })).toBeInTheDocument();
   });
 
   it('takeover가 비활성화되면 기록 조회만 허용한다', () => {
@@ -592,7 +592,7 @@ describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', ()
 
     expect(screen.getByRole('list', { name: '기록 목록' })).toHaveTextContent('정우진');
     expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: '고치기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^고치기 · 기록 취소/ })).toBeNull();
   });
 
   // 큐가 비어 있으면 "전송 상태" 절은 아예 나오지 않아야 한다 — 평상시 화면에 빈 패널이

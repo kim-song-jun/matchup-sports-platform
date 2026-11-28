@@ -228,9 +228,9 @@ describe('RecordedEventList', () => {
     expect(rows[1]).not.toHaveTextContent('취소된 기록');
     expect(rows[2]).toHaveTextContent('골');
     expect(rows[2]).not.toHaveTextContent('취소된 기록');
-    expect(within(rows[0]).queryByRole('button', { name: '고치기' })).toBeNull();
+    expect(within(rows[0]).queryByRole('button', { name: /^고치기 · 기록 취소/ })).toBeNull();
     expect(within(rows[0]).queryByRole('button', { name: /어시스트/ })).toBeNull();
-    await userEvent.click(within(rows[2]).getByRole('button', { name: '고치기' }));
+    await userEvent.click(within(rows[2]).getByRole('button', { name: /^고치기 · 기록 취소/ }));
     expect(onReverseEvent).toHaveBeenCalledWith(unrelatedUndefinedReference);
   });
 
@@ -302,7 +302,7 @@ describe('RecordedEventList', () => {
         />,
       );
 
-      expect(screen.queryByRole('button', { name: '고치기' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^고치기 · 기록 취소/ })).toBeNull();
       const edit = screen.getByRole('button', { name: '기록 고치기 (골)' });
       expect(edit.className).toContain('min-h-[44px]');
       await userEvent.click(edit);
@@ -323,7 +323,7 @@ describe('RecordedEventList', () => {
       );
       expect(screen.queryAllByRole('button', { name: '기록 고치기 (골)' })).toHaveLength(0);
       // 백필 골은 시각을 고칠 수 없어 기록 취소로 이어지는 고치기만 남는다.
-      expect(screen.getAllByRole('button', { name: '고치기' })).toHaveLength(1);
+      expect(screen.getAllByRole('button', { name: /^고치기 · 기록 취소/ })).toHaveLength(1);
 
       rerender(
         <RecordedEventList events={[original]} sides={SIDES} lineups={LINEUPS} onEditEvent={vi.fn()} resultOfficialized />,
@@ -331,9 +331,10 @@ describe('RecordedEventList', () => {
       expect(screen.queryByRole('button', { name: '기록 고치기 (골)' })).toBeNull();
     });
 
-    it('onEditEvent 가 없으면 "고치기"는 기록 취소 콜백으로 이어진다', () => {
+    it('onEditEvent 가 없으면 "고치기"는 기록 취소 콜백으로 이어지고, 스크린리더에도 취소로 이어진다고 알린다', () => {
       render(<RecordedEventList events={[original]} sides={SIDES} lineups={LINEUPS} onReverseEvent={vi.fn()} />);
-      expect(screen.getByRole('button', { name: '고치기' })).toBeInTheDocument();
+      const cancel = screen.getByRole('button', { name: '고치기 · 기록 취소 (골)' });
+      expect(cancel).toHaveTextContent('고치기');
     });
   });
 
@@ -527,7 +528,7 @@ describe('RecordedEventList', () => {
         onReverseEvent={onReverseEvent}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: '고치기' }));
+    await userEvent.click(screen.getByRole('button', { name: /^고치기 · 기록 취소/ }));
     expect(onReverseEvent).toHaveBeenCalledWith(recordedGoal);
   });
 });
@@ -681,9 +682,9 @@ describe('RecordedEventList — 경고 누적 퇴장', () => {
     );
 
     const merged = rowsOf()[1];
-    await userEvent.click(within(merged).getByRole('button', { name: '옐로 고치기' }));
+    await userEvent.click(within(merged).getByRole('button', { name: '옐로 고치기 · 기록 취소 (옐로카드)' }));
     expect(onReverseEvent).toHaveBeenLastCalledWith(second);
-    await userEvent.click(within(merged).getByRole('button', { name: '레드 고치기' }));
+    await userEvent.click(within(merged).getByRole('button', { name: '레드 고치기 · 기록 취소 (레드카드)' }));
     expect(onReverseEvent).toHaveBeenLastCalledWith(red);
   });
 

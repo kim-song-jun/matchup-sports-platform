@@ -24,14 +24,10 @@ export interface ConsoleScoreCardProps {
   readonly overlay?: ReactNode;
 }
 
-/**
- * 팀 파울 표시 단계. 기준에 이르면 예고(notice), 기준을 넘는 파울부터 세컨 파울(second)이다.
- * 색(주황 → 빨강)만으로 구분하지 않고 문구도 다르다.
- */
-const FOUL_STAGE_TONE = {
-  none: { color: 'text-[var(--text-body)]', message: null },
-  notice: { color: 'text-[var(--orange700)]', message: '다음부터 10m 프리킥' },
-  second: { color: 'text-[var(--red700)]', message: '세컨 파울 · 10m 프리킥' },
+/** 기준에 이르면 예고, 기준을 넘는 파울부터 세컨 파울. 색만으로 구분하지 않고 문구가 다르다. */
+const FOUL_STAGE = {
+  notice: { message: '다음부터 10m 프리킥', tone: 'text-[var(--orange700)]' },
+  second: { message: '세컨 파울 · 10m 프리킥', tone: 'text-[var(--red700)]' },
 } as const;
 
 /** 콘솔 머리: 점수 · 팀 파울 · 상태 · 시계를 한 장에 모은다. 스크롤해도 화면 위에 붙어 있다. */
@@ -60,8 +56,7 @@ export function ConsoleScoreCard({
   const teamColumn = (side: GameSide, align: 'start' | 'end') => {
     const sideWord = side.sideKey === 'HOME' ? '홈' : '원정';
     const fouls = foulCounts[side.id] ?? 0;
-    const stage = foulLabel === null || fouls < foulThreshold ? 'none' : fouls === foulThreshold ? 'notice' : 'second';
-    const tone = FOUL_STAGE_TONE[stage];
+    const stage = foulLabel === null || fouls < foulThreshold ? null : fouls > foulThreshold ? FOUL_STAGE.second : FOUL_STAGE.notice;
     return (
       <div
         role="group"
@@ -79,17 +74,17 @@ export function ConsoleScoreCard({
         {foulLabel !== null ? (
           <span
             className={`flex items-center gap-1 whitespace-nowrap text-[length:var(--font-size-caption)] tabular-nums ${
-              stage === 'none' ? 'font-medium' : 'font-bold'
-            } ${tone.color}`}
+              stage !== null ? `font-bold ${stage.tone}` : 'font-medium text-[var(--text-body)]'
+            }`}
           >
-            {stage !== 'none' ? <AlertTriangle size={12} aria-hidden="true" className="shrink-0" /> : null}
+            {stage !== null ? <AlertTriangle size={12} aria-hidden="true" className="shrink-0" /> : null}
             <span>
               {foulLabel} {fouls}
             </span>
           </span>
         ) : null}
-        {tone.message !== null ? (
-          <span className={`text-[length:var(--font-size-caption)] font-semibold ${tone.color}`}>{tone.message}</span>
+        {stage !== null ? (
+          <span className={`text-[length:var(--font-size-caption)] font-semibold ${stage.tone}`}>{stage.message}</span>
         ) : null}
       </div>
     );

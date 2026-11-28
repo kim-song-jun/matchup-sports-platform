@@ -28,7 +28,7 @@ export function FieldConsoleDemo() {
     if (!await confirm({ title: '샘플 경기를 초기화할까요?', message: '이 체험의 점수와 경기 기록을 지워요. 실제 대회에는 영향을 주지 않아요.', confirmLabel: '초기화' })) return;
     client.clear(); setSession((value) => value + 1);
   }
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${styles.consolePage}`}>
     <div inert={step !== null}>
       <header className={styles.header}><div className={styles.headerInner}>
         <Link className={styles.brand} href="/home">teameet</Link>

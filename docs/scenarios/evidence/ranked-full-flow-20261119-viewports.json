@@ -7,7 +7,7 @@
         "finalRank20": true,
         "finishedPools": 4
       },
-      "screenshot": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-full-flow-20261119-results-390.png"
+      "screenshot": "docs/scenarios/evidence/ranked-full-flow-20261119-results-390.png"
     },
     {
       "viewport": {
@@ -16,7 +16,7 @@
         "finalRank20": true,
         "finishedPools": 4
       },
-      "screenshot": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-full-flow-20261119-results-768.png"
+      "screenshot": "docs/scenarios/evidence/ranked-full-flow-20261119-results-768.png"
     },
     {
       "viewport": {
@@ -25,7 +25,7 @@
         "finalRank20": true,
         "finishedPools": 4
       },
-      "screenshot": "C:/Users/lsmin_v08xbo0/dev/teameet/matchup-sports-platform/tmp/worktrees/qa-ranked-leagues-20261119/docs/scenarios/evidence/ranked-full-flow-20261119-results-1440.png"
+      "screenshot": "docs/scenarios/evidence/ranked-full-flow-20261119-results-1440.png"
     }
   ],
   "errors": [

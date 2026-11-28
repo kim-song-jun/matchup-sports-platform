@@ -1,3 +1,5 @@
+'use client';
+
 import { AlertTriangle, ArrowLeftRight, Ellipsis, Goal } from 'lucide-react';
 
 export type RecordCellKey = 'GOAL' | 'OWN_GOAL' | 'YELLOW' | 'RED' | 'FOUL' | 'SUBSTITUTION' | 'MORE';

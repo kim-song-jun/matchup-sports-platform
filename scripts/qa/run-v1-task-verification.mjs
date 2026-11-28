@@ -18,6 +18,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeSync,
 } from 'node:fs';
@@ -3242,14 +3243,18 @@ function verifyTaskOneRelativeGrowthOverride(options, repoRoot, plan, phase, cha
 
 function requireBoundSourcePath(envName, label) {
   const supplied = process.env[envName];
-  if (!supplied) {
+  if (!supplied?.trim()) {
     throw new HarnessError(
       'MALFORMED_INPUT',
       `${envName} must name the local ${label} bound to the Task-1 plan`,
       64,
     );
   }
-  return resolve(supplied);
+  const source = resolve(supplied);
+  if (!statSync(source, { throwIfNoEntry: false })?.isFile()) {
+    throw new HarnessError('MALFORMED_INPUT', `${envName} does not name an existing file: ${source}`, 64);
+  }
+  return source;
 }
 
 function taskOneMounts(repoRoot, snapshot, chain, boundSources, preflightOverride = null) {

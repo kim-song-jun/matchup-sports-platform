@@ -3580,6 +3580,7 @@ Expected: 파일 1개.
 - [ ] **Step 1: 내 머지가 alpha 에 배포됐는지 확인한다 (배포 창 중엔 측정 금지)**
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 gh run list --workflow deploy-alpha.yml --branch dev --limit 1 --repo kim-song-jun/matchup-sports-platform --json headSha,status,conclusion --jq '.[0]'
 curl -fsSI https://alpha.teameet.co.kr/landing | grep -i 'x-teameet-commit'
 git merge-base --is-ancestor <내 머지 커밋> <x-teameet-commit 값> && echo "포함됨"

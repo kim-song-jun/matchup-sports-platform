@@ -513,7 +513,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     renderPage();
     goToParticipationStep();
 
-    expect(screen.getByRole('heading', { name: '동점일 때 순서' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '순위 정하는 순서' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: /득실차 우선/ }));
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
     fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
@@ -544,7 +544,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fillScheduleStep();
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
 
-    expect(screen.queryByRole('heading', { name: '동점일 때 순서' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '순위 정하는 순서' })).toBeNull();
   });
 
   it('경기 시간: 기본값 그대로 만들면 피리어드 설정을 따로 저장하지 않는다', () => {
@@ -1811,7 +1811,8 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       screen.getByRole('combobox', { name: '상금 항목 1 이름' }).focus();
       flushFocusFrames();
-      for (let index = 0; index < 7; index += 1) {
+      // 줄마다 구분 칸이 이름 앞에 하나씩 있어, 1번 이름에서 3번 내용까지 Tab 9번이다.
+      for (let index = 0; index < 9; index += 1) {
         await user.tab();
         flushFocusFrames();
       }

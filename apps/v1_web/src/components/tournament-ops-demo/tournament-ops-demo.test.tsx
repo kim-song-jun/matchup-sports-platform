@@ -22,13 +22,13 @@ import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-cont
 import { useV1AdminBracket, useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
 import { ADMIN_DEMO_ID, ADMIN_DEMO_STORAGE_KEY, createAdminDemoState, restoreAdminDemo } from '@/lib/tournament-admin-demo';
 
-const nav = vi.hoisted(() => ({ pathname: '/tournament-ops-demo/registrations', push: vi.fn(), replace: vi.fn() }));
+const nav = vi.hoisted(() => ({ pathname: '/tournament-ops-demo/registrations', search: '', push: vi.fn(), replace: vi.fn() }));
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(nav.search),
   useRouter: () => ({ push: nav.push, replace: nav.replace }),
 }));
-beforeEach(() => { sessionStorage.clear(); vi.restoreAllMocks(); });
+beforeEach(() => { sessionStorage.clear(); vi.restoreAllMocks(); nav.search = ''; });
 function QueriesSettled() {
   const pending = useIsFetching();
   return <output data-testid="pending-queries">{pending}</output>;
@@ -52,12 +52,14 @@ function seedBracket() {
 }
 
 describe('실제 어드민을 사용하는 공개 대회 체험', () => {
-  it('실제 대회 정보 편집 모달로 대회명을 저장하고 공유 헤더에 반영한다', async () => {
+  it('실제 대회 정보의 기본 수정 시트로 대회명을 저장하고 공유 헤더에 반영한다', async () => {
     const user = userEvent.setup();
     const network = vi.spyOn(globalThis, 'fetch');
+    nav.pathname = '/tournament-ops-demo/info';
+    nav.search = 'edit=basic';
     render(<TournamentOpsDemo><TournamentInfoSection /></TournamentOpsDemo>);
-    await user.click(await screen.findByRole('button', { name: '대회 정보 수정' }));
-    const dialog = await screen.findByRole('dialog');
+    expect(await screen.findByRole('button', { name: '기본 수정' })).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: '기본' });
     const title = within(dialog).getByLabelText(/^대회명/);
     await user.clear(title); await user.type(title, '파트너 시연 대회');
     await user.click(within(dialog).getByRole('button', { name: '저장' }));

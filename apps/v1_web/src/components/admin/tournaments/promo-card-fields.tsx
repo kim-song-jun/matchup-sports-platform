@@ -229,7 +229,7 @@ export function PromoCardFields({
                 />
               </Field>
             </div>
-            <Field id={`${prefix}-date`} label="날짜 문구" hint="대회 일정에서 자동으로 채워요.">
+            <Field id={`${prefix}-date`} label="날짜 문구" hint="「다시 채우기」를 누르면 대회 일정으로 채워요.">
               <input
                 id={`${prefix}-date`}
                 value={value.dateText}
@@ -256,7 +256,7 @@ export function PromoCardFields({
                 className={inputClass}
               />
             </Field>
-            <Field id={`${prefix}-location`} label="장소 문구" hint="대회 장소에서 자동으로 채워요.">
+            <Field id={`${prefix}-location`} label="장소 문구" hint="「다시 채우기」를 누르면 대회 장소로 채워요.">
               <input
                 id={`${prefix}-location`}
                 value={value.locationText}
@@ -270,7 +270,7 @@ export function PromoCardFields({
             <Field
               id={`${prefix}-prize`}
               label="상금 문구"
-              hint="상품 및 상금 요약에서 자동으로 채워요."
+              hint="「다시 채우기」를 누르면 상금과 시상 요약으로 채워요."
             >
               <input
                 id={`${prefix}-prize`}

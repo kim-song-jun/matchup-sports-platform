@@ -24,10 +24,10 @@ export interface ConsoleScoreCardProps {
   readonly overlay?: ReactNode;
 }
 
-/** 기준에 이르면 예고, 기준을 넘는 파울부터 세컨 파울. 색만으로 구분하지 않고 문구가 다르다. */
+/** 기준에 이르면 예고, 기준을 넘는 파울부터 10m 프리킥. 색만으로 구분하지 않고 문구가 다르다. */
 const FOUL_STAGE = {
   notice: { message: '다음부터 10m 프리킥', tone: 'text-[var(--orange700)]' },
-  second: { message: '세컨 파울 · 10m 프리킥', tone: 'text-[var(--red700)]' },
+  second: { message: '10m 프리킥', tone: 'text-[var(--red700)]' },
 } as const;
 
 /** 콘솔 머리: 점수 · 팀 파울 · 상태 · 시계를 한 장에 모은다. 스크롤해도 화면 위에 붙어 있다. */

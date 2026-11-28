@@ -318,7 +318,7 @@ function RulesForm({ base, disabled, ref, onDirtyChange, leaveLinkClick }: InfoS
             onChange={(value) => set('teamFoulThreshold', value)}
             disabled={disabled}
             placeholder={String(DEFAULT_TEAM_FOUL_THRESHOLD)}
-            hint={`한 팀의 파울이 이 개수에 이르면 경기 화면이 '다음부터 10m 프리킥'으로 예고하고, 넘으면 '세컨 파울 · 10m 프리킥'으로 알려요. 비우면 ${DEFAULT_TEAM_FOUL_THRESHOLD}개예요.`}
+            hint={`한 팀의 파울이 이 개수에 이르면 경기 화면이 '다음부터 10m 프리킥'으로 예고하고, 넘으면 '10m 프리킥'으로 알려요. 비우면 ${DEFAULT_TEAM_FOUL_THRESHOLD}개예요.`}
             error={errorFor(ids.teamFoulThreshold)}
           />
           <TeamFoulPublicSwitch checked={draft.showTeamFouls} onChange={(checked) => set('showTeamFouls', checked)} disabled={disabled} />

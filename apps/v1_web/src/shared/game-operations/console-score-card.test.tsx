@@ -79,13 +79,13 @@ describe('ConsoleScoreCard', () => {
     expect(away.querySelector('svg')).toBeNull();
   });
 
-  it('기준을 넘는 파울부터는 세컨 파울로 알리고 예고와 문구·색이 다르다(기준 3개면 4번째부터)', () => {
+  it('기준을 넘는 파울부터는 10m 프리킥으로 알리고 예고와 문구·색이 다르다(기준 3개면 4번째부터)', () => {
     renderCard({ foulCounts: { 'side-home': 4, 'side-away': 3 }, foulThreshold: 3 });
     const [home, away] = screen.getAllByRole('group');
-    const second = within(home).getByText('세컨 파울 · 10m 프리킥');
+    const second = within(home).getByText('10m 프리킥');
     const notice = within(away).getByText('다음부터 10m 프리킥');
     expect(within(home).queryByText('다음부터 10m 프리킥')).toBeNull();
-    expect(within(away).queryByText('세컨 파울 · 10m 프리킥')).toBeNull();
+    expect(within(away).queryByText('10m 프리킥')).toBeNull();
     expect(second).toHaveClass('text-[var(--red700)]');
     expect(notice).toHaveClass('text-[var(--orange700)]');
     expect(home.querySelector('svg')).not.toBeNull();

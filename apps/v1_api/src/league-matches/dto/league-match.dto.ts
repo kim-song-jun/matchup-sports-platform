@@ -95,7 +95,7 @@ export class CreateLeagueMatchDto {
   @IsDateString()
   registrationDeadlineAt?: string | null;
 
-  /** 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "세컨 파울 · 10m 프리킥"으로 알린다. 생략·null = 기본값(5개). */
+  /** 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "10m 프리킥"으로 알린다. 생략·null = 기본값(5개). */
   @IsOptional()
   @IsInt({ message: '팀 파울 기준은 정수여야 해요.' })
   @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
@@ -511,7 +511,7 @@ export class UpdateLeagueDisciplineDto {
   redCardSuspensionMatches?: number | null;
 
   /**
-   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "세컨 파울 · 10m 프리킥"으로 알린다.
+   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고하고, 넘으면 "10m 프리킥"으로 알린다.
    * 생략 = 유지, null = 기본값(5개)으로 되돌리기. **출전정지 규정과 달리 경기가 시작된 뒤에도 바꿀 수 있다** —
    * 화면 안내 기준일 뿐이라 이미 치른 경기의 기록·판정을 소급해서 바꾸지 않는다.
    */

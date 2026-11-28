@@ -304,7 +304,7 @@ export function BracketGroupCard({
     }
     if (!fixtureRound.trim() || !fixtureNumber) return;
     if (fixtureHomeRegId && fixtureHomeRegId === fixtureAwayRegId) {
-      showToast('홈과 어웨이에 같은 팀을 선택할 수 없어요.', 'error');
+      showToast('홈과 원정에 같은 팀을 선택할 수 없어요.', 'error');
       return;
     }
     createFixture.mutate(
@@ -448,7 +448,7 @@ export function BracketGroupCard({
           </div>
 
           {/* ── 팀 배정 ── */}
-          {!structureEditable ? <p className="tm-text-caption text-[var(--text-muted)]">그림 보기에서 예선 팀을 배정하고, 진출팀 배정 화면에서 결선 진출팀을 편집해요.</p> : managedKnockout ? <p className="tm-text-caption text-[var(--text-muted)]">결선 진출 자리는 대진표에서 확인하고 배정해 주세요.</p> : managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
+          {!structureEditable ? <p className="tm-text-caption text-[var(--text-muted)]">그림 보기에서 예선 팀을 배정하고, 「팀 채우기」 메뉴의 「결선 진출팀 직접 정하기」에서 결선 진출팀을 정해요.</p> : managedKnockout ? <p className="tm-text-caption text-[var(--text-muted)]">결선 진출 자리는 대진표에서 확인하고 배정해 주세요.</p> : managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
             pickerId={`bracket-group-${group.id}-team-search`}
             suggestedTeams={existingKnockout ? [] : suggestedTeams}
             searchPoolItems={searchPoolItems}
@@ -553,7 +553,7 @@ export function BracketGroupCard({
                 {entryType === 'match' && <>
                 <div className="flex flex-col gap-1">
                   <label htmlFor={`fixture-away-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
-                    어웨이 팀 (선택)
+                    원정 팀 (선택)
                     {awayBooked && <span className="ml-1 text-xs text-[var(--orange700)]" aria-live="polite">이미 해당 라운드에 배정됨</span>}
                   </label>
                   <EntityPicker
@@ -563,14 +563,14 @@ export function BracketGroupCard({
                     items={fixtureTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
                     disabled={createFixture.isPending || byePending}
                     clearLabel="미정"
-                    placeholder="어웨이 팀 검색"
+                    placeholder="원정 팀 검색"
                   />
                 </div>
                 </>}
                 <div className="flex flex-col gap-1 items-start sm:col-span-2">
                   {entryType === 'match' && (sameTeam || hasBookingWarn) && (
                     <p className="text-xs text-[var(--orange700)]" role="alert">
-                      {sameTeam ? '홈과 어웨이에 같은 팀을 선택할 수 없어요.' : '해당 라운드에 이미 배정된 팀이 있어요. 확인 후 추가해 주세요.'}
+                      {sameTeam ? '홈과 원정에 같은 팀을 선택할 수 없어요.' : '해당 라운드에 이미 배정된 팀이 있어요. 확인 후 추가해 주세요.'}
                     </p>
                   )}
                   <button

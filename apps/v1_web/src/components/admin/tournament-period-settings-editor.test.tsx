@@ -1,399 +1,317 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { TournamentPeriodSettingsEditor } from './tournament-period-settings-editor';
-import type { TournamentPeriodSettingsResponse } from '@/hooks/use-tournament-period-settings';
+import { usePatchPeriods, type TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
+import { setupTournamentInfoBackend } from '@/test/tournament-info-sheet';
+import {
+  PeriodSettingsFields,
+  TournamentPeriodSettingsEditor,
+  usePeriodSettingsDraft,
+} from './tournament-period-settings-editor';
 
-const { state } = vi.hoisted(() => {
-  const settings: TournamentPeriodSettingsResponse = {
-    tournamentId: 'tournament-1',
-    kind: 'regular_tournament',
-    competitionConfigVersionId: 'config-1',
-    expectedVersion: 'version-1',
-    periods: [
-      { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
-      { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
-    ],
-    legacyPeriodCount: null,
-    requiresDurationInput: false,
-    stageOverrides: [], groupOverrides: [],
-  };
-  return { state: { settings, mutate: vi.fn(), refetch: vi.fn() } };
-});
+const start = setupTournamentInfoBackend();
+type Backend = ReturnType<typeof start>;
 
-vi.mock('@/hooks/use-tournament-period-settings', () => ({
-  useTournamentPeriodSettings: () => ({
-    data: state.settings,
-    isPending: false,
-    isError: false,
-    isFetching: false,
-    refetch: state.refetch,
-  }),
-  useUpdateTournamentPeriodSettings: () => ({ mutate: state.mutate, isPending: false, error: null }),
-}));
+const period = (durationMinutes: number) => ({ code: 'P', label: '', durationMinutes, extraTime: false });
 
-describe('TournamentPeriodSettingsEditor', () => {
-  it('단계·편성별 시간이 있으면 실제 이름과 값을 보여주고 전체 기본값 안내를 하지 않는다', () => {
-    state.settings = { ...state.settings, compositionOverrides: [
-      { scope: 'stage', key: 'pre', competitionConfigVersionId: 'c-stage', periods: [{ code: 'SINGLE_PERIOD', label: '단판', durationMinutes: 15, extraTime: false }] },
-      { scope: 'pool', key: 'pool-a', competitionConfigVersionId: 'c-pool', periods: [{ code: 'SINGLE_PERIOD', label: '단판', durationMinutes: 10, extraTime: false }] },
-    ], stageOverrides: [] };
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} stagePlan={{
-      version: 1, stages: [{ key: 'pre', name: '예선', pools: [{ key: 'pool-a', name: 'A조', format: 'league', capacity: 4, legs: 1, sources: [] }] }],
-    }} />);
+function Host({ stagePhases }: { stagePhases: readonly TournamentPeriodPhase[] }) {
+  const draft = usePeriodSettingsDraft({ tournamentId: 'tournament-1', stagePhases });
+  const patchPeriods = usePatchPeriods('tournament-1');
+  const [result, setResult] = useState('');
+  return (
+    <>
+      <PeriodSettingsFields draft={draft} disabled={false} />
+      <output data-testid="dirty">{String(draft.dirty)}</output>
+      <output data-testid="invalid">{draft.invalid?.message ?? ''}</output>
+      <output data-testid="result">{result}</output>
+      <button
+        type="button"
+        onClick={async () => {
+          const steps = draft.buildSteps(patchPeriods);
+          for (const step of steps) await step.run();
+          setResult(`${steps.length}단계 끝`);
+        }}
+      >
+        단계 실행
+      </button>
+    </>
+  );
+}
+
+function wrap(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+async function mountHost(stagePhases: readonly TournamentPeriodPhase[] = []) {
+  wrap(<Host stagePhases={stagePhases} />);
+  await screen.findByLabelText('전반');
+}
+const run = async (expected: string) => {
+  fireEvent.click(screen.getByRole('button', { name: '단계 실행' }));
+  await waitFor(() => expect(screen.getByTestId('result')).toHaveTextContent(expected));
+};
+const stageRow = (name: string) => within(screen.getByRole('group', { name: `${name} 경기 시간` }));
+
+describe('usePeriodSettingsDraft + PeriodSettingsFields', () => {
+  it('저장된 시간을 채우고, 바꾸지 않으면 보낼 단계가 없다', async () => {
+    const backend = start();
+    await mountHost();
+
+    expect(screen.getByLabelText('전반')).toHaveValue('20');
+    expect(screen.getByLabelText('후반')).toHaveValue('20');
+    expect(screen.getByText('한 경기 40분 · 연장은 빼고 정해요.')).toBeInTheDocument();
+    expect(screen.getByTestId('dirty')).toHaveTextContent('false');
+    await run('0단계 끝');
+    expect(backend.state.periodPatches).toEqual([]);
+  });
+
+  it('전반만 바꾸면 PATCH 본문은 expectedVersion 과 periods 두 칸뿐이다', async () => {
+    const backend = start();
+    await mountHost();
+
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '25' } });
+    expect(screen.getByTestId('dirty')).toHaveTextContent('true');
+    await run('1단계 끝');
+
+    expect(backend.state.periodPatches).toEqual([
+      { expectedVersion: '2026-11-01T00:00:00.000Z', periods: [{ durationMinutes: 25 }, { durationMinutes: 20 }] },
+    ]);
+  });
+
+  it('단판으로 바꾸면 합친 시간 한 칸을 보내고, 다시 전·후반으로 나눌 수 있다', async () => {
+    const backend = start();
+    await mountHost();
+    const split = within(screen.getByRole('group', { name: '경기 시간 나누기' }));
+
+    expect(split.getByRole('button', { name: '전·후반' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(split.getByRole('button', { name: '단판' }));
+    expect(screen.getByLabelText('단판')).toHaveValue('40');
+    expect(split.getByRole('button', { name: '단판' })).toHaveAttribute('aria-pressed', 'true');
+    await run('1단계 끝');
+
+    expect(backend.state.periodPatches[0].periods).toEqual([{ durationMinutes: 40 }]);
+    fireEvent.click(split.getByRole('button', { name: '전·후반' }));
+    expect(screen.getByLabelText('전반')).toHaveValue('20');
+  });
+
+  it('대진에 있는 단계만 줄로 나오고, 단계를 고르는 select 는 없다', async () => {
+    start();
+    await mountHost(['group', 'semi', 'final']);
+
+    expect(screen.getAllByRole('group', { name: / 경기 시간$/ }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      '조별리그 경기 시간', '4강 경기 시간', '결승 경기 시간',
+    ]);
+    expect(stageRow('결승').getByText('위 시간 그대로')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('단계의 「바꾸기」 로 시간을 적으면 그 단계만 보낸다', async () => {
+    const backend = start();
+    await mountHost(['group', 'final']);
+
+    fireEvent.click(stageRow('결승').getByRole('button', { name: '결승 경기 시간 바꾸기' }));
+    expect(screen.getByTestId('dirty')).toHaveTextContent('false');
+    fireEvent.change(stageRow('결승').getByLabelText('결승 전반'), { target: { value: '30' } });
+    fireEvent.change(stageRow('결승').getByLabelText('결승 후반'), { target: { value: '30' } });
+    await run('1단계 끝');
+
+    expect(backend.state.periodPatches).toEqual([
+      { expectedVersion: '2026-11-01T00:00:00.000Z', phase: 'final', periods: [{ durationMinutes: 30 }, { durationMinutes: 30 }] },
+    ]);
+  });
+
+  it('펼치기만 하고 적지 않은 단계는 보내지 않는다', async () => {
+    const backend = start();
+    await mountHost(['final']);
+
+    fireEvent.click(stageRow('결승').getByRole('button', { name: '결승 경기 시간 바꾸기' }));
+    await run('0단계 끝');
+
+    expect(backend.state.periodPatches).toEqual([]);
+  });
+
+  it('따로 정해 둔 단계는 대진에 없어도 줄이 나오고, 「위 시간 그대로 쓰기」 는 inheritDefault 를 보낸다', async () => {
+    const backend = start();
+    backend.state.periods = {
+      ...backend.state.periods,
+      stageOverrides: [{ phase: 'final', competitionConfigVersionId: 'c-final', periods: [period(30), period(30)], legacyPeriodCount: null }],
+    };
+    await mountHost([]);
+
+    expect(stageRow('결승').getByText('30분 / 30분')).toBeInTheDocument();
+    fireEvent.click(stageRow('결승').getByRole('button', { name: '결승 경기 시간 바꾸기' }));
+    fireEvent.click(stageRow('결승').getByRole('button', { name: '위 시간 그대로 쓰기' }));
+    expect(stageRow('결승').getByText('위 시간 그대로')).toBeInTheDocument();
+    await run('1단계 끝');
+
+    expect(backend.state.periodPatches).toEqual([
+      { expectedVersion: '2026-11-01T00:00:00.000Z', phase: 'final', inheritDefault: true },
+    ]);
+  });
+
+  it('기본 시간과 단계 시간을 함께 바꾸면 기본 → 단계 순서로, 각각 직전 저장이 올린 버전으로 보낸다', async () => {
+    const backend = start();
+    await mountHost(['final']);
+
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '25' } });
+    fireEvent.click(stageRow('결승').getByRole('button', { name: '결승 경기 시간 바꾸기' }));
+    fireEvent.change(stageRow('결승').getByLabelText('결승 전반'), { target: { value: '30' } });
+    await run('2단계 끝');
+
+    expect(backend.state.periodPatches.map((body) => body.phase ?? 'default')).toEqual(['default', 'final']);
+    expect(backend.state.periodPatches[1].expectedVersion).not.toBe(backend.state.periodPatches[0].expectedVersion);
+    expect(backend.state.periodPatches[1].expectedVersion).toBe('2026-11-01T00:00:01.000Z');
+  });
+
+  it.each(['0', ''])('시간이 %j 이면 저장할 수 없다고 알리고 단계를 만들지 않는다', async (value) => {
+    const backend = start();
+    await mountHost();
+
+    fireEvent.change(screen.getByLabelText('후반'), { target: { value } });
+
+    expect(screen.getByTestId('invalid')).toHaveTextContent('경기 시간은 1분 이상으로 입력해 주세요.');
+    await run('0단계 끝');
+    expect(backend.state.periodPatches).toEqual([]);
+  });
+
+  it('전·후반도 단판도 아닌 옛 설정은 나누기 버튼 없이 칸마다 n부로 보여 준다', async () => {
+    const backend = start();
+    backend.state.periods = { ...backend.state.periods, periods: [period(10), period(10), period(10)] };
+    wrap(<Host stagePhases={[]} />);
+
+    expect(await screen.findByLabelText('1부')).toHaveValue('10');
+    expect(screen.getByLabelText('3부')).toHaveValue('10');
+    expect(screen.queryByRole('group', { name: '경기 시간 나누기' })).toBeNull();
+  });
+
+  it('길이 없이 개수만 저장된 옛 설정은 빈 칸으로 열고 입력을 안내하되, 손대지 않으면 다른 저장을 막지 않는다', async () => {
+    const backend = start();
+    backend.state.periods = { ...backend.state.periods, periods: null, legacyPeriodCount: 2, requiresDurationInput: true };
+    wrap(<Host stagePhases={[]} />);
+
+    expect(await screen.findByLabelText('전반')).toHaveValue('');
+    expect(screen.getByText(/각 길이를 입력해 주세요/)).toBeInTheDocument();
+    expect(screen.getByTestId('invalid')).toHaveTextContent('');
+    expect(screen.getByTestId('dirty')).toHaveTextContent('false');
+
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '20' } });
+    expect(screen.getByTestId('invalid')).toHaveTextContent('경기 시간은 1분 이상으로 입력해 주세요.');
+    fireEvent.change(screen.getByLabelText('후반'), { target: { value: '20' } });
+    await run('1단계 끝');
+    expect(backend.state.periodPatches[0].periods).toEqual([{ durationMinutes: 20 }, { durationMinutes: 20 }]);
+  });
+
+  it('따로 정한 조·경기와 단계·편성 시간은 읽기 안내로 남기고, 화면 어디에도 「피리어드」 가 없다', async () => {
+    const backend = start();
+    backend.state.periods = {
+      ...backend.state.periods,
+      groupOverrides: [{ groupId: 'g-a', name: 'A조', competitionConfigVersionId: 'c-a', periods: [period(15)], legacyPeriodCount: null }],
+      matchOverrideCount: 2,
+      compositionOverrides: [
+        { scope: 'stage', key: 'pre', competitionConfigVersionId: 'c-stage', periods: [period(15)] },
+        { scope: 'pool', key: 'pool-a', competitionConfigVersionId: 'c-pool', periods: [period(10)] },
+      ],
+    };
+    const draftHost = () => {
+      const draft = usePeriodSettingsDraft({ tournamentId: 'tournament-1', stagePhases: ['group'] });
+      return (
+        <PeriodSettingsFields
+          draft={draft}
+          disabled={false}
+          stagePlan={{ version: 1, stages: [{ key: 'pre', name: '예선', pools: [{ key: 'pool-a', name: 'A조', format: 'league', capacity: 4, legs: 1, sources: [] }] }] }}
+        />
+      );
+    };
+    const DraftHost = draftHost;
+    const view = wrap(<DraftHost />);
+    await screen.findByLabelText('전반');
+
+    expect(screen.getByText('따로 정한 조: A조')).toBeInTheDocument();
+    expect(screen.getByText('따로 정한 경기: 2개')).toBeInTheDocument();
     expect(screen.getByText('예선 전체 · 15분')).toBeInTheDocument();
     expect(screen.getByText('예선 · A조 · 10분')).toBeInTheDocument();
-    expect(screen.queryByText('모든 단계가 대회 기본값을 사용하고 있어요.')).toBeNull();
     expect(screen.getByRole('link', { name: '단계·편성 경기 시간 수정' })).toHaveAttribute('href', '/admin/tournaments/tournament-1/bracket');
-    state.settings = { ...state.settings, compositionOverrides: [] };
+    expect(view.container.textContent).not.toContain('피리어드');
+  });
+});
+
+describe('TournamentPeriodSettingsEditor — 리그 경기 규칙의 경기 시간 카드', () => {
+  const league = (backend: Backend) => {
+    backend.state.periods = { ...backend.state.periods, kind: 'regular_league' };
+    return backend;
+  };
+
+  it('요약을 보여 주고, 수정 → 시트에서 저장하면 요약이 새 값으로 바뀐다', async () => {
+    const backend = league(start());
+    const showToast = vi.fn();
+    wrap(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+    const card = within(await screen.findByRole('region', { name: '경기 시간' }));
+
+    expect(await card.findByText('전·후반 20분 / 20분')).toBeInTheDocument();
+    fireEvent.click(card.getByRole('button', { name: '경기 시간 수정' }));
+    const sheet = within(await screen.findByRole('dialog', { name: '경기 시간' }));
+    fireEvent.change(await sheet.findByLabelText('전반'), { target: { value: '25' } });
+    fireEvent.change(sheet.getByLabelText('후반'), { target: { value: '25' } });
+    fireEvent.click(sheet.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('경기 시간을 저장했어요.', 'success'));
+    expect(backend.state.periodPatches).toEqual([
+      { expectedVersion: '2026-11-01T00:00:00.000Z', periods: [{ durationMinutes: 25 }, { durationMinutes: 25 }] },
+    ]);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '경기 시간' })).toBeNull());
+    expect(await card.findByText('전·후반 25분 / 25분')).toBeInTheDocument();
   });
 
-  it('hydrates current durations and sends a durations-only update', () => {
-    state.mutate.mockClear();
-    state.settings = { ...state.settings, expectedVersion: 'version-1', periods: [
-      { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
-      { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
-    ], legacyPeriodCount: null, requiresDurationInput: false };
-    const showToast = vi.fn();
-    const view = render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+  it('리그에는 단계 줄이 없다', async () => {
+    league(start());
+    wrap(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    const card = within(await screen.findByRole('region', { name: '경기 시간' }));
+    fireEvent.click(await card.findByRole('button', { name: '경기 시간 수정' }));
+    const sheet = within(await screen.findByRole('dialog', { name: '경기 시간' }));
+    await sheet.findByLabelText('전반');
 
-    expect(screen.getByText('2개 · 45분 / 45분')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    // A background query refresh must not silently change the CAS token for this draft.
-    state.settings = { ...state.settings, expectedVersion: 'version-2' };
-    view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-
-    expect(state.mutate).toHaveBeenCalledWith(
-      { expectedVersion: 'version-1', periods: [{ durationMinutes: 40 }, { durationMinutes: 45 }] },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
+    expect(sheet.queryByText('단계마다 다르게')).toBeNull();
   });
 
-  it.each([[3, '피리어드 설정을 저장했어요. 시작 전 경기 3개에도 적용했어요.'], [0, '피리어드 설정을 저장했어요.']])(
-    '저장 토스트는 실제로 옮긴 시작 전 경기 수(%i)만 말한다', (fixturesRepointed, message) => {
-      state.mutate.mockClear();
-      const showToast = vi.fn();
-      render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-      fireEvent.click(screen.getByRole('button', { name: '수정' }));
-      fireEvent.click(screen.getByRole('button', { name: '저장' }));
-      const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onSuccess: (data: { fixturesRepointed: number }) => void }];
-      act(() => callbacks.onSuccess({ fixturesRepointed }));
-      expect(showToast).toHaveBeenCalledWith(message, 'success');
-    },
-  );
-
-  it('keeps the draft and query data when a generic server save fails', () => {
-    state.settings = {
-      ...state.settings,
-      expectedVersion: 'version-1',
-      periods: [
-        { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
-        { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
-      ],
-      legacyPeriodCount: null,
-      requiresDurationInput: false,
-    };
-    state.mutate.mockClear();
+  it('저장이 실패하면 시트 안에 알리고 입력을 지킨다', async () => {
+    const backend = league(start());
     const showToast = vi.fn();
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+    wrap(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+    const card = within(await screen.findByRole('region', { name: '경기 시간' }));
+    fireEvent.click(await card.findByRole('button', { name: '경기 시간 수정' }));
+    const sheet = within(await screen.findByRole('dialog', { name: '경기 시간' }));
+    backend.state.failNext('periods', 409, { code: 'TOURNAMENT_VERSION_CONFLICT' });
 
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    fireEvent.change(await sheet.findByLabelText('전반'), { target: { value: '25' } });
+    fireEvent.click(sheet.getByRole('button', { name: '저장' }));
 
-    const [, callbacks] = state.mutate.mock.calls[0] as [
-      unknown,
-      { onSuccess: () => void; onError: (error: Error) => void },
-    ];
-    callbacks.onError(new Error('server unavailable'));
-
-    expect(screen.getByDisplayValue('40')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
-    expect(state.settings.expectedVersion).toBe('version-1');
-    expect(state.settings.periods?.map((period) => period.durationMinutes)).toEqual([45, 45]);
-    expect(showToast).toHaveBeenCalledTimes(1);
-    expect(showToast).toHaveBeenCalledWith('server unavailable', 'error');
-    expect(showToast).not.toHaveBeenCalledWith(expect.stringContaining('저장했어요'), 'success');
-  });
-
-  // 2026-10-13 alpha: 기본 장소를 저장한 뒤 피리어드를 저장하면 리그 행 수정 시각이 바뀌어 409 가 났다.
-  it('버전 충돌이어도 서버 피리어드가 편집 시작 때와 같으면 새 버전으로 한 번 더 저장한다', async () => {
-    const base = {
-      ...state.settings,
-      expectedVersion: 'version-1',
-      periods: [
-        { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
-        { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
-      ],
-      legacyPeriodCount: null,
-      requiresDurationInput: false,
-    };
-    state.settings = base;
-    state.mutate.mockClear();
-    state.refetch.mockResolvedValue({ data: { ...base, expectedVersion: 'version-2' } });
-    const showToast = vi.fn();
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.change(screen.getByLabelText('후반'), { target: { value: '40' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
-    await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));
-
-    expect(state.mutate).toHaveBeenCalledTimes(2);
-    expect(state.mutate.mock.calls[1][0]).toEqual({ expectedVersion: 'version-2', periods: [{ durationMinutes: 45 }, { durationMinutes: 40 }] });
+    expect(await sheet.findByRole('alert')).toHaveTextContent('다른 곳에서 먼저 저장돼서 이번 저장은 반영되지 않았어요.');
+    expect(sheet.getByLabelText('전반')).toHaveValue('25');
     expect(showToast).not.toHaveBeenCalled();
   });
 
-  it('버전 충돌이고 서버 피리어드도 바뀌었으면 덮어쓰지 않고 알린다', async () => {
-    const base = { ...state.settings, expectedVersion: 'version-1' };
-    state.settings = base;
-    state.mutate.mockClear();
-    state.refetch.mockResolvedValue({
-      data: { ...base, expectedVersion: 'version-2', periods: [{ code: 'FULL_TIME', label: '단판', durationMinutes: 30, extraTime: false }] },
-    });
-    const showToast = vi.fn();
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+  it('0분은 시트 안에서 막고 요청하지 않는다', async () => {
+    const backend = league(start());
+    wrap(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    const card = within(await screen.findByRole('region', { name: '경기 시간' }));
+    fireEvent.click(await card.findByRole('button', { name: '경기 시간 수정' }));
+    const sheet = within(await screen.findByRole('dialog', { name: '경기 시간' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
-    await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));
+    fireEvent.change(await sheet.findByLabelText('전반'), { target: { value: '0' } });
+    fireEvent.click(sheet.getByRole('button', { name: '저장' }));
 
-    expect(state.mutate).toHaveBeenCalledTimes(1);
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('피리어드 설정이 먼저 바뀌었어요'), 'error');
+    expect(sheet.getByRole('alert')).toHaveTextContent('경기 시간은 1분 이상으로 입력해 주세요.');
+    expect(backend.state.periodPatches).toEqual([]);
   });
 
-  it('blocks save when write permission is revoked during editing', () => {
-    state.mutate.mockClear();
-    const showToast = vi.fn();
-    const view = render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite={false} showToast={showToast} />);
-    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
-    expect(state.mutate).not.toHaveBeenCalled();
-  });
+  it('읽기 전용 역할에게는 수정 버튼이 없다', async () => {
+    league(start());
+    wrap(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite={false} showToast={vi.fn()} />);
+    const card = within(await screen.findByRole('region', { name: '경기 시간' }));
 
-  it('adds a stage override using the current default as its initial value', () => {
-    state.settings = {
-      ...state.settings,
-      expectedVersion: 'version-stage-1',
-      kind: 'regular_tournament',
-      periods: [
-        { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
-        { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
-      ],
-      stageOverrides: [], groupOverrides: [],
-    };
-    state.mutate.mockClear();
-    const showToast = vi.fn();
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-
-    fireEvent.change(screen.getByLabelText('추가할 대회 단계'), { target: { value: 'final' } });
-    fireEvent.click(screen.getByRole('button', { name: '단계 추가' }));
-    expect(screen.getByText('결승 설정')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '10' } });
-    fireEvent.change(screen.getByLabelText('후반 (분)'), { target: { value: '10' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-
-    expect(state.mutate).toHaveBeenCalledWith(
-      {
-        expectedVersion: 'version-stage-1',
-        phase: 'final',
-        inheritDefault: false,
-        periods: [{ durationMinutes: 10 }, { durationMinutes: 10 }],
-      },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
-  });
-
-  it('labels the quarter-final stage as also covering the 6-team bracket, in the add list and the configured list', () => {
-    const quarterLabel = '8강 · 6팀 대진의 6강';
-    state.settings = { ...state.settings, kind: 'regular_tournament', stageOverrides: [] };
-    const view = render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
-    expect(screen.getByRole('option', { name: quarterLabel })).toBeInTheDocument();
-
-    state.settings = {
-      ...state.settings,
-      stageOverrides: [{
-        phase: 'quarter',
-        competitionConfigVersionId: 'config-quarter',
-        periods: [{ code: 'FULL_TIME', label: '단판', durationMinutes: 20, extraTime: false }],
-        legacyPeriodCount: null,
-      }],
-    };
-    view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
-    expect(screen.getByText(quarterLabel)).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: quarterLabel })).toBeNull();
-  });
-
-  it('uses the short stage name in the edit heading and save toast while the list keeps the long one', () => {
-    const quarterLabel = '8강 · 6팀 대진의 6강';
-    state.settings = {
-      ...state.settings,
-      expectedVersion: 'version-quarter',
-      kind: 'regular_tournament',
-      stageOverrides: [{
-        phase: 'quarter',
-        competitionConfigVersionId: 'config-quarter',
-        periods: [{ code: 'FULL_TIME', label: '단판', durationMinutes: 20, extraTime: false }],
-        legacyPeriodCount: null,
-      }],
-    };
-    state.mutate.mockClear();
-    const showToast = vi.fn();
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-
-    expect(screen.getByText(quarterLabel)).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
-    expect(screen.getByText('8강 설정')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    const { onSuccess } = state.mutate.mock.calls[0][1] as { onSuccess: (saved: { fixturesRepointed: number }) => void };
-    act(() => onSuccess({ fixturesRepointed: 2 }));
-
-    expect(showToast).toHaveBeenCalledWith('8강 경기 시간을 저장했어요. 시작 전 경기 2개에도 적용했어요.', 'success');
-    expect(showToast).not.toHaveBeenCalledWith(expect.stringContaining('6팀'), expect.anything());
-  });
-
-  it('can remove a stage override and return that phase to the tournament default', () => {
-    state.settings = {
-      ...state.settings,
-      expectedVersion: 'version-stage-2',
-      kind: 'regular_tournament',
-      stageOverrides: [{
-        phase: 'final',
-        competitionConfigVersionId: 'config-final',
-        periods: [
-          { code: 'FIRST_HALF', label: '전반', durationMinutes: 10, extraTime: false },
-          { code: 'SECOND_HALF', label: '후반', durationMinutes: 10, extraTime: false },
-        ],
-        legacyPeriodCount: null,
-      }],
-    };
-    state.mutate.mockClear();
-    const showToast = vi.fn();
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-
-    fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
-    fireEvent.click(screen.getByRole('button', { name: '기본값 사용' }));
-
-    expect(state.mutate).toHaveBeenCalledWith(
-      { expectedVersion: 'version-stage-2', phase: 'final', inheritDefault: true },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-    );
-  });
-
-  describe('stage save version conflict', () => {
-    const finalOverride = (minutes: number) => ({
-      phase: 'final' as const,
-      competitionConfigVersionId: 'config-final',
-      periods: [
-        { code: 'FIRST_HALF', label: '전반', durationMinutes: minutes, extraTime: false },
-        { code: 'SECOND_HALF', label: '후반', durationMinutes: minutes, extraTime: false },
-      ],
-      legacyPeriodCount: null,
-    });
-
-    it.each(['저장', '기본값 사용'])('단계 편집 중 서버가 갱신돼도 %s는 편집 시작 버전으로 요청한다', async (action) => {
-      const base = { ...state.settings, expectedVersion: 'version-stage-1', kind: 'regular_tournament' as const, stageOverrides: [finalOverride(10)] };
-      state.settings = base;
-      state.mutate.mockClear();
-      const fresh = { ...base, expectedVersion: 'version-stage-2', stageOverrides: [finalOverride(30)] };
-      state.refetch.mockResolvedValue({ data: fresh });
-      const showToast = vi.fn();
-      const view = render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-      fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
-      fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '12' } });
-
-      state.settings = fresh;
-      view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-      fireEvent.click(screen.getByRole('button', { name: action }));
-
-      expect(state.mutate.mock.calls[0][0]).toEqual({
-        expectedVersion: 'version-stage-1', phase: 'final', inheritDefault: action === '기본값 사용',
-        ...(action === '저장' ? { periods: [{ durationMinutes: 12 }, { durationMinutes: 10 }] } : {}),
-      });
-      const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
-      await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));
-      expect(state.mutate).toHaveBeenCalledTimes(1);
-      expect(screen.getByLabelText('전반 (분)')).toHaveValue(12);
-      expect(showToast).toHaveBeenCalledWith(expect.stringContaining('결승 경기 시간이 먼저 바뀌었어요'), 'error');
-    });
-
-    function saveFinalAfterConflict(freshOverrideMinutes: number) {
-      const base = { ...state.settings, expectedVersion: 'version-stage-3', kind: 'regular_tournament' as const, stageOverrides: [finalOverride(10)] };
-      state.settings = base;
-      state.mutate.mockClear();
-      state.refetch.mockResolvedValue({ data: { ...base, expectedVersion: 'version-stage-4', stageOverrides: [finalOverride(freshOverrideMinutes)] } });
-      const showToast = vi.fn();
-      render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-
-      fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
-      fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '12' } });
-      fireEvent.click(screen.getByRole('button', { name: '저장' }));
-      const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
-      return { showToast, conflict: () => act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } })) };
-    }
-
-    it('retries once with the fresh version when only other settings changed', async () => {
-      const { showToast, conflict } = saveFinalAfterConflict(10);
-      await conflict();
-
-      expect(state.mutate).toHaveBeenCalledTimes(2);
-      expect(state.mutate.mock.calls[1][0]).toEqual({
-        expectedVersion: 'version-stage-4', phase: 'final', inheritDefault: false,
-        periods: [{ durationMinutes: 12 }, { durationMinutes: 10 }],
-      });
-      expect(showToast).not.toHaveBeenCalled();
-    });
-
-    it('does not overwrite when the same stage changed elsewhere', async () => {
-      const { showToast, conflict } = saveFinalAfterConflict(15);
-      await conflict();
-
-      expect(state.mutate).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenCalledWith(expect.stringContaining('결승 경기 시간이 먼저 바뀌었어요'), 'error');
-    });
-  });
-
-  it('keeps legacy count explicit until every duration is entered', () => {
-    state.settings = {
-      ...state.settings,
-      periods: null,
-      legacyPeriodCount: 3,
-      requiresDurationInput: true,
-      stageOverrides: [], groupOverrides: [],
-    };
-    const showToast = vi.fn();
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-
-    expect(screen.getByText('기존 설정에 각 피리어드 길이 입력 필요')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(showToast).toHaveBeenCalledWith('각 피리어드 시간을 1분 이상 입력해 주세요.', 'error');
-  });
-
-  it('shows which narrower overrides will stay unchanged when a parent setting changes', () => {
-    state.settings = {
-      ...state.settings,
-      requiresDurationInput: false,
-      stageOverrides: [],
-      groupOverrides: [{
-        groupId: 'group-b',
-        name: 'B조',
-        competitionConfigVersionId: 'config-group-b',
-        periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 15, extraTime: false }],
-        legacyPeriodCount: null,
-      }],
-      matchOverrideCount: 2,
-    };
-
-    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
-
-    expect(screen.getByLabelText('별도 경기 시간 안내')).toHaveTextContent('따로 정한 조·경기는 위 기본값이나 단계별 경기 시간을 바꿔도 그대로 유지돼요.');
-    expect(screen.getByText('따로 정한 조: B조')).toBeInTheDocument();
-    expect(screen.getByText('따로 정한 경기: 2개')).toBeInTheDocument();
+    expect(await card.findByText('전·후반 20분 / 20분')).toBeInTheDocument();
+    expect(card.queryByRole('button', { name: '경기 시간 수정' })).toBeNull();
   });
 });

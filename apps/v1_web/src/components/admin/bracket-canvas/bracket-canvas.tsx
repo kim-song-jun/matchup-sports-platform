@@ -28,6 +28,8 @@ export type BracketCanvasProps = {
   fixtures: V1AdminBracketFixture[];
   slots: V1AdminBracketSlot[];
   selectedFixtureId: string | null;
+  /** 필터(「시간 미정 경기만 보기」)가 켜졌을 때 해당하는 경기 id. 생략하면 필터가 없다. */
+  filterMatchIds?: ReadonlySet<string>;
   pendingRegistrationId: string | null;
   canWrite: boolean;
   onSelectFixture: (fixtureId: string) => void;
@@ -63,6 +65,7 @@ function SingleBracketCanvas({
   fixtures,
   slots,
   selectedFixtureId,
+  filterMatchIds,
   pendingRegistrationId,
   canWrite,
   onSelectFixture,
@@ -99,6 +102,7 @@ function SingleBracketCanvas({
     sideLabels={labels ?? { HOME: fixtureSideLabel(fixture, 'HOME', labelContext), AWAY: fixtureSideLabel(fixture, 'AWAY', labelContext) }}
     slots={{ HOME: fixture.homeSlotId ? slotsById.get(fixture.homeSlotId) ?? null : null, AWAY: fixture.awaySlotId ? slotsById.get(fixture.awaySlotId) ?? null : null }}
     selected={fixture.id === selectedFixtureId}
+    filterMatch={filterMatchIds?.has(fixture.id)}
     canWrite={canWrite}
     pendingRegistrationId={pendingRegistrationId}
     onSelect={onSelectFixture}
@@ -165,6 +169,7 @@ function SingleBracketCanvas({
                 AWAY: fixture.awaySlotId === null ? null : (slotsById.get(fixture.awaySlotId) ?? null),
               }}
               selected={fixture.id === selectedFixtureId}
+              filterMatch={filterMatchIds?.has(fixture.id)}
               canWrite={canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))}
               pendingRegistrationId={pendingRegistrationId}
               onSelect={onSelectFixture}

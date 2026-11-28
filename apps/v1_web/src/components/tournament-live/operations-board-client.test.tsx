@@ -1,694 +1,518 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
+import { installViewport, resizeViewport } from '@/test/viewport';
+import type { V1TournamentOperationsBoardItem, V1TournamentStaffRole } from '@/types/api';
 import { OperationsBoardClient } from './operations-board-client';
-import { v1Get } from '@/lib/api-client';
-import type { V1TournamentOperationsBoardItem, V1TournamentOperationsBoardPage } from '@/types/api';
-
-const mocks = vi.hoisted(() => ({
-  useV1TournamentOperationsBoard: vi.fn(),
-  useV1TournamentFields: vi.fn(),
-  fetchV1TournamentOperationsBoardPage: vi.fn(),
-  routerReplace: vi.fn(),
-  useTournamentOpsRole: vi.fn(),
-  assignFixtureField: vi.fn(),
-  clearFixtureField: vi.fn(),
-  useGameResultRevisions: vi.fn(),
-  pathname: { value: '/tournament-ops/tournaments/t-1/operations' },
-}));
-
-// 런타임에는 `_gate.tsx` 가 이 화면을 항상 TournamentOpsRoleProvider 로 감싼다(셸 분기).
-// 테스트는 provider 트리를 세우는 대신 역할만 갈아끼운다 — staff-client.test.tsx 와 같은 방식.
-vi.mock('@/components/tournament-ops/role-context', () => ({
-  useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
-}));
-
-vi.mock('@/components/tournament-result-review/game-result-correction-panel', () => ({
-  GameResultCorrectionPanel: (props: { gameId: string }) => (
-    <div data-testid={`inline-correction-${props.gameId}`}>인라인 결과 정정</div>
-  ),
-}));
-
-vi.mock('@/hooks/use-tournament-result-review', () => ({
-  useGameResultRevisions: (...args: unknown[]) => mocks.useGameResultRevisions(...args),
-}));
-
-vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
-  GameResultReviewPanel: (props: { onSaved: () => void }) => <button onClick={props.onSaved}>테스트 결과 확인</button>,
-}));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => mocks.pathname.value,
-  useRouter: () => ({ replace: mocks.routerReplace }),
+  usePathname: () => '/admin/live/t-1/operations',
+  useRouter: () => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({}),
-}));
+const kst = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+09:00`).toISOString();
+const D20 = '2026-12-20';
 
-vi.mock('@/hooks/use-v1-api', () => ({
-  useV1TournamentOperationsBoard: (...args: unknown[]) => mocks.useV1TournamentOperationsBoard(...args),
-  fetchV1TournamentOperationsBoardPage: (...args: unknown[]) => mocks.fetchV1TournamentOperationsBoardPage(...args),
-  useV1TournamentFields: (...args: unknown[]) => mocks.useV1TournamentFields(...args),
-  useV1AssignFixtureField: () => ({ mutate: mocks.assignFixtureField, isPending: false }),
-  useV1ClearFixtureField: () => ({ mutate: mocks.clearFixtureField, isPending: false }),
-  useV1Tournament: () => ({
-    data: {
-      title: '가을 풋살 대회',
-      format: 'knockout',
-      status: 'in_progress',
-      // `round`/`liveStatus` 는 `V1TournamentFixture` 의 필수 필드다. 예전 목업은 둘 다
-      // 빠져 있었는데, 진행 단계 스테퍼가 `round === 'final'` 처럼 값을 **비교만** 하던
-      // 동안에는 undefined 도 조용히 지나가서 드리프트가 드러나지 않았다. 스테퍼가 라운드
-      // 이름을 실제로 읽기 시작하자 이 목업만 터졌다 — 실제 API 는 항상 채워 보낸다.
-      fixtures: [
-        {
-          id: 'fixture-1',
-          round: '8강',
-          fixtureNumber: 1,
-          liveStatus: 'live',
-          status: 'scheduled',
-          homeTeamName: '레드팀',
-          awayTeamName: '블루팀',
-        },
-      ],
-    },
+function fx(n: number, fieldId: string | null, at: string | null, over: Partial<V1TournamentOperationsBoardItem> = {}): V1TournamentOperationsBoardItem {
+  return {
+    fixtureId: `f${n}`,
+    tournamentId: 't-1',
+    round: '조별리그 1라운드',
+    fixtureNumber: n,
+    legNumber: null,
+    groupName: 'A조',
+    gameId: `g${n}`,
+    gameState: 'SCHEDULED',
+    fieldId,
+    fieldName: fieldId === null ? null : fieldId === 'fld1' ? '구장 1' : fieldId === 'fld2' ? '구장 2' : fieldId === 'fld3' ? '구장 3' : '구장 4',
+    homeRegistrationId: `rh${n}`,
+    awayRegistrationId: `ra${n}`,
+    scheduledAt: at,
+    currentScore: null,
+    currentRevisionState: null,
+    warnings: [],
+    version: 1,
+    revisionId: null,
+    stableRevision: `s${n}`,
+    ...over,
+  };
+}
+
+const official = { gameState: 'ENDED' as const, revisionId: 'rev', currentRevisionState: 'OFFICIAL' as const };
+
+function dayItems(): V1TournamentOperationsBoardItem[] {
+  return [
+    fx(1, 'fld1', kst(D20, '09:00'), { ...official, currentScore: { home: 2, away: 1 } }),
+    fx(6, 'fld2', kst(D20, '09:00'), { ...official, currentScore: { home: 0, away: 0 } }),
+    fx(7, 'fld2', kst(D20, '09:30'), { gameState: 'ENDED' }),
+    fx(2, 'fld1', kst(D20, '10:00'), { gameState: 'LIVE' }),
+    fx(8, 'fld2', kst(D20, '10:30'), {}),
+    fx(3, 'fld1', kst(D20, '11:00'), {}),
+    fx(12, 'fld2', kst(D20, '14:30'), {}),
+    fx(90, 'fld1', null, {}),
+    fx(91, 'fld1', null, {}),
+  ];
+}
+
+function operator(fieldId: string, name: string, expiresAt: string | null) {
+  return {
+    id: `s-${fieldId}`, tournamentId: 't-1', userId: `u-${fieldId}`, role: 'FIELD_OPERATOR', fieldId, fixtureIds: [], version: 1,
+    expiresAt, revokedAt: null, grantedByUserId: null, createdAt: '2026-12-01T00:00:00.000Z', nickname: name,
+  };
+}
+
+interface Scenario {
+  pages: Array<{ items: V1TournamentOperationsBoardItem[]; nextCursor: string | null }>;
+  fields: Array<{ id: string; name: string; sortOrder: number }>;
+  staff: unknown[];
+  fixtures: unknown[];
+  leagueFixtures: unknown[];
+  kind: string;
+}
+
+let scenario: Scenario;
+const operationRequests: string[] = [];
+
+function defaultScenario(): Scenario {
+  const items = dayItems();
+  return {
+    pages: [{ items, nextCursor: null }],
+    fields: [{ id: 'fld1', name: '구장 1', sortOrder: 1 }, { id: 'fld2', name: '구장 2', sortOrder: 2 }],
+    staff: [operator('fld1', '김도윤', null), operator('fld2', '이서연', kst(D20, '14:00'))],
+    fixtures: items.map((item) => ({
+      id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null,
+      round: item.round, fixtureNumber: item.fixtureNumber, liveStatus: 'scheduled', status: 'scheduled',
+    })),
+    leagueFixtures: [],
+    kind: 'regular_tournament',
+  };
+}
+
+const ok = (data: unknown) => HttpResponse.json({ status: 'success', timestamp: '2026-12-20T01:15:00.000Z', data });
+
+const server = setupServer(
+  http.get('*/api/v1/tournament-ops/tournaments/:id/operations', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    operationRequests.push(cursor ?? 'first');
+    const index = cursor === null ? 0 : Number(cursor.replace('c', ''));
+    const page = scenario.pages[index];
+    return ok({ items: page.items, nextCursor: page.nextCursor, watermark: 'w', liveWarnings: [] });
   }),
-}));
+  http.get('*/api/v1/tournament-ops/tournaments/:id/fields', () =>
+    ok({ items: scenario.fields.map((f) => ({ ...f, tournamentId: 't-1', scopeKey: f.id, active: true, version: 1 })) }),
+  ),
+  http.get('*/api/v1/tournament-ops/tournaments/:id/staff', () => ok({ items: scenario.staff })),
+  http.get('*/api/v1/tournaments/:id', () =>
+    ok({ id: 't-1', title: '겨울 풋살컵', kind: scenario.kind, status: 'in_progress', fixtures: scenario.fixtures, leagueFixtures: scenario.leagueFixtures }),
+  ),
+);
 
-const ITEM_A: V1TournamentOperationsBoardItem = {
-  fixtureId: 'fixture-1',
-  tournamentId: 't-1',
-  round: '8강',
-  fixtureNumber: 1,
-  legNumber: 1,
-  groupName: null,
-  gameId: 'game-1',
-  gameState: 'LIVE',
-  fieldId: 'field-1',
-  fieldName: '1번 코트',
-  homeRegistrationId: 'reg-home',
-  awayRegistrationId: 'reg-away',
-  scheduledAt: '2026-08-10T05:00:00.000Z',
-  currentScore: null,
-  currentRevisionState: 'SUBMITTED',
-  warnings: ['MISSING_SCORER', 'NO_FIELD_ASSIGNED'],
-  version: 3,
-  revisionId: null,
-  stableRevision: 'hash-a',
-};
+let restoreViewport: () => void;
 
-/** 결선 무승부 → 승부차기로 끝난 경기. 알파 실측 데이터 형태 그대로(정규시간 0:0,
- *  승부차기 2:0, 실시간 확정 경로라 평평한 `{home,away,penalties}`). */
-const ENDED_PENALTY_ITEM: V1TournamentOperationsBoardItem = {
-  ...ITEM_A,
-  fixtureId: 'fixture-2',
-  round: '결승',
-  fixtureNumber: 2,
-  gameId: 'game-2',
-  gameState: 'ENDED',
-  warnings: [],
-  currentScore: { home: 0, away: 0, penalties: { home: 2, away: 0 } },
-  currentRevisionState: 'OFFICIAL',
-  revisionId: 'rev-2',
-  stableRevision: 'hash-b',
-};
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => {
+  server.resetHandlers();
+  restoreViewport();
+  vi.useRealTimers();
+});
+afterAll(() => server.close());
+beforeEach(() => {
+  scenario = defaultScenario();
+  operationRequests.length = 0;
+  restoreViewport = installViewport(1280);
+  vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(kst(D20, '10:15')));
+});
 
-const PAGE: V1TournamentOperationsBoardPage = {
-  items: [ITEM_A],
-  nextCursor: 'cursor-2',
-  watermark: 'wm-1',
-  liveWarnings: [{ fixtureId: 'fixture-1', warnings: ['NO_STAFF_ASSIGNED'] }],
-};
+function renderBoard(role: V1TournamentStaffRole = 'PLATFORM_OPS') {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <TournamentOpsRoleProvider role={role}>
+        <OperationsBoardClient tournamentId="t-1" />
+      </TournamentOpsRoleProvider>
+    </QueryClientProvider>,
+  );
+}
 
-describe('OperationsBoardClient', () => {
-  beforeEach(() => {
-    mocks.useV1TournamentFields.mockReturnValue({
-      data: { items: [{ id: 'field-1', name: '1번 코트' }, { id: 'field-2', name: '2번 코트' }] },
-      refetch: vi.fn(), isFetching: false,
-    });
-    mocks.useV1TournamentOperationsBoard.mockReset();
-    mocks.fetchV1TournamentOperationsBoardPage.mockReset();
-    mocks.routerReplace.mockReset();
-    mocks.assignFixtureField.mockReset();
-    mocks.clearFixtureField.mockReset();
-    mocks.useGameResultRevisions.mockReset();
-    mocks.useGameResultRevisions.mockReturnValue({ data: [], isPending: false, isError: false });
-    mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
-    mocks.pathname.value = '/tournament-ops/tournaments/t-1/operations';
-    mocks.useV1TournamentOperationsBoard.mockReturnValue({
-      data: PAGE,
-      isPending: false,
-      isError: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
+describe('OperationsBoardClient — 데스크톱', () => {
+  it('구장 열 머리와 시간 판을 그리고, 시간 미정 경기는 판 아래 묶음에 둔다', async () => {
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    expect(screen.getByRole('columnheader', { name: /구장 2/ })).toHaveTextContent('구장 담당자 이서연');
+    expect(screen.getByRole('columnheader', { name: /구장 2/ })).toHaveTextContent('14:00까지');
+    const table = screen.getByRole('table', { name: '구장별 경기 시간표' });
+    const bundle = screen.getByRole('heading', { name: '시간 미정 2' });
+    expect(table.compareDocumentPosition(bundle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('article', { name: '홈90 vs 원정90' })).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: '지금 10:15' })).toBeInTheDocument();
   });
 
-  /** 첫 번째(데스크톱 표) 행의 ⋯ 를 눌러 시트를 연다. 표와 카드가 둘 다 DOM 에 있어 이름이 겹친다. */
-  function openRowMenu(title = '레드팀 vs 블루팀') {
-    fireEvent.click(screen.getAllByRole('button', { name: new RegExp(`^${title} .+ 더보기$`) })[0]);
-    return screen.getByRole('dialog', { name: `${title} 더보기` });
-  }
-
-  it('새로고침은 경기 목록뿐 아니라 다른 탭에서 추가한 필드 선택지도 갱신한다', async () => {
-    let latestFields = [{ id: 'field-1', name: '1번 코트' }];
-    let refreshFields = false;
-    mocks.useV1TournamentFields.mockImplementation(() => ({
-      data: { items: latestFields }, isFetching: false,
-      refetch: async () => {
-        refreshFields = true;
-        latestFields = [...latestFields, { id: 'field-3', name: '새 코트' }];
-      },
-    }));
-    const boardRefetch = vi.fn();
-    mocks.useV1TournamentOperationsBoard.mockReturnValue({
-      data: PAGE, isPending: false, isError: false, isFetching: false, refetch: boardRefetch,
-    });
-    const { rerender } = render(<OperationsBoardClient tournamentId="t-1" />);
-    await userEvent.click(screen.getByRole('button', { name: '지금 새로고침' }));
-    expect(refreshFields).toBe(true);
-    expect(boardRefetch).toHaveBeenCalled();
-    rerender(<OperationsBoardClient tournamentId="t-1" />);
-    expect(within(screen.getByRole('combobox', { name: '필드' })).getByRole('option', { name: '새 코트' })).toBeInTheDocument();
-    expect(screen.getAllByRole('option', { name: '새 코트' }).length).toBeGreaterThan(1);
-  });
-
-  it('renders a fixture row joined with its public team names, game state, and both stable + live warnings', () => {
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    expect(screen.getAllByText('레드팀 vs 블루팀').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('진행 중').length).toBeGreaterThan(0);
-    // MISSING_SCORER 는 "골에 득점자가 안 적힘"이지 기록 담당 스태프 부재가 아니다.
-    // 결과 검토 화면과 같은 라벨을 쓴다.
-    expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
-  });
-
-  // 어드민에서 고친 경기 제목은 운영 보드에도 같은 이름으로 보여야 한다.
-  it('운영자가 정한 경기 제목이 있으면 라운드 이름 대신 그것을 쓴다', () => {
-    mocks.useV1TournamentOperationsBoard.mockReturnValue({
-      data: { ...PAGE, items: [{ ...ITEM_A, round: 'league_r5', groupName: 'A조', displayTitle: '풀리그 1라운드' }] },
-      isPending: false,
-      isError: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    expect(screen.getAllByText(/풀리그 1라운드 · 1번 경기/).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/조별리그 5라운드/)).not.toBeInTheDocument();
-  });
-
-  it('상단 진행 단계는 단계 이름·상태와 지금 위치를 알린다', () => {
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    const stepper = screen.getByRole('list', { name: '대회 진행 단계' });
-    expect(within(stepper).getAllByRole('listitem').map((item) => item.getAttribute('aria-label'))).toEqual([
-      '8강 (진행 중)',
-      '결승 (예정)',
-      '시상 (예정)',
-    ]);
-    expect(screen.getByText('전체 3단계 중 1단계 진행 중')).toBeInTheDocument();
-  });
-
-  // Task 180 G6(C안) — 경기별 팀 명단 요약(빠짐·정지)과 명단 링크는 운영 보드가 아니라 콘솔의
-  // "킥오프 준비"에 있다. 보드 행은 경기 · 상태 · 콘솔 열기로 가볍게 남는다.
-  describe('명단 요약은 콘솔로 옮겼다', () => {
-    const SCHEDULED_ITEM: V1TournamentOperationsBoardItem = {
-      ...ITEM_A,
-      gameState: 'SCHEDULED',
-      currentRevisionState: null,
-      warnings: [],
-    };
-
-    it('시작 전 경기 행에도 빠짐·정지 요약이나 경기 명단 링크가 없다', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: { ...PAGE, items: [SCHEDULED_ITEM], liveWarnings: [] },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.queryByText(/빠짐|정지 \d/)).toBeNull();
-      expect(screen.queryByRole('link', { name: /경기 명단/ })).toBeNull();
-      // 콘솔로 가는 길은 그대로다.
-      expect(screen.getAllByRole('link', { name: /운영 콘솔/ }).length).toBeGreaterThan(0);
-    });
-
-    it('명단 요약 때문에 ⋯ 가 생기지 않는다 — 결과가 없는 시작 전 경기의 운영 열은 콘솔 링크뿐이다', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: { ...PAGE, items: [SCHEDULED_ITEM], liveWarnings: [] },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
-    });
-  });
-
-  // Task 180 G6(F53·F55) — 운영 열은 주 버튼 하나 + ⋯ 다.
-  describe('운영 열', () => {
-    it('운영 콘솔 링크 하나와 ⋯ 만 행에 두고, 결과 정정은 ⋯ 안으로 들어간다', () => {
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.getAllByRole('link', { name: /운영 콘솔/ }).length).toBeGreaterThan(0);
-      expect(screen.queryByRole('button', { name: '결과 정정' })).toBeNull();
-      const sheet = openRowMenu();
-      expect(within(sheet).getByRole('button', { name: /^결과 정정/ })).toBeEnabled();
-    });
-
-    // G6-V2 — 리그 행 제목은 "N주차"라 같은 주의 두 경기가 같은 버튼 이름을 가졌다(스크린리더로 못 가름).
-    it('제목이 같은 두 행도 운영 콘솔 링크와 ⋯ 의 이름이 일정으로 갈린다', () => {
-      const untitled = { ...ITEM_A, round: null, fixtureNumber: null };
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: {
-          ...PAGE,
-          items: [
-            { ...untitled, fixtureId: 'tm-a', gameId: 'game-a', scheduledAt: '2026-09-29T16:10:00.000Z' },
-            { ...untitled, fixtureId: 'tm-b', gameId: 'game-b', scheduledAt: '2026-09-30T09:30:00.000Z' },
-          ],
-          liveWarnings: [],
-        },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      const table = screen.getByRole('table');
-      const consoleNames = within(table).getAllByRole('link', { name: /운영 콘솔$/ }).map((el) => el.getAttribute('aria-label'));
-      const menuNames = within(table).getAllByRole('button', { name: /더보기$/ }).map((el) => el.getAttribute('aria-label'));
-      for (const names of [consoleNames, menuNames]) {
-        expect(names).toHaveLength(2);
-        expect(new Set(names).size).toBe(2);
-      }
-    });
-
-    it('아직 결과가 없는 경기(예정·진행 중, 제출 전)에는 결과 정정 항목이 없고, 넣을 항목이 없으면 ⋯ 자체가 없다', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: {
-          ...PAGE,
-          items: [{ ...ITEM_A, gameState: 'SCHEDULED', currentRevisionState: null }],
-          liveWarnings: [],
-        },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      // 넣을 항목이 없으면 ⋯ 자체를 두지 않는다.
-      expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
-      expect(screen.queryByText(/결과 정정/)).toBeNull();
-    });
-
-    it('SUPPORT_READONLY 에게는 같은 항목이 "결과 보기"로 나온다', () => {
-      mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      const sheet = openRowMenu();
-      expect(within(sheet).getByRole('button', { name: /^결과 보기/ })).toBeInTheDocument();
-      expect(within(sheet).queryByRole('button', { name: /결과 정정/ })).toBeNull();
-    });
-  });
-
-  it('expands the selected game row with its stable game id and closes it without changing the route', async () => {
-    const user = userEvent.setup();
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: /^레드팀 vs 블루팀 .+ 더보기$/ })[0]);
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
-
-    // 항목을 고르면 시트는 닫히고 인라인 패널이 열린다.
-    expect(screen.queryByRole('dialog', { name: /더보기/ })).toBeNull();
-
-    expect(screen.getAllByTestId('inline-correction-game-1')).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: '정정 닫기' })).toHaveLength(1);
-
-    await user.click(screen.getAllByRole('button', { name: '정정 닫기' })[0]);
-    expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
-    expect(mocks.routerReplace).not.toHaveBeenCalled();
-  });
-
-  it('switches from submitted review to correction after a successful authoritative refresh', async () => {
-    const user = userEvent.setup();
-    mocks.useGameResultRevisions.mockReturnValue({
-      data: [{ state: 'SUBMITTED' }], isPending: false, isError: false,
-      refetch: vi.fn().mockResolvedValue({ isSuccess: true, data: [{ state: 'OFFICIAL' }] }),
-    });
-    render(<OperationsBoardClient tournamentId="t-1" />);
-    await user.click(screen.getAllByRole('button', { name: /^레드팀 vs 블루팀 .+ 더보기$/ })[0]);
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
-    await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
-    expect(await screen.findByTestId('inline-correction-game-1')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '테스트 결과 확인' })).not.toBeInTheDocument();
-  });
-
-  it('does not switch the editor on a failed refresh containing stale cached data', async () => {
-    const user = userEvent.setup();
-    mocks.useGameResultRevisions.mockReturnValue({
-      data: [{ state: 'SUBMITTED' }], isPending: false, isError: false,
-      refetch: vi.fn().mockResolvedValue({ isSuccess: false, data: [{ state: 'OFFICIAL' }] }),
-    });
-    render(<OperationsBoardClient tournamentId="t-1" />);
-    await user.click(screen.getAllByRole('button', { name: /^레드팀 vs 블루팀 .+ 더보기$/ })[0]);
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
-    await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
-    expect(screen.getByRole('button', { name: '테스트 결과 확인' })).toBeInTheDocument();
-    expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
-  });
-
-  /* 이 두 테스트는 예전에 정반대를 못박고 있었다: 경기장 배정 UI 가 없어서 운영자가
-     "경기장 미배정"·"담당자 미배정"을 끌 수단이 없었고, 해소 불가능한 경고가 상시 켜져
-     있으면 조치가 필요한 경고까지 묻히므로 **화면에서 숨겼다**(필터 선택지에서도 뺐다).
-     이제 이 화면에 배정 셀렉트가 있어 둘 다 해소 가능하므로 원래대로 되돌린다 —
-     당시 주석도 "배정 UI 가 생기면 이 테스트를 뒤집어야 한다"고 적어 두었다. */
-  it('shows the field/staff warnings now that the board can resolve them', () => {
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    expect(screen.getAllByText('경기장 미배정').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('담당자 미배정').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
-  });
-
-  /* 결과·승부차기 표시 — 이 보드에는 결과 칸이 아예 없어서, 결선 무승부를 승부차기로
-     끝낸 경기도 "종료" 배지 하나로만 보였다(알파 실측: 서버에는 정규 0:0 · 승부차기 2:0
-     이 저장돼 있는데 스태프 화면 어디에도 그 값이 없었다). 표와 카드 두 경로 모두
-     같은 값을 그려야 한다 — 한쪽만 고치면 뷰포트에 따라 결과가 사라진다. */
-  describe('결과·승부차기', () => {
-    it('종료된 경기의 확정 스코어와 승부차기를 함께 보여준다', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: { ...PAGE, items: [ENDED_PENALTY_ITEM], liveWarnings: [] },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      // 데스크톱 표 + 모바일 카드 = 같은 값 두 벌
-      expect(screen.getAllByText('0:0')).toHaveLength(2);
-      expect(screen.getAllByText('승부차기 2:0')).toHaveLength(2);
-    });
-
-    /**
-     * 이 셀은 승부차기 문구를 손으로 조립하고 있었다(`승부차기 {home}:{away}`). 그래서
-     * 공용 포맷터에 선축을 넣어도 **이 화면만** 선축이 안 보였고, 같은 경기가 결과 검수
-     * 리비전 타임라인에는 `선축 원정`이 뜨는데 운영 보드에는 안 뜨는 어긋남이 생겼다.
-     */
-    it('선축이 기록된 경기는 승부차기 옆에 선축도 보여준다', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: {
-          ...PAGE,
-          items: [
-            {
-              ...ENDED_PENALTY_ITEM,
-              currentScore: { home: 0, away: 0, penalties: { home: 2, away: 0, firstKickSideKey: 'AWAY' } },
-            },
-          ],
-          liveWarnings: [],
-        },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.getAllByText('승부차기 2:0, 선축 원정')).toHaveLength(2);
-    });
-
-    // 선축이 없던 시절에 저장된 경기(그리고 중첩 백필 형태)는 모르는 것을 지어내지 않는다.
-    it('선축이 없는 경기는 선축을 그리지 않는다', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: { ...PAGE, items: [ENDED_PENALTY_ITEM], liveWarnings: [] },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.queryByText(/선축/)).not.toBeInTheDocument();
-    });
-
-    it('아직 확정 결과가 없는 경기는 결과 칸을 비워 둔다 — 0:0 을 지어내지 않는다', () => {
-      // ITEM_A 는 진행 중(currentScore: null)이다. 여기에 0:0 이 그려지면 운영자는
-      // "득점 없이 끝난 경기"로 오독한다.
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.queryByText('0:0')).not.toBeInTheDocument();
-      expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
-    });
-
-    it('does not render a VOID score as an official result', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: {
-          ...PAGE,
-          items: [{ ...ENDED_PENALTY_ITEM, currentScore: { home: 0, away: 1 }, currentRevisionState: 'VOID' }],
-          liveWarnings: [],
-        },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.getAllByText('결과 무효')).toHaveLength(2);
-      expect(screen.queryByText('0:1')).not.toBeInTheDocument();
-    });
-
-    // F55 — 비활성 버튼으로 남기지 않고 항목 자체를 뺀다.
-    it('does not offer correction for a paused game without a revision', () => {
-      mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: { ...PAGE, items: [{ ...ITEM_A, gameState: 'PAUSED', currentRevisionState: null }], liveWarnings: [] },
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      });
-
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.queryByText('결과 정정')).toBeNull();
-      expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
-    });
-  });
-
-  it('offers every stable warning code in the filter', () => {
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    const select = screen.getByLabelText('경고') as HTMLSelectElement;
-    const labels = Array.from(select.options).map((o) => o.textContent);
-    expect(labels).toContain('경기장 미배정');
-    expect(labels).toContain('득점자 미기재');
-  });
-
-  /* 경기장 배정 — `V1TournamentFixture.fieldId` 의 유일한 쓰기 경로다.
-     백엔드는 Task 18 부터 있었는데 호출부가 없어 alpha 의 픽스처가 전부 fieldId=null 이었고,
-     그래서 필드 담당자는 담당 경기를 영영 가질 수 없었다. */
-  describe('경기장 배정', () => {
-    it('셀렉트에서 고르면 그 경기에 배정한다', async () => {
-      const user = userEvent.setup();
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      const selects = screen.getAllByLabelText('8강 1번 경기장') as HTMLSelectElement[];
-      await user.selectOptions(selects[0], 'field-2');
-
-      expect(mocks.assignFixtureField).toHaveBeenCalledWith(
-        { fixtureId: 'fixture-1', fieldId: 'field-2' },
-        expect.anything(),
-      );
-      expect(mocks.clearFixtureField).not.toHaveBeenCalled();
-    });
-
-    it('미배정을 고르면 배정 해제로 보낸다 — 빈 fieldId 로 배정하지 않는다', async () => {
-      const user = userEvent.setup();
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      const selects = screen.getAllByLabelText('8강 1번 경기장') as HTMLSelectElement[];
-      await user.selectOptions(selects[0], '');
-
-      expect(mocks.clearFixtureField).toHaveBeenCalledWith(
-        { fixtureId: 'fixture-1' },
-        expect.anything(),
-      );
-      expect(mocks.assignFixtureField).not.toHaveBeenCalled();
-    });
-
-    it('현재 배정된 필드를 선택값으로 반영한다', () => {
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      const selects = screen.getAllByLabelText('8강 1번 경기장') as HTMLSelectElement[];
-      expect(selects[0].value).toBe('field-1');
-    });
-
-    it('권한 없는 역할에게는 셀렉트 대신 읽기 전용 텍스트를 보여준다', () => {
-      // 서버는 event_reverse 로 판정한다 — 필드 담당자는 거부되므로 누르면 403 나는
-      // 컨트롤을 아예 만들지 않는다.
-      mocks.useTournamentOpsRole.mockReturnValue('FIELD_OPERATOR');
-      render(<OperationsBoardClient tournamentId="t-1" />);
-
-      expect(screen.queryByLabelText('8강 1번 경기장')).not.toBeInTheDocument();
-      expect(screen.getAllByText('1번 코트').length).toBeGreaterThan(0);
-    });
-  });
-
-  // 데스크톱 표와 모바일 카드가 같은 행을 그리는데 경기 번호 표기가 갈려 있었다
-  // (표: "8강 1경기" / 카드: "8강 · 1번 경기"). "N경기"는 "그 라운드의 N번째 경기"로
-  // 오독되지만 fixtureNumber 는 대회 전체 연번이다 — 두 경로 모두 같은 표기를 쓴다.
-  it('labels the fixture number identically in the desktop table and the mobile card', () => {
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    // 데스크톱 표: 번호만 단독 노드
-    expect(screen.getByText('8강 · 1번 경기')).toBeInTheDocument();
-    // 모바일 카드: 같은 표기 뒤에 일정이 이어붙는다
-    expect(screen.getByText(/8강 · 1번 경기 ·/)).toBeInTheDocument();
-    // 옛 표기는 어느 경로에도 남아 있으면 안 된다
-    expect(screen.queryByText(/8강 1경기/)).not.toBeInTheDocument();
-  });
-
-  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선은 저장한 조 이름.
-  it('names a group fixture "A조 · 조별리그 2라운드" and a knockout fixture by its saved group name, in table, card and field label', () => {
-    const groupItem = { ...ITEM_A, fixtureId: 'fixture-g', round: 'league_r2', fixtureNumber: 3, groupName: 'A조' };
-    const knockoutItem = { ...ITEM_A, fixtureId: 'fixture-k', round: 'semi', fixtureNumber: 9, groupName: '본선' };
-    mocks.useV1TournamentOperationsBoard.mockReturnValue({
-      data: { ...PAGE, items: [groupItem, knockoutItem], liveWarnings: [] },
-      isPending: false,
-      isError: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    expect(screen.getByText('A조 · 조별리그 2라운드 · 3번 경기')).toBeInTheDocument();
-    expect(screen.getByText(/A조 · 조별리그 2라운드 · 3번 경기 ·/)).toBeInTheDocument();
-    expect(screen.getAllByLabelText('A조 · 조별리그 2라운드 3번 경기장').length).toBeGreaterThan(0);
-    expect(screen.getByText('본선 · 9번 경기')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('본선 9번 경기장').length).toBeGreaterThan(0);
-  });
-
-  it('names a knockout second leg "4강 2차" like the public screens', () => {
-    const secondLeg = { ...ITEM_A, fixtureId: 'fixture-k2', round: 'semi', fixtureNumber: 10, legNumber: 2 };
-    mocks.useV1TournamentOperationsBoard.mockReturnValue({
-      data: { ...PAGE, items: [secondLeg], liveWarnings: [] },
-      isPending: false,
-      isError: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    expect(screen.getByText('4강 2차 · 10번 경기')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('4강 2차 10번 경기장').length).toBeGreaterThan(0);
-  });
-
-  it('updates the URL (deep link) when a filter changes, and does not lose the filter selection across an incremental data refresh', async () => {
-    const user = userEvent.setup();
-    const { rerender } = render(<OperationsBoardClient tournamentId="t-1" />);
-
-    const statusSelect = screen.getByLabelText('경기 상태') as HTMLSelectElement;
-    await user.selectOptions(statusSelect, 'LIVE');
-
-    expect(mocks.routerReplace).toHaveBeenCalledWith(
-      '/tournament-ops/tournaments/t-1/operations?status=LIVE',
-      { scroll: false },
-    );
-    expect(statusSelect.value).toBe('LIVE');
-
-    // 백그라운드 폴링이 새 스냅샷 객체로 갈아끼워도(참조가 바뀌어도) 방금 고른 필터 선택은 사라지지
-    // 않아야 한다 — 필터는 쿼리 데이터가 아니라 컴포넌트 로컬 상태이기 때문이다.
-    mocks.useV1TournamentOperationsBoard.mockReturnValue({
-      data: { ...PAGE, watermark: 'wm-2' },
-      isPending: false,
-      isError: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    rerender(<OperationsBoardClient tournamentId="t-1" />);
-
-    expect((screen.getByLabelText('경기 상태') as HTMLSelectElement).value).toBe('LIVE');
-  });
-
-  it('appends the next cursor page below the existing items instead of replacing them', async () => {
-    const user = userEvent.setup();
-    mocks.fetchV1TournamentOperationsBoardPage.mockResolvedValue({
-      items: [{ ...ITEM_A, fixtureId: 'fixture-2', round: '4강' }],
-      nextCursor: null,
-      watermark: 'wm-3',
-      liveWarnings: [],
-    });
-
-    render(<OperationsBoardClient tournamentId="t-1" />);
-
-    await user.click(screen.getByRole('button', { name: '더 보기' }));
-
-    expect(mocks.fetchV1TournamentOperationsBoardPage).toHaveBeenCalledWith(
-      expect.anything(),
-      't-1',
-      expect.objectContaining({ cursor: 'cursor-2' }),
-      v1Get,
-    );
-    // 기존 fixture-1 행은 그대로 남아 있고, 새로 불러온 fixture-2(4강) 행이 추가된다.
-    expect(screen.getAllByText('레드팀 vs 블루팀').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/4강/).length).toBeGreaterThan(0);
-    // 더 이상 다음 페이지가 없으므로 "더 보기" 버튼은 사라진다.
-    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
-  });
-
-  // 본문 링크도 셸 nav 와 같이 **지금 표면**을 따라가야 한다. nav 만 표면 인식으로 바꾸고
-  // 본문을 하드코딩으로 남겨 두면, 어드민에서 '운영 콘솔'을 누르는 순간 스태프 경로로
-  // 튕겨 나가 콘솔 셸이 다시 뜬다(alpha 실측에서 실제로 그랬다).
-  it('경기 콘솔 링크가 스태프 표면에서는 /tournament-ops 를 가리킨다', () => {
-    render(<OperationsBoardClient tournamentId="t-1" />);
-    const links = screen.getAllByRole('link', { name: /운영 콘솔/ });
-    expect(links.length).toBeGreaterThan(0);
-    for (const link of links) {
-      expect(link.getAttribute('href')).toMatch(/^\/tournament-ops\/tournaments\/t-1\/fixtures\//);
+  it('상태·구장·경고 select 와 운영 콘솔 링크가 없고, 카드마다 할 일은 하나다', async () => {
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /운영 콘솔/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('전체 필드')).not.toBeInTheDocument();
+    for (const article of screen.getAllByRole('article')) {
+      expect(within(article).queryAllByRole('link').length).toBeLessThanOrEqual(1);
     }
+    expect(within(screen.getByRole('article', { name: '홈7 vs 원정7' })).getByRole('link')).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f7');
+    expect(within(screen.getByRole('article', { name: '홈2 vs 원정2' })).getByRole('link')).toHaveAttribute('href', '/admin/live/t-1/fixtures/f2/operate');
+    expect(within(screen.getByRole('article', { name: '홈1 vs 원정1' })).getByRole('link', { name: /결과 고치기/ })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f1');
   });
 
-  it('경기 콘솔 링크가 어드민 표면에서는 /admin/live 를 가리킨다', () => {
-    mocks.pathname.value = '/admin/live/t-1/operations';
-    render(<OperationsBoardClient tournamentId="t-1" />);
-    const links = screen.getAllByRole('link', { name: /운영 콘솔/ });
-    expect(links.length).toBeGreaterThan(0);
-    for (const link of links) {
-      expect(link.getAttribute('href')).toMatch(/^\/admin\/live\/t-1\/fixtures\//);
-    }
+  it('머리말이 선택한 날 기준 개수와 15초 갱신을 알린다', async () => {
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    expect(screen.getByText(/겨울 풋살컵 · 12\. 20\.\(일\)/)).toBeInTheDocument();
+    expect(screen.getByText(/끝남 3 · 진행 중 1 · 남은 경기 3 · 10:15 기준 · 15초마다 새로 고쳐요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /참가자 화면 보기/ })).toHaveAttribute('href', '/tournaments/t-1');
   });
 
-  // 같은 사람이 담당 경기 목록(`?from=staff`)으로도, 이 보드로도 콘솔에 들어갈 수 있다(디렉터 + 필드 담당자).
-  // 출처를 실어 보내지 않으면 예전에 저장된 `staff` 가 남아, 콘솔의 뒤로가기가 바로 앞 화면(이 보드)이 아니라
-  // 가 본 적 없는 담당 경기 목록으로 갔다.
-  it('스태프 표면의 경기 콘솔 링크는 출처(from=board)를 싣는다', () => {
-    render(<OperationsBoardClient tournamentId="t-1" />);
-    const links = screen.getAllByRole('link', { name: /운영 콘솔/ });
-    expect(links.length).toBeGreaterThan(0);
-    for (const link of links) {
-      expect(link.getAttribute('href')).toMatch(/\/operate\?from=board$/);
-    }
+  it('구장 4곳이면 앞 3곳만 열로 그리고, 칩은 최대 3곳까지 고른다', async () => {
+    const items = [
+      fx(1, 'fld1', kst(D20, '09:00')), fx(2, 'fld2', kst(D20, '09:00')), fx(3, 'fld3', kst(D20, '09:00')), fx(4, 'fld4', kst(D20, '09:00')),
+    ];
+    scenario.pages = [{ items, nextCursor: null }];
+    scenario.fields = ['1', '2', '3', '4'].map((n, i) => ({ id: `fld${n}`, name: `구장 ${n}`, sortOrder: i }));
+    scenario.staff = [];
+    scenario.fixtures = items.map((item) => ({ id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null }));
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    expect(screen.getAllByRole('columnheader').filter((h) => /^구장 \d/.test(h.textContent ?? ''))).toHaveLength(3);
+    expect(chips.getByRole('button', { name: '구장 4' })).toBeDisabled();
+    expect(chips.queryByRole('button', { name: '전체' })).not.toBeInTheDocument();
+
+    await user.click(chips.getByRole('button', { name: '구장 1' }));
+    expect(chips.getByRole('button', { name: '구장 4' })).toBeEnabled();
+    await user.click(chips.getByRole('button', { name: '구장 4' }));
+    expect(screen.getByRole('columnheader', { name: /구장 4/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /구장 1/ })).not.toBeInTheDocument();
   });
 
-  it('어드민 표면의 경기 콘솔 링크에는 쿼리를 붙이지 않는다 — 경로만 봐도 출처를 안다', () => {
-    mocks.pathname.value = '/admin/live/t-1/operations';
-    render(<OperationsBoardClient tournamentId="t-1" />);
-    for (const link of screen.getAllByRole('link', { name: /운영 콘솔/ })) {
-      expect(link.getAttribute('href')).toMatch(/\/operate$/);
+  it('구장 담당자가 한 곳도 없으면 보드 위 안내 한 줄만 두고 카드마다 경고하지 않는다', async () => {
+    scenario.staff = [];
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    expect(screen.getAllByText('구장 담당자가 아직 없어요.', { exact: false })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: '스태프·구장' })).toHaveAttribute('href', '/admin/live/t-1/staff');
+    expect(screen.queryByText('구장 담당자가 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /담당자 배정하기/ })).not.toBeInTheDocument();
+  });
+
+  it('지원은 확정·고치기·담당자 버튼 없이 결과 보기만 얻고 점수와 상태를 본다', async () => {
+    renderBoard('SUPPORT_READONLY');
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    expect(screen.queryByRole('link', { name: /결과 확정|결과 고치기|담당자 배정하기/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('article', { name: '홈7 vs 원정7' })).getByRole('link', { name: /결과 보기/ })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f7');
+    expect(within(screen.getByRole('article', { name: '홈1 vs 원정1' })).getByRole('link', { name: /결과 보기/ })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f1');
+    expect(screen.queryByText(/구장 담당자가 아직 없어요/)).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '홈1 vs 원정1' })).toHaveTextContent('2 : 1');
+    expect(screen.getByRole('article', { name: '홈7 vs 원정7' })).toHaveTextContent('결과 확정 대기');
+  });
+
+  it('먼 예정 경기의 제목을 누르면 경기 정보 시트에서 경기 콘솔로 갈 수 있다', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    await user.click(screen.getByRole('button', { name: '홈3 vs 원정3 경기 정보' }));
+
+    const dialog = screen.getByRole('dialog', { name: '홈3 vs 원정3 경기 정보' });
+    expect(within(dialog).getByRole('link', { name: '경기 콘솔 열기' })).toHaveAttribute('href', '/admin/live/t-1/fixtures/f3/operate');
+    expect(within(dialog).getByRole('combobox', { name: '홈3 vs 원정3 구장' })).toHaveValue('fld1');
+  });
+});
+
+function withFields(count: number, extra: V1TournamentOperationsBoardItem[]) {
+  const items = [
+    ...Array.from({ length: count }, (_, i) => fx(i + 1, `fld${i + 1}`, kst(D20, '09:00'))),
+    ...extra,
+  ];
+  scenario.pages = [{ items, nextCursor: null }];
+  scenario.fields = Array.from({ length: count }, (_, i) => ({ id: `fld${i + 1}`, name: `구장 ${i + 1}`, sortOrder: i }));
+  scenario.staff = [];
+  scenario.fixtures = items.map((item) => ({ id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null }));
+}
+
+describe('OperationsBoardClient — 구장 미정과 칩 모드', () => {
+  const unassigned = () => fx(9, null, kst(D20, '10:00'), { warnings: ['MISSING_SCORER'] });
+
+  it('구장 3곳 + 구장 미정은 구장 4열로 세지 않아 칩 모드가 아니고, 미정 열이 보이고 센다', async () => {
+    withFields(3, [unassigned()]);
+    renderBoard();
+
+    await screen.findByRole('columnheader', { name: /구장 3/ });
+    expect(screen.getByRole('columnheader', { name: /구장 미정/ })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '홈9 vs 원정9' })).toBeInTheDocument();
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    expect(chips.getByRole('button', { name: '전체' })).toBeInTheDocument();
+    expect(chips.getAllByRole('button').filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(0);
+    expect(screen.getByRole('button', { name: '확인할 것 1' })).toBeInTheDocument();
+  });
+
+  it('구장 4곳 + 구장 미정은 구장 3곳만 열로 고르되 미정 열은 늘 보이고 센다', async () => {
+    withFields(4, [unassigned()]);
+    renderBoard();
+
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent ?? '');
+    expect(headers.filter((h) => /^구장 [1-4]/.test(h))).toHaveLength(3);
+    expect(headers.some((h) => h.startsWith('구장 미정'))).toBe(true);
+    expect(screen.getByRole('article', { name: '홈9 vs 원정9' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인할 것 1' })).toBeInTheDocument();
+
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    expect(chips.queryByRole('button', { name: '전체' })).not.toBeInTheDocument();
+    expect(chips.queryByRole('button', { name: '구장 미정' })).not.toBeInTheDocument();
+    expect(chips.getByRole('button', { name: '구장 4' })).toBeDisabled();
+  });
+
+  it('구장 4곳 중 하나를 바꿔 골라도 구장 미정 경기는 남는다', async () => {
+    withFields(4, [unassigned()]);
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    await user.click(chips.getByRole('button', { name: '구장 1' }));
+    await user.click(chips.getByRole('button', { name: '구장 4' }));
+
+    expect(screen.getByRole('article', { name: '홈9 vs 원정9' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인할 것 1' })).toBeInTheDocument();
+  });
+});
+
+describe('OperationsBoardClient — 결과 무효', () => {
+  it('무효 처리된 결과는 확정 대기가 아니라 「결과 무효」이고 결과 다시 입력으로 간다', async () => {
+    scenario.pages = [{ items: [fx(5, 'fld1', kst(D20, '09:00'), { gameState: 'ENDED', revisionId: 'rev', currentRevisionState: 'VOID' })], nextCursor: null }];
+    scenario.fixtures = [{ id: 'f5', homeTeamName: '홈5', awayTeamName: '원정5', homeSlotLabel: null, awaySlotLabel: null }];
+    scenario.staff = [];
+    const { container } = renderBoard();
+
+    const card = await screen.findByRole('article', { name: '홈5 vs 원정5' });
+    expect(within(card).getByText('결과 무효')).toBeInTheDocument();
+    expect(within(card).queryByText('결과 확정 대기')).not.toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: /결과 다시 입력/ })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f5');
+    expect(container.textContent).toMatch(/끝남 1/);
+  });
+});
+
+describe('OperationsBoardClient — 확인할 것과 목록', () => {
+  it('확인할 것을 켜면 담당자 없음 카드만 남고 개수가 같다(결과 확정 대기는 세지 않는다)', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    const toggle = screen.getByRole('button', { name: '확인할 것 1' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('article').map((a) => a.getAttribute('aria-label'))).toEqual(['홈12 vs 원정12']);
+    expect(within(screen.getByRole('article', { name: '홈12 vs 원정12' })).getByRole('link', { name: /담당자 배정하기/ })).toHaveAttribute('href', '/admin/live/t-1/staff');
+  });
+
+  it('필터에 걸리는 경기가 없으면 안내 문구를 보여 준다', async () => {
+    scenario.staff = [operator('fld1', '김도윤', null), operator('fld2', '이서연', null)];
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    await user.click(screen.getByRole('button', { name: '확인할 것 0' }));
+    expect(screen.getByText('조건에 맞는 경기가 없어요')).toBeInTheDocument();
+  });
+
+  it('목록 보기는 구장 열 머리와 행마다 할 일 하나를 준다', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    await user.click(screen.getByRole('tab', { name: '목록' }));
+
+    expect(screen.getByRole('columnheader', { name: '구장' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '필드' })).not.toBeInTheDocument();
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(dayItems().length);
+    for (const row of rows) {
+      expect(within(row).getAllByRole('link')).toHaveLength(1);
     }
+    expect(within(screen.getByRole('row', { name: /홈8 vs 원정8/ })).getByRole('link')).toHaveTextContent('경기 콘솔 열기');
+    expect(within(screen.getByRole('row', { name: /홈1 vs 원정1/ })).getByText('2:1')).toBeInTheDocument();
+  });
+});
+
+describe('OperationsBoardClient — 날짜', () => {
+  it('하루짜리 대회에는 날짜 넘기기가 없다', async () => {
+    renderBoard();
+    await screen.findByRole('columnheader', { name: /구장 1/ });
+
+    expect(screen.queryByRole('button', { name: '다음 경기일' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이전 경기일' })).not.toBeInTheDocument();
+  });
+
+  it('오늘 경기가 없으면 가장 가까운 경기일을 열고, 날짜를 넘길 수 있다', async () => {
+    const items = [fx(1, 'fld1', kst('2026-12-19', '10:00')), fx(2, 'fld1', kst('2026-12-21', '10:00'))];
+    scenario.pages = [{ items, nextCursor: null }];
+    scenario.staff = [];
+    scenario.fixtures = items.map((item) => ({ id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null }));
+    const user = userEvent.setup();
+    renderBoard();
+
+    expect(await screen.findByRole('article', { name: '홈1 vs 원정1' })).toBeInTheDocument();
+    expect(screen.getAllByText(/12\. 19\.\(토\)/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '오늘' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator', { name: /지금/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이전 경기일' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: '다음 경기일' }));
+
+    expect(await screen.findByRole('article', { name: '홈2 vs 원정2' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: '홈1 vs 원정1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음 경기일' })).toBeDisabled();
+  });
+
+  it('오늘 경기가 있으면 오늘을 열고, 다른 날을 보다가 오늘로 돌아올 수 있다', async () => {
+    const items = [fx(1, 'fld1', kst('2026-12-19', '10:00')), fx(2, 'fld1', kst(D20, '10:00')), fx(3, 'fld1', kst('2026-12-21', '10:00'))];
+    scenario.pages = [{ items, nextCursor: null }];
+    scenario.staff = [];
+    scenario.fixtures = items.map((item) => ({ id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null }));
+    const user = userEvent.setup();
+    renderBoard();
+
+    expect(await screen.findByRole('article', { name: '홈2 vs 원정2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '오늘' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '이전 경기일' }));
+    expect(await screen.findByRole('article', { name: '홈1 vs 원정1' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '오늘' }));
+    expect(await screen.findByRole('article', { name: '홈2 vs 원정2' })).toBeInTheDocument();
+  });
+
+  it('KST 자정 앞뒤 경기는 서로 다른 날이다', async () => {
+    const items = [fx(1, 'fld1', '2026-12-20T14:30:00.000Z'), fx(2, 'fld1', '2026-12-20T15:30:00.000Z')];
+    scenario.pages = [{ items, nextCursor: null }];
+    scenario.staff = [];
+    scenario.fixtures = items.map((item) => ({ id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null }));
+    renderBoard();
+
+    expect(await screen.findByRole('article', { name: '홈1 vs 원정1' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: '홈2 vs 원정2' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음 경기일' })).toBeEnabled();
+  });
+
+  it('서버 페이지가 둘이어도 끝까지 읽어 한 보드에 그린다', async () => {
+    const first = [fx(1, 'fld1', kst(D20, '09:00'))];
+    const second = [fx(2, 'fld1', kst(D20, '10:00'))];
+    scenario.pages = [{ items: first, nextCursor: 'c1' }, { items: second, nextCursor: null }];
+    scenario.staff = [];
+    scenario.fixtures = [...first, ...second].map((item) => ({ id: item.fixtureId, homeTeamName: `홈${item.fixtureNumber}`, awayTeamName: `원정${item.fixtureNumber}`, homeSlotLabel: null, awaySlotLabel: null }));
+    renderBoard();
+
+    expect(await screen.findByRole('article', { name: '홈2 vs 원정2' })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '홈1 vs 원정1' })).toBeInTheDocument();
+    expect(operationRequests).toEqual(['first', 'c1']);
+  });
+});
+
+describe('OperationsBoardClient — 폰', () => {
+  it('구장 칩 하나가 열 하나이고, 끝난 경기는 한 줄로 접는다', async () => {
+    restoreViewport();
+    restoreViewport = installViewport(390);
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole('article', { name: '홈2 vs 원정2' });
+
+    const chips = within(screen.getByRole('group', { name: '구장 고르기' }));
+    expect(chips.getAllByRole('button').map((b) => b.textContent)).toEqual(['전체', '구장 1', '구장 2']);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '끝난 경기 2' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('article', { name: '홈1 vs 원정1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '홈7 vs 원정7' })).toBeInTheDocument();
+
+    await user.click(chips.getByRole('button', { name: '구장 2' }));
+
+    expect(screen.queryByRole('article', { name: '홈2 vs 원정2' })).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '홈8 vs 원정8' })).toBeInTheDocument();
+    expect(screen.getByText(/구장 2 · 구장 담당자 이서연 · 14:00까지 · 경기 4/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '끝난 경기 1' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('창 폭이 바뀌면 판과 목록이 바뀐다', async () => {
+    renderBoard();
+    await screen.findByRole('table', { name: '구장별 경기 시간표' });
+
+    resizeViewport(390);
+
+    await waitFor(() => expect(screen.queryByRole('table')).not.toBeInTheDocument());
+    expect(screen.getByRole('group', { name: '구장 고르기' })).toBeInTheDocument();
+  });
+});
+
+describe('OperationsBoardClient — 빈 상태·특수 응답', () => {
+  it('경기가 하나도 없으면 대진 전 안내를 보여 준다', async () => {
+    scenario.pages = [{ items: [], nextCursor: null }];
+    scenario.fixtures = [];
+    scenario.staff = [];
+    renderBoard();
+
+    expect(await screen.findByText('아직 대진이 없어요')).toBeInTheDocument();
+    expect(screen.getByText('대진을 만들면 여기에서 경기를 운영해요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다음 경기일' })).not.toBeInTheDocument();
+  });
+
+  it('리그 행(라운드·번호 없음)에서 null·undefined 가 화면에 찍히지 않는다', async () => {
+    const items = [
+      fx(1, 'fld1', kst(D20, '10:00'), { round: null, fixtureNumber: null, legNumber: null, groupName: null }),
+      fx(2, null, null, { round: null, fixtureNumber: null, legNumber: null, groupName: null }),
+    ];
+    scenario.pages = [{ items, nextCursor: null }];
+    scenario.kind = 'regular_league';
+    scenario.fixtures = [];
+    scenario.leagueFixtures = [{ teamMatchId: 'f1', title: '1주차 1경기' }, { teamMatchId: 'f2', title: '1주차 2경기' }];
+    scenario.staff = [];
+    const { container } = renderBoard();
+
+    expect(await screen.findByRole('article', { name: '1주차 1경기' })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: '1주차 2경기' })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/null|undefined/);
+    expect(screen.getByRole('link', { name: /참가자 화면 보기/ })).toHaveAttribute('href', '/league-matches/t-1');
+  });
+
+  it('체험(demo) 모양 응답(gameState·legNumber 만 있고 번호 일부가 비어도)에서 null·undefined 가 찍히지 않는다', async () => {
+    const demoLike = { ...fx(1, 'fld1', kst(D20, '10:00')), gameState: undefined, gameId: undefined, version: undefined } as unknown as V1TournamentOperationsBoardItem;
+    scenario.pages = [{ items: [demoLike], nextCursor: null }];
+    scenario.staff = [];
+    const { container } = renderBoard();
+
+    expect(await screen.findByRole('article', { name: '홈1 vs 원정1' })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/null|undefined/);
+  });
+
+  it('팀이 정해지지 않은 쪽은 자리 이름으로 보여 준다', async () => {
+    const items = [fx(1, 'fld1', kst(D20, '10:00'), { homeRegistrationId: null, awayRegistrationId: null })];
+    scenario.pages = [{ items, nextCursor: null }];
+    scenario.fixtures = [{ id: 'f1', homeTeamName: 'TBD', awayTeamName: null, homeSlotLabel: 'A조 1위', awaySlotLabel: null }];
+    scenario.staff = [];
+    renderBoard();
+
+    expect(await screen.findByRole('article', { name: 'A조 1위 vs 팀 미정' })).toBeInTheDocument();
   });
 });

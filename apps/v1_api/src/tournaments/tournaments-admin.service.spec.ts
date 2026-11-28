@@ -1902,6 +1902,56 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
+  it('update: genderCategory null clears a saved category and the four mixed bounds with it', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    let stored = tournamentRow({
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 6,
+      genderMinFemale: 2,
+      genderMaxFemale: 6,
+    });
+    prisma.v1Tournament.findFirst.mockImplementation(async () => ({ ...stored, _count: { registrations: 0 } }));
+    prisma.v1Tournament.updateMany.mockImplementation(async ({ data }) => { stored = { ...stored, ...data }; return { count: 1 }; });
+
+    const result = await service.update(ownerAuthUser, 'tournament-1', {
+      expectedVersion: TOURNAMENT_ROW_UPDATED_AT,
+      genderCategory: null,
+    });
+
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          genderCategory: null,
+          genderMinMale: null,
+          genderMaxMale: null,
+          genderMinFemale: null,
+          genderMaxFemale: null,
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      genderCategory: null,
+      genderMinMale: null,
+      genderMaxMale: null,
+      genderMinFemale: null,
+      genderMaxFemale: null,
+    });
+  });
+
+  it('update: omitting genderCategory keeps the saved category and its bounds', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    let stored = tournamentRow({ genderCategory: 'mixed', genderMinMale: 2, genderMaxMale: 6 });
+    prisma.v1Tournament.findFirst.mockImplementation(async () => ({ ...stored, _count: { registrations: 0 } }));
+    prisma.v1Tournament.updateMany.mockImplementation(async ({ data }) => { stored = { ...stored, ...data }; return { count: 1 }; });
+
+    const result = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '새 제목' });
+
+    expect(result).toMatchObject({ genderCategory: 'mixed', genderMinMale: 2, genderMaxMale: 6 });
+    const [{ data }] = prisma.v1Tournament.updateMany.mock.calls.at(-1) as [{ data: Record<string, unknown> }];
+    expect(data).not.toHaveProperty('genderCategory');
+  });
+
   it('create: rejects a gender maximum above the roster capacity', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
 

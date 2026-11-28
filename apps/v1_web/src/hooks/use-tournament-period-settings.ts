@@ -2,6 +2,7 @@
 
 import { useV1DataSource } from '@/components/providers/v1-data-source';
 
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Patch } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
@@ -114,6 +115,24 @@ export function useUpdateTournamentPeriodSettings(tournamentId: string) {
     // 버전 충돌 뒤 같은 낡은 버전으로 다시 보내지 않게 설정을 다시 읽는다.
     onError: () => queryClient.invalidateQueries({ queryKey: periodSettingsKey(tournamentId) }),
   });
+}
+
+/**
+ * 저장 직전에 설정을 다시 읽어 그 버전으로 보낸다. 버전은 대회 행의 수정 시각이라 같은 시트의 앞선 저장이나
+ * 다른 설정 변경만으로도 낡는다.
+ */
+export function usePatchPeriods(tournamentId: string) {
+  const { refetch } = useTournamentPeriodSettings(tournamentId, { enabled: false });
+  const { mutateAsync } = useUpdateTournamentPeriodSettings(tournamentId);
+
+  return useCallback(
+    async (change: Omit<UpdateTournamentPeriodSettingsPayload, 'expectedVersion'>): Promise<void> => {
+      const { data } = await refetch({ throwOnError: true });
+      if (!data?.expectedVersion) throw new Error('현재 설정 버전을 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+      await mutateAsync({ ...change, expectedVersion: data.expectedVersion });
+    },
+    [mutateAsync, refetch],
+  );
 }
 
 /** 대회 생성 마법사용 — 대회 id 가 생성 직후에야 생기므로 변수로 받는다. */

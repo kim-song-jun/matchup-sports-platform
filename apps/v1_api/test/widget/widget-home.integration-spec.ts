@@ -8,7 +8,10 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { ScheduleAttendanceService } from '../../src/team-schedules/attendance.service';
 import { resolveTeamLogoUrl } from '../../src/teams/team-logo-presets';
+import { ApnsPushService } from '../../src/notifications/apns-push.service';
+import { FcmPushService } from '../../src/notifications/fcm-push.service';
 import { WidgetHomeService } from '../../src/widget/widget-home.service';
+import { WidgetPushService } from '../../src/widget/widget-push.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 const DAY = 24 * 60 * 60 * 1_000;
@@ -43,6 +46,7 @@ describe('위젯 홈 HTTP/DB 계약', () => {
   const bearer = (token: string) => ({
     get: (url: string) => request(app.getHttpServer()).get(`/api/v1${url}`).set('Authorization', `Bearer ${token}`),
     put: (url: string) => request(app.getHttpServer()).put(`/api/v1${url}`).set('Authorization', `Bearer ${token}`),
+    delete: (url: string) => request(app.getHttpServer()).delete(`/api/v1${url}`).set('Authorization', `Bearer ${token}`),
   });
   const tokenOf = async (userId: string) => (await as(userId).post('/me/widget-token').expect(201)).body.data.token as string;
   const homeOf = async (token: string) => (await bearer(token).get('/widget/home').expect(200)).body.data;
@@ -359,6 +363,90 @@ describe('위젯 홈 HTTP/DB 계약', () => {
       expect(calls).toBe(2); // 첫 시도는 VERSION_CONFLICT, 재시도가 저장
     } finally {
       spy.mockRestore();
+    }
+  });
+  it('종료 시각(endedAt): 끝난 경기에만 공식 결과 확정 시각이, 진행 중 경기는 null', async () => {
+    const live = (await homeOf(await tokenOf(userB))).live as Array<{ gameId: string; endedAt: string | null }>;
+    expect(live.find((g) => g.gameId === games.live)!.endedAt).toBeNull();
+    const endedAt = new Date(live.find((g) => g.gameId === games.endedAway)!.endedAt!).getTime();
+    expect(Math.abs(Date.now() - 5 * MIN - endedAt)).toBeLessThan(2 * MIN); // 5분 전에 확정
+  });
+
+  it('실시간 카드 토큰: 내 팀 경기만 등록·같은 기기는 덮어쓰기, 취소는 토큰까지 같을 때만, 위젯 토큰을 폐기하면 함께 지워진다', async () => {
+    const token = await tokenOf(userB);
+    const hex = (n: string) => n.repeat(32);
+    await bearer(token).put('/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('a1') }).expect(200);
+    await bearer(token).put('/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('b2') }).expect(200); // 회전
+    expect(await db.v1WidgetLiveActivity.findMany({ where: { userId: userB, gameId: games.live } })).toEqual([expect.objectContaining({ pushToken: hex('b2') })]);
+
+    await bearer(token).delete('/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('a1') }).expect(200).expect((res) => expect(res.body.data.removed).toBe(0)); // 늦게 온 옛 취소
+    expect(await db.v1WidgetLiveActivity.count({ where: { userId: userB, gameId: games.live } })).toBe(1);
+
+    await bearer(await tokenOf(userC)).put('/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('c3') }).expect(404); // 팀 없는 사람
+    await bearer(token).put('/widget/live-activity-token').send({ gameId: games.live, pushToken: 'ZZ' }).expect(400);
+    await request(app.getHttpServer()).put('/api/v1/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('a1') }).expect(401);
+
+    await bearer(token).delete('/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('b2') }).expect(200).expect((res) => expect(res.body.data.removed).toBe(1));
+
+    await bearer(token).put('/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('d4') }).expect(200);
+    await bearer(token).delete('/widget/token').expect(200); // 로그아웃
+    expect(await db.v1WidgetLiveActivity.count({ where: { userId: userB } })).toBe(0);
+  });
+
+  it('푸시: 변한 경기만 보내고(같으면 다시 안 보냄), 끝난 카드는 종료+정리 시각으로 보내고 지우며, 죽은 토큰은 지운다. 안드로이드는 데이터 푸시', async () => {
+    const token = await tokenOf(userB);
+    const hex = (n: string) => n.repeat(32);
+    await bearer(token).put('/widget/live-activity-token').send({ gameId: games.live, pushToken: hex('e5') }).expect(200);
+    await bearer(token).put('/widget/live-activity-token').send({ gameId: games.justEnded, pushToken: hex('f6') }).expect(200);
+    await bearer(token).put('/widget/live-activity-token').send({ gameId: games.friendly, pushToken: hex('99') }).expect(200);
+    await db.v1PushDevice.create({ data: { userId: userB, installationId: `inst-${tag}`, platform: 'android', environment: 'alpha', token: `fcm-${tag}` } });
+
+    const apnsCalls: Array<{ token: string; event: string; dismissalDate?: number; state: Record<string, unknown> }> = [];
+    const apns = {
+      sendLiveActivity: jest.fn(async (pushToken: string, live: { event: string; dismissalDate?: number; contentState: Record<string, unknown> }) => {
+        apnsCalls.push({ token: pushToken, event: live.event, dismissalDate: live.dismissalDate, state: live.contentState });
+        return pushToken === hex('99') ? 'permanent' : 'delivered';
+      }),
+    } as unknown as ApnsPushService;
+    const fcmSends: unknown[] = [];
+    const fcm = { isConfigured: true, send: jest.fn(async (devices: unknown, payload: unknown) => { fcmSends.push({ devices, payload }); return { devices: 1, delivered: 1, failed: 0, disabled: false }; }) } as unknown as FcmPushService;
+    const logger = { error: jest.fn(), warn: jest.fn() };
+    const previousEnv = process.env.V1_PUSH_ENVIRONMENT;
+    process.env.V1_PUSH_ENVIRONMENT = 'alpha';
+    try {
+      const push = new WidgetPushService(db, app.get(WidgetHomeService), apns, fcm, logger as never);
+      await push.tick();
+      expect(logger.error).not.toHaveBeenCalled();
+
+      const byToken = new Map(apnsCalls.map((c) => [c.token, c]));
+      expect(byToken.get(hex('e5'))).toMatchObject({ event: 'update', state: { gameId: games.live, state: 'LIVE', score: { mine: 2, opponent: 1 }, endedAt: null } });
+      expect(byToken.get(hex('e5'))!.state).not.toHaveProperty('scorers');
+      const ended = byToken.get(hex('f6'))!;
+      expect(ended.event).toBe('end');
+      expect(ended.dismissalDate).toBe(Math.floor(((ended.state.endedAt as number) + 15 * MIN) / 1000)); // 종료 + 15분(초)
+      expect(await db.v1WidgetLiveActivity.count({ where: { gameId: games.justEnded, userId: userB } })).toBe(0); // 끝난 카드 정리
+      expect(await db.v1WidgetLiveActivity.count({ where: { gameId: games.friendly, userId: userB } })).toBe(0); // 죽은 토큰 정리
+      expect(await db.v1WidgetLiveActivity.count({ where: { gameId: games.live, userId: userB } })).toBe(1);
+      expect(fcmSends).toHaveLength(1);
+      expect(fcmSends[0]).toMatchObject({ payload: { dataOnly: { type: 'widget_refresh' } }, devices: [expect.objectContaining({ token: `fcm-${tag}` })] });
+
+      // 같은 상태면 다시 보내지 않는다.
+      apnsCalls.length = 0;
+      await push.tick();
+      expect(apnsCalls).toEqual([]);
+      expect(fcmSends).toHaveLength(1);
+
+      // 골이 하나 더 들어가면 그 경기만 다시 간다.
+      const liveSide = (await db.v1Game.findUniqueOrThrow({ where: { id: games.live }, include: { sides: true } })).sides.find((side) => side.sideKey === 'AWAY')!;
+      await goal(games.live, liveSide.id);
+      await push.tick();
+      expect(apnsCalls.map((c) => [c.token, (c.state.score as { mine: number }).mine])).toEqual([[hex('e5'), 3]]);
+      expect(fcmSends).toHaveLength(2);
+    } finally {
+      if (previousEnv === undefined) delete process.env.V1_PUSH_ENVIRONMENT;
+      else process.env.V1_PUSH_ENVIRONMENT = previousEnv;
+      await db.v1PushDevice.deleteMany({ where: { userId: userB } });
+      await db.v1WidgetLiveActivity.deleteMany({ where: { userId: userB } });
     }
   });
 });

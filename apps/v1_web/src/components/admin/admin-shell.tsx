@@ -228,6 +228,17 @@ function NavBadge({ count }: { count: number }) {
   );
 }
 
+/** 데스크톱 사이드바와 모바일 서랍이 같이 쓴다. 선택은 한쪽 색 띠가 아니라 옅은 배경으로 표시한다. */
+function sidebarLinkClass(active: boolean): string {
+  return [
+    'tm-admin-sidebar-link mx-2 flex min-h-[44px] items-center gap-3 rounded-lg px-2 py-3 text-sm transition-colors',
+    'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
+    active
+      ? 'bg-[var(--blue50)] text-[var(--blue700)] font-semibold'
+      : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
+  ].join(' ');
+}
+
 // ── Sidebar nav link (desktop) ────────────────────────────────────────────
 function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   const hasBadge = typeof item.badgeCount === 'number' && item.badgeCount > 0;
@@ -236,14 +247,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
       href={item.href}
       aria-current={active ? 'page' : undefined}
       aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
-      className={[
-        'tm-admin-sidebar-link',
-        'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
-        'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-        active
-          ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
-          : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
-      ].join(' ')}
+      className={sidebarLinkClass(active)}
     >
       <span
         className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}
@@ -424,14 +428,7 @@ function Drawer({
                     aria-current={active ? 'page' : undefined}
                     aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
                     onClick={overlayLinkClick(item.href, pathname, onClose)}
-                    className={[
-                      'tm-admin-sidebar-link',
-                      'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
-                      'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                      active
-                        ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
-                        : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
-                    ].join(' ')}
+                    className={sidebarLinkClass(active)}
                   >
                     <span
                       className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}
@@ -590,7 +587,8 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
       </div>
 
       {/* ── Right column: appbar + main ───────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px]">
+      {/* --admin-sticky-top 은 아래 모바일 앱바(h-[52px]) 높이, --admin-gutter 는 main 의 좌우 패딩이다. */}
+      <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px] [--admin-sticky-top:52px]">
         {/* Mobile sticky appbar (<lg) */}
         <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
           <button
@@ -618,7 +616,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
         </header>
 
         {/* Page content */}
-        <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8">
+        <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8 [--admin-gutter:1rem] md:[--admin-gutter:1.5rem]">
           <div className={`${wide ? 'max-w-none' : 'max-w-[1200px] xl:max-w-[1320px]'} mx-auto w-full`}>{children}</div>
         </main>
       </div>

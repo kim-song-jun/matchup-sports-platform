@@ -1,5 +1,6 @@
 import type { V1Tournament } from '@/types/api';
 import { isBracketPublished } from '@/lib/bracket-visibility';
+import { infoNeedHref, tournamentInfoNeeds, type InfoNeedKey, type InfoNeedTier } from './info-sections';
 
 /**
  * 대회 '개요' 섹션의 판정 로직 — 화면과 분리해 둔다. 여기 규칙이 곧 운영자가 보는
@@ -16,14 +17,6 @@ export interface TournamentNextMilestone {
   daysLeft: number | null;
   /** 마감이 이미 지났는데 상태가 따라오지 않은 경우 — 운영자 개입이 필요하다. */
   overdue: boolean;
-}
-
-export interface TournamentOverviewCheck {
-  id: string;
-  label: string;
-  hint: string;
-  /** 고칠 수 있는 화면. 셸 안에서 이동할 섹션 slug. */
-  section?: 'info' | 'bracket' | 'announcements' | 'registrations';
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -131,98 +124,90 @@ export function resolveNextMilestone(tournament: V1Tournament, now: Date): Tourn
   };
 }
 
-function hasPrizeInfo(tournament: V1Tournament) {
-  return Boolean(
-    (tournament.prizePool ?? 0) > 0 ||
-      tournament.prizeSummary?.trim() ||
-      tournament.prizeBreakdown?.trim(),
-  );
+export interface TournamentSetupItem {
+  key: InfoNeedKey | 'bracket' | 'announcements';
+  tier: InfoNeedTier;
+  label: string;
+  detail: string;
+  /** info 항목은 `?edit=` 딥링크, 그 밖은 탭 경로. */
+  href: string;
+  /** 「필요」 첫 항목의 주 버튼 글자이자 그 밖 항목의 이동 글자. */
+  actionLabel: string;
 }
 
+const SETUP_ACTION_LABEL: Record<TournamentSetupItem['key'], string> = {
+  venue: '장소 정하기',
+  'roster-deadline': '마감 정하기',
+  'registration-deadline': '마감 정하기',
+  'bank-account': '계좌 입력하기',
+  'scheduled-at': '일정 정하기',
+  entry: '대회 정보',
+  rules: '대회 정보',
+  'public-screen': '대회 정보',
+  'stage-plan': '대진',
+  bracket: '대진',
+  announcements: '공지',
+};
+
+const TIER_ORDER: Record<InfoNeedTier, number> = { required: 0, review: 1, optional: 2 };
+
 /**
- * 아직 안 된 것만 돌려준다 — 빈 배열이면 지금 손볼 게 없다는 뜻이다.
- * 끝난 대회(완료·취소)는 고칠 수 있는 게 없으므로 아무것도 내지 않는다.
+ * 개요의 「채워야 할 설정」. 판정·문구·단계는 `tournamentInfoNeeds` 가 정하고, 여기서는 다른 탭에서
+ * 고치는 대진·공지 두 항목만 덧붙인다. 필요 → 기본값 확인 → 선택 순이며 끝난 대회는 비어 있다.
  */
-export function buildTournamentChecklist(
+export function buildTournamentSetupItems(
   tournament: V1Tournament,
   now: Date,
-): TournamentOverviewCheck[] {
+  basePath: string,
+): TournamentSetupItem[] {
   if (tournament.status === 'completed' || tournament.status === 'cancelled') return [];
 
-  const checks: TournamentOverviewCheck[] = [];
+  const items: TournamentSetupItem[] = tournamentInfoNeeds(tournament, basePath).map((need) => ({
+    key: need.key,
+    tier: need.tier,
+    label: need.label,
+    detail: need.detail,
+    href: infoNeedHref(need, tournament.id, basePath),
+    actionLabel: SETUP_ACTION_LABEL[need.key],
+  }));
+
   const fixtures = tournament.operationCounts?.fixtures ?? 0;
   const announcements = tournament.operationCounts?.announcements ?? 0;
 
-  if (!tournament.registrationDeadlineAt) {
-    checks.push({
-      id: 'registration-deadline',
-      label: '접수 마감 시각이 없어요',
-      hint: '마감이 없으면 신청이 언제까지 열려 있는지 참가자가 알 수 없어요.',
-      section: 'info',
-    });
-  }
-  if (!tournament.rosterDeadlineAt) {
-    checks.push({
-      id: 'roster-deadline',
-      label: '명단 마감 시각이 없어요',
-      hint: '명단 마감이 없으면 경기 직전까지 선수단이 바뀔 수 있어요.',
-      section: 'info',
-    });
-  }
-  if (tournament.entryFee > 0 && !tournament.bankAccount?.trim()) {
-    checks.push({
-      id: 'bank-account',
-      label: '참가비를 받는데 입금 계좌가 없어요',
-      hint: '입금 안내가 비어 있으면 신청 팀이 참가비를 보낼 곳을 알 수 없어요.',
-      section: 'info',
-    });
-  }
-  if (!tournament.scheduledAt) {
-    checks.push({
-      id: 'scheduled-at',
-      label: '경기 일정이 없어요',
-      hint: '대회 날짜가 없으면 목록·상세 어디에도 일정이 표시되지 않아요.',
-      section: 'info',
-    });
-  }
   if (fixtures === 0) {
-    checks.push({
-      id: 'no-fixtures',
-      label: '경기가 아직 없어요',
-      hint: '대진 관리에서 조를 만들고 경기를 편성해요.',
-      section: 'bracket',
+    items.push({
+      key: 'bracket',
+      tier: 'optional',
+      label: '대진',
+      detail: '대진 관리에서 조를 만들고 경기를 편성해요.',
+      href: `${basePath}/bracket`,
+      actionLabel: SETUP_ACTION_LABEL.bracket,
     });
   } else if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt, now)) {
-    checks.push({
-      id: 'bracket-unpublished',
-      label: '대진표가 아직 공개되지 않았어요',
-      hint: '공개 전에는 참가자에게 조·경기가 보이지 않아요.',
-      section: 'bracket',
-    });
-  }
-  if (!tournament.coverImageUrl) {
-    checks.push({
-      id: 'cover-image',
-      label: '커버 이미지가 없어요',
-      hint: '목록과 상세 상단이 비어 보여요.',
-      section: 'info',
-    });
-  }
-  if (!hasPrizeInfo(tournament)) {
-    checks.push({
-      id: 'prize',
-      label: '상금·시상 정보가 없어요',
-      hint: '참가 결정에 큰 영향을 주는 정보예요.',
-      section: 'info',
+    items.push({
+      key: 'bracket',
+      tier: 'optional',
+      label: '대진표 공개',
+      detail: '공개 전에는 참가자에게 조와 경기가 보이지 않아요.',
+      href: `${basePath}/bracket`,
+      actionLabel: SETUP_ACTION_LABEL.bracket,
     });
   }
   if (announcements === 0) {
-    checks.push({
-      id: 'no-announcements',
-      label: '공지가 아직 없어요',
-      hint: '집합 시간·준비물 같은 안내를 공지로 남겨요.',
-      section: 'announcements',
+    items.push({
+      key: 'announcements',
+      tier: 'optional',
+      label: '공지',
+      detail: '집합 시간·준비물 같은 안내를 공지로 남겨요.',
+      href: `${basePath}/announcements`,
+      actionLabel: SETUP_ACTION_LABEL.announcements,
     });
   }
-  return checks;
+
+  // Array.prototype.sort 는 안정 정렬이라 같은 단계 안의 선언 순서가 유지된다.
+  return items.sort((left, right) => TIER_ORDER[left.tier] - TIER_ORDER[right.tier]);
+}
+
+export function requiredSetupLabels(items: readonly TournamentSetupItem[]): string[] {
+  return items.filter((item) => item.tier === 'required').map((item) => item.label);
 }

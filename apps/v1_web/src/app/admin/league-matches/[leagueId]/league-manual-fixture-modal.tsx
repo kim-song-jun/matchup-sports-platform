@@ -258,7 +258,7 @@ export function LeagueManualFixtureModal({
               />
               {durationInput === null && defaultDuration !== null ? (
                 <p id={`${id}-duration-hint`} className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-                  이 리그의 피리어드 설정({defaultDuration.label})에서 가져왔어요. 일정의 종료 시각에만 쓰여요.
+                  이 리그의 경기 시간({defaultDuration.label})에서 가져왔어요. 일정의 종료 시각에만 쓰여요.
                 </p>
               ) : null}
             </div>

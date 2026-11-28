@@ -48,7 +48,7 @@ function candidateLabel(candidate: V1TournamentStaffCandidate): string {
 
 /**
  * 입력값이 왜 막혔는지 말해 준다(해요체). 종전에는 제출 버튼이 조용히 잠겨 있을 뿐이라
- * 운영자가 "왜 안 눌리는지" 알 방법이 없었다 — 특히 담당 필드 미선택이 그랬다.
+ * 운영자가 "왜 안 눌리는지" 알 방법이 없었다 — 특히 담당 구장 미선택이 그랬다.
  */
 function validationMessage(
   selected: V1TournamentStaffCandidate | null,
@@ -61,8 +61,8 @@ function validationMessage(
   }
   if (role === 'FIELD_OPERATOR' && fieldId === '') {
     return fieldCount === 0
-      ? '등록된 경기장이 없어 필드 담당자를 배정할 수 없어요. 위쪽 “경기장(필드)”에서 먼저 등록해 주세요.'
-      : '필드 담당자는 담당 경기장을 골라야 해요.';
+      ? '등록된 구장이 없어 구장 담당자를 배정할 수 없어요. 위쪽 “구장”에서 먼저 등록해 주세요.'
+      : '구장 담당자는 담당 구장을 골라야 해요.';
   }
   return null;
 }
@@ -249,7 +249,7 @@ export function GrantStaffModal({
         <form onSubmit={handleSubmit} noValidate className="flex flex-col min-h-0">
           <div className="px-5 py-5 flex flex-col gap-4 overflow-y-auto">
             {/* 예전에는 이 자리가 사용자 UUID 직접 입력이었고 안내는 "어드민 > 사용자
-                관리에서 ID를 복사해 오라"였다 — 어드민이 아닌 대회 디렉터는 그 화면에
+                관리에서 ID를 복사해 오라"였다 — 어드민이 아닌 대회 운영자는 그 화면에
                 들어갈 수 없으므로 사실상 배정할 방법이 없었다(2026-08-13 사용자 제보).
                 닉네임으로 찾아 고르는 방식으로 바꾼다. */}
             <div className="flex flex-col gap-2">
@@ -388,7 +388,7 @@ export function GrantStaffModal({
             {requiresField && (
               <div className="flex flex-col gap-2">
                 <label htmlFor="grant-staff-field" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
-                  담당 필드 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
+                  담당 구장 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                   <span className="sr-only">(필수)</span>
                 </label>
                 <select
@@ -400,19 +400,18 @@ export function GrantStaffModal({
                   aria-describedby="grant-staff-field-help"
                   className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
                 >
-                  <option value="">{fields.length === 0 ? '등록된 경기장이 없어요' : '필드를 선택해주세요'}</option>
+                  <option value="">{fields.length === 0 ? '등록된 구장이 없어요' : '구장을 선택해 주세요'}</option>
                   {fields.map((field) => (
                     <option key={field.id} value={field.id}>
                       {field.name}
                     </option>
                   ))}
                 </select>
-                {/* 등록된 필드가 하나도 없으면 이 select 는 영영 비어 있고 제출 버튼도 계속 잠긴다.
-                    잠긴 이유와 다음 행동을 적지 않으면 운영자는 "필드"가 뭔지도 모른 채 막힌다(#373). */}
+                {/* 등록된 구장이 없으면 select 가 비고 제출이 잠기므로 다음 행동을 같이 적는다. */}
                 <p id="grant-staff-field-help" className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                   {fields.length === 0
-                    ? '필드는 경기가 열리는 코트·구장이에요. 스태프 화면 위쪽 “경기장(필드)”에서 먼저 등록해 주세요.'
-                    : '이 담당자가 맡을 코트·구장이에요. 배정하면 그 경기장의 경기만 담당해요.'}
+                    ? '구장은 경기가 열리는 곳이에요. 스태프·구장 화면 위쪽 “구장”에서 먼저 등록해 주세요.'
+                    : '이 담당자가 맡을 구장이에요. 배정하면 그 구장의 경기만 담당해요.'}
                 </p>
               </div>
             )}

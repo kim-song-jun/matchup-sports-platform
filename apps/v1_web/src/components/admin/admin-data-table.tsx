@@ -69,9 +69,8 @@ interface AdminDataTableProps<T> {
    */
   stickyActions?: boolean;
   /**
-   * #9: Per-row visual tone for dangerous/warning states (suspended, blocked, cancelled…).
-   * danger → var(--red50)/40 + left red accent bar.
-   * warning → var(--tint-orange) + left amber accent bar.
+   * 위험/경고 상태(정지·차단·취소…) 행의 배경 틴트 — danger 는 연한 빨강, warning 은 연한 주황.
+   * 상태 자체는 틴트가 아니라 열의 글자가 말해야 한다(색만으로 전달하지 않는다).
    */
   rowTone?: (row: T) => 'danger' | 'warning' | undefined;
   /**
@@ -96,14 +95,9 @@ function alignClass(align: AdminTableColumn<unknown>['align']): string {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
-// #9: row tone → Tailwind class maps
 const ROW_TONE_TR: Record<'danger' | 'warning', string> = {
   danger: 'bg-[var(--red50)]/40',
   warning: 'bg-[var(--tint-orange)]',
-};
-const ROW_TONE_ACCENT: Record<'danger' | 'warning', string> = {
-  danger: 'border-l-2 border-l-red-400',
-  warning: 'border-l-2 border-l-[var(--orange500)]',
 };
 
 export function AdminDataTable<T>({
@@ -243,14 +237,12 @@ export function AdminDataTable<T>({
                   tone ? 'tm-on-tint ' + ROW_TONE_TR[tone] : '',
                 ].filter(Boolean).join(' ')}
               >
-                {columns.map((col, colIdx) => (
+                {columns.map((col) => (
                   <td
                     key={col.key}
                     className={[
                       cellPad,
                       'tabular-nums align-middle',
-                      // rowTone 좌측 accent: 테이블에서 <tr> border-l은 border model상 미렌더될 수 있어 첫 셀(td)에 적용 (Copilot)
-                      colIdx === 0 && tone ? ROW_TONE_ACCENT[tone] : '',
                       alignClass(col.align),
                       col.width ?? '',
                       col.className ?? '',
@@ -338,7 +330,6 @@ export function AdminDataTable<T>({
                   ? 'cursor-pointer transition-colors hover:bg-[var(--surface-soft)]/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
                   : '',
                 tone ? 'tm-on-tint ' + ROW_TONE_TR[tone] : '',
-                tone ? ROW_TONE_ACCENT[tone] : '',
               ].filter(Boolean).join(' ')}
             >
               <dl className="flex flex-col gap-2">

@@ -112,9 +112,9 @@ const AWAY_PARTICIPANT_ID = '22222222-2222-4c3a-9c1e-2222701eb3';
 function baseProps() {
   return {
     open: true,
-    title: '결과를 정정할까요?',
+    title: '결과를 고칠까요?',
     message: '메시지',
-    confirmLabel: '정정 제출',
+    confirmLabel: '고친 결과로 확정',
     base: {
       score: SCORE,
       goalEvents: goalsMatching(SCORE),
@@ -141,12 +141,12 @@ describe('card timeline correction', () => {
     expect(screen.getAllByText('시간 미입력')).toHaveLength(2);
     expect(screen.getByLabelText('1번째 카드 시간(분)')).toHaveValue(null);
     fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '12' } });
-    fireEvent.change(screen.getByLabelText('1번째 카드 피리어드'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('1번째 카드 전·후반'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('1번째 카드 종류'), { target: { value: 'RED' } });
     fireEvent.change(screen.getByLabelText('1번째 카드 선수'), { target: { value: AWAY_PARTICIPANT_ID } });
     fireEvent.click(screen.getByRole('button', { name: '2번째 카드 삭제' }));
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '카드 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
     const submitted = props.onConfirm.mock.calls[0][0].actualParticipants;
     expect(submitted[0].cards).toEqual({ yellow: 0, red: 0, events: [] });
     expect(submitted[1].cards).toMatchObject({ yellow: 0, red: 1,
@@ -158,7 +158,7 @@ describe('card timeline correction', () => {
     fireEvent.click(screen.getByRole('button', { name: '카드 추가' }));
     fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '0' } });
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '누락 카드 추가' } });
-    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
     expect(props.onConfirm.mock.calls[0][0].actualParticipants[0].cards).toMatchObject({
       yellow: 1, red: 0, events: [{ minute: 0, card: 'YELLOW' }],
     });
@@ -260,7 +260,7 @@ describe('ResultEditModal — 출전자 빼기·추가(어드민이 누가 뛰�
     expect(options).toEqual(['선수 선택', '원정 · #7 강아라']);
 
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '출전 명단 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
     const submitted = onConfirm.mock.calls[0][0].actualParticipants as Array<{ participantId: string; goals: number; started: boolean }>;
     expect(submitted.map((participant) => participant.participantId)).toEqual([HOME_PARTICIPANT_ID, THIRD_ID]);
     expect(submitted[1]).toMatchObject({ goals: 0, started: true, cards: { yellow: 0, red: 0 } });
@@ -922,7 +922,7 @@ describe('ResultEditModal — 숫자 입력은 정수로 정규화된다', () =>
   });
 });
 
-describe('ResultEditModal — 단판 경기의 득점 피리어드', () => {
+describe('ResultEditModal — 단판 경기의 득점 전·후반', () => {
   const renderWith = (periodCount: number | null | undefined, onConfirm = vi.fn()) => {
     const props = baseProps();
     render(
@@ -938,12 +938,12 @@ describe('ResultEditModal — 단판 경기의 득점 피리어드', () => {
     return { onConfirm, confirmLabel: props.confirmLabel };
   };
 
-  it('단판이면 피리어드 칸이 없고, 새 골은 첫 피리어드로 제출된다', () => {
+  it('단판이면 전·후반 칸이 없고, 새 골은 첫 구간으로 제출된다', () => {
     const { onConfirm, confirmLabel } = renderWith(1);
-    expect(screen.queryByLabelText('1번째 득점 피리어드')).toBeNull();
+    expect(screen.queryByLabelText('1번째 득점 전·후반')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
-    expect(screen.queryByLabelText('2번째 득점 피리어드')).toBeNull();
+    expect(screen.queryByLabelText('2번째 득점 전·후반')).toBeNull();
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '단판 득점 추가' } });
     fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
 
@@ -953,9 +953,9 @@ describe('ResultEditModal — 단판 경기의 득점 피리어드', () => {
     ]);
   });
 
-  it.each([[2], [null], [undefined]])('periodCount=%s 이면 피리어드 칸이 그대로 있다', (periodCount) => {
+  it.each([[2], [null], [undefined]])('periodCount=%s 이면 전·후반 칸이 그대로 있다', (periodCount) => {
     renderWith(periodCount);
-    expect(screen.getByLabelText('1번째 득점 피리어드')).toBeInTheDocument();
+    expect(screen.getByLabelText('1번째 득점 전·후반')).toBeInTheDocument();
   });
 });
 
@@ -968,11 +968,11 @@ describe('ResultEditModal — 공식 득점 타임라인 편집', () => {
         ],
       },
       ({ confirmLabel }) => {
-        const period = screen.getByLabelText('1번째 득점 피리어드');
+        const period = screen.getByLabelText('1번째 득점 전·후반');
         expect(screen.getByRole('option', { name: '전반' })).toBeInTheDocument();
         expect(screen.getByRole('option', { name: '후반' })).toBeInTheDocument();
         fireEvent.change(period, { target: { value: '1' } });
-        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '득점 피리어드 정정' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '득점 전·후반 정정' } });
         fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
       },
     );

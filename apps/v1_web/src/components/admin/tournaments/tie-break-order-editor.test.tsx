@@ -63,8 +63,8 @@ describe('TieBreakOrderEditor', () => {
 
   it('제목을 숨겨도 접근 가능한 이름은 남는다', () => {
     render(<TieBreakOrderEditor order={DEFAULT_TOURNAMENT_TIE_BREAK_ORDER} onChange={() => {}} showHeading={false} />);
-    expect(screen.queryByRole('heading', { name: '동점일 때 순서' })).toBeNull();
-    expect(screen.getByRole('region', { name: '동점일 때 순서' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '순위 정하는 순서' })).toBeNull();
+    expect(screen.getByRole('region', { name: '순위 정하는 순서' })).toBeInTheDocument();
   });
 
   it('저장 중(disabled)에도 버튼이 모두 꺼진다', () => {

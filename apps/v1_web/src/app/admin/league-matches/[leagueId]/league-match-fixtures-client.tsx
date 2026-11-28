@@ -1881,7 +1881,7 @@ function FixtureTimingFields({
         />
         <p id={`${idPrefix}-game-duration-hint`} className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           {prefilledHint !== null
-            ? `이 리그의 피리어드 설정(${prefilledHint})에서 가져왔어요. 바꾸면 이번 대진에만 적용돼요.`
+            ? `이 리그의 경기 시간(${prefilledHint})에서 가져왔어요. 바꾸면 이번 대진에만 적용돼요.`
             : '비우면 경기 설정 시간(전·후반 합계, 단판이면 그 길이)으로 채워요.'}
         </p>
       </div>

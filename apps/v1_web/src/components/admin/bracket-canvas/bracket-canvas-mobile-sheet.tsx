@@ -2,10 +2,11 @@
 
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { useState, type ReactNode } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Trash2 } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
 import { StatusChip } from '@/components/v1-ui/status-chip';
-import { useV1AssignFixtureField, useV1UpdateFixture } from '@/hooks/use-v1-api';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useV1AssignFixtureField, useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
@@ -24,6 +25,8 @@ import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } f
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
 import { ByeSlotEditor } from './bye-slot-editor';
+import { fixtureDeleteConfirm } from './fixture-delete-confirm';
+import { fixtureTitle } from './bracket-canvas';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 import { ByeSideControl } from './bye-side-control';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -127,16 +130,16 @@ function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone
     );
   }
 
-  // 라이브로 득점이 기록된 경기는 그림에서 점수만 고치면 기록과 어긋난다 — 기존 정정 화면으로 보낸다.
+  // 라이브로 득점이 기록된 경기는 그림에서 점수만 고치면 기록과 어긋난다 — 기존 결과 고치기 화면으로 보낸다.
   if (node.state === 'official' && node.game.hasLiveRecords) {
     return (
       <div className="flex flex-col gap-2">
-        <Note>득점 기록이 있는 경기는 결과 정정 화면에서 고쳐요.</Note>
+        <Note>득점 기록이 있는 경기는 결과 고치기 화면에서 고쳐요.</Note>
         <Link
           href={`/admin/live/${encodeURIComponent(competitionId)}/records/corrections?fixtureId=${encodeURIComponent(node.fixtureId)}`}
           className="tm-btn tm-btn-md tm-btn-outline min-h-[44px]"
         >
-          결과 정정 화면으로 가기
+          결과 고치기 화면으로 가기
         </Link>
       </div>
     );
@@ -350,22 +353,45 @@ function isNodeLocked(node: MobileNode): boolean {
   return node.state === 'cancelled' || (game !== null && (game.state !== 'SCHEDULED' || game.latestRevision !== null));
 }
 
+/** 시트 머리의 휴지통 — 데스크톱 칸 패널과 같은 확인 창을 거쳐 경기를 지운다. 단계 관리 경기는 단계 구성이 맡는다. */
+function MobileDeleteButton({ fixture, groups, fixtures, competitionId, showToast, onDone }: {
+  fixture: V1AdminBracketFixture; groups: readonly V1AdminBracketGroup[]; fixtures: readonly V1AdminBracketFixture[];
+  competitionId: string; showToast: MobileNodeSheetBodyProps['showToast']; onDone: () => void;
+}) {
+  const deleteFixture = useV1DeleteFixture(competitionId);
+  const { confirm, ConfirmModal } = useConfirm();
+  const remove = async () => {
+    if (!await confirm(fixtureDeleteConfirm({ title: fixtureTitle(fixture, groups), fixture, fixtures }))) return;
+    deleteFixture.mutate(fixture.id, {
+      onSuccess: () => { showToast('경기를 삭제했어요.'); onDone(); },
+      onError: (error) => showToast(describeBracketCanvasError(error, '경기를 삭제하지 못했어요.'), 'error'),
+    });
+  };
+  return <>
+    <button type="button" aria-label="경기 삭제" onClick={() => void remove()} disabled={deleteFixture.isPending}
+      className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-[var(--red700)] transition-colors hover:bg-[var(--surface-soft)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
+      <Trash2 size={18} aria-hidden="true" />
+    </button>
+    {ConfirmModal}
+  </>;
+}
+
 function MobileFieldSetting({ node, competitionId, showToast }: MobileNodeSheetBodyProps) {
   const assign = useV1AssignFixtureField(competitionId);
   const [fieldId, setFieldId] = useState(node.fieldId ?? '');
   const [error, setError] = useState<string | null>(null);
   const pending = assign.isPending;
-  return <section className="flex flex-col gap-3" aria-label="경기장 설정">
+  return <section className="flex flex-col gap-3" aria-label="구장 설정">
     <CompetitionFieldPicker tournamentId={competitionId} value={fieldId} onChange={setFieldId} disabled={pending}
-      allowNew={false} emptyLabel="등록된 경기장을 선택해 주세요" />
+      allowNew={false} emptyLabel="등록된 구장을 선택해 주세요" />
     {error ? <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>{error}</p> : null}
     <button type="button" className="tm-btn tm-btn-md tm-btn-outline" disabled={pending || !fieldId || fieldId === (node.fieldId ?? '')}
       onClick={() => {
         setError(null);
-        const options = { onSuccess: () => showToast('경기장을 저장했어요.'),
-          onError: (err: unknown) => setError(extractErrorMessage(err, '경기장을 저장하지 못했어요.')) };
+        const options = { onSuccess: () => showToast('구장을 저장했어요.'),
+          onError: (err: unknown) => setError(extractErrorMessage(err, '구장을 저장하지 못했어요.')) };
         if (fieldId) assign.mutate({ fixtureId: node.fixtureId, fieldId }, options);
-      }}>{pending ? '저장 중…' : '경기장 저장'}</button>
+      }}>{pending ? '저장 중…' : '구장 저장'}</button>
   </section>;
 }
 
@@ -391,7 +417,7 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
     const side = view.side === 'HOME' ? node.home : node.away;
     const kind = pickKind(side);
     const common = {
-      sideLabel: view.side === 'HOME' ? '홈' : '어웨이',
+      sideLabel: view.side === 'HOME' ? '홈' : '원정',
       competitionId: props.competitionId,
       registrationsState: props.registrationsState,
       showToast: props.showToast,
@@ -407,25 +433,30 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
   }
 
   const hasRankSlot = editable && [node.home, node.away].some((side) => side.slotKind === 'GROUP_RANK');
+  const fixture = scope === 'tournament' ? props.fixtures?.find((candidate) => candidate.id === node.fixtureId) : undefined;
+  const deletable = canWrite && fixture !== undefined && !groups.some((group) => group.id === fixture.groupId && group.bracketTrack?.startsWith('stage:'));
 
   return (
     <div className="flex flex-col gap-4 pb-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusChip chip={bracketNodeStateChip(node.state)} />
-        {node.scoreText ? (
-          <span className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">{node.scoreText}</span>
-        ) : null}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusChip chip={bracketNodeStateChip(node.state)} />
+          {node.scoreText ? (
+            <span className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">{node.scoreText}</span>
+          ) : null}
+        </div>
+        {deletable ? <MobileDeleteButton fixture={fixture} groups={groups} fixtures={props.fixtures ?? []} competitionId={props.competitionId} showToast={props.showToast} onDone={props.onDone} /> : null}
       </div>
       <ul role="list" aria-label="참가팀" className="flex flex-col gap-2">
         <SideRow label="홈" side={node.home} canPick={pickKind(node.home) !== null} onPick={() => onViewChange({ kind: 'pick', side: 'HOME' })} />
-        <SideRow label="어웨이" side={node.away} canPick={pickKind(node.away) !== null} onPick={() => onViewChange({ kind: 'pick', side: 'AWAY' })} />
+        <SideRow label="원정" side={node.away} canPick={pickKind(node.away) !== null} onPick={() => onViewChange({ kind: 'pick', side: 'AWAY' })} />
       </ul>
-      {hasRankSlot ? <Note>조 순위가 정해지면 큰 화면에서 순위대로 채워요.</Note> : null}
+      {hasRankSlot ? <Note>조 순위가 정해지면 「팀 채우기」 메뉴에서 순위대로 채워요.</Note> : null}
       {scope === 'tournament' && props.fixtures?.find((fixture) => fixture.id === node.fixtureId) ? (
         <ByeSideControl tournamentId={props.competitionId} fixture={props.fixtures.find((fixture) => fixture.id === node.fixtureId)!}
           slots={props.slots} canWrite={canWrite} showToast={props.showToast} onSaved={props.onDone} />
       ) : null}
-      {scope === 'tournament' && props.fixtures?.find(f => f.id === node.fixtureId) ? <FixtureMetadataEditor key={node.fixtureId} tournamentId={props.competitionId} fixture={props.fixtures.find(f => f.id === node.fixtureId)!} groups={groups} fixtures={props.fixtures} slots={props.slots} canWrite={canWrite} /> : canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
+      {scope === 'tournament' && props.fixtures?.find(f => f.id === node.fixtureId) ? <FixtureMetadataEditor key={node.fixtureId} tournamentId={props.competitionId} fixture={props.fixtures.find(f => f.id === node.fixtureId)!} groups={groups} fixtures={props.fixtures} slots={props.slots} canWrite={canWrite} showToast={props.showToast} /> : canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
       <ResultSection {...props} />
     </div>
   );

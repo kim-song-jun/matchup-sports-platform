@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { isUsableAccessTokenSecret, issueAccessToken, parseAccessToken } from '../calendar-feed/access-token';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
@@ -12,6 +12,8 @@ import { NEXT_GAME_STARTED_GRACE_MS } from '../team-lineups/team-upcoming-games.
 const MAX_ACTIVE_WIDGET_TOKENS = 10;
 export const WIDGET_DEFAULT_LIMIT = 3;
 export const WIDGET_MAX_LIMIT = 10;
+/** 기기 하나가 동시에 등록해 둘 수 있는 실시간 카드 수(진행 중 경기는 많아야 한두 개라 넉넉하다). */
+const MAX_LIVE_ACTIVITIES_PER_TOKEN = 5;
 
 export interface WidgetGame {
   gameId: string;
@@ -75,13 +77,48 @@ export class WidgetService {
       where: { userId: user.id, kind: 'widget', revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    await this.prisma.v1WidgetLiveActivity.deleteMany({ where: { userId: user.id } });
     return { revoked: count };
   }
 
   /** 앱에서 로그아웃할 때 그 기기의 위젯 토큰을 폐기한다. */
   async revoke(tokenId: string): Promise<{ revoked: true }> {
     await this.prisma.v1AccessToken.updateMany({ where: { id: tokenId, revokedAt: null }, data: { revokedAt: new Date() } });
+    await this.prisma.v1WidgetLiveActivity.deleteMany({ where: { tokenId } });
     return { revoked: true };
+  }
+
+  // ── 실시간 카드(Live Activity) 푸시 토큰 ────────────────────────────────────
+
+  /**
+   * 카드가 받은 푸시 토큰을 등록한다. 기기(위젯 토큰)·경기마다 한 줄이라 토큰이 바뀌면(회전) 같은 줄을 덮어쓴다.
+   * 내 팀 경기가 아니면 있는지도 알려 주지 않는다(404).
+   */
+  async registerLiveActivity(userId: string, tokenId: string, gameId: string, pushToken: string): Promise<{ registered: true }> {
+    const memberships = await this.prisma.v1TeamMembership.findMany({ where: { userId, status: 'active' }, select: { teamId: true } });
+    const game = await this.prisma.v1Game.findFirst({
+      where: { id: gameId, sides: { some: { teamId: { in: memberships.map((m) => m.teamId) } } } },
+      select: { id: true },
+    });
+    if (game === null) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: '경기를 찾을 수 없어요.' });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1WidgetLiveActivity.upsert({
+        where: { tokenId_gameId: { tokenId, gameId } },
+        create: { tokenId, userId, gameId, pushToken },
+        update: { pushToken },
+      });
+      const rows = await tx.v1WidgetLiveActivity.findMany({ where: { tokenId }, orderBy: { updatedAt: 'desc' }, select: { id: true } });
+      if (rows.length > MAX_LIVE_ACTIVITIES_PER_TOKEN) {
+        await tx.v1WidgetLiveActivity.deleteMany({ where: { id: { in: rows.slice(MAX_LIVE_ACTIVITIES_PER_TOKEN).map((row) => row.id) } } });
+      }
+    });
+    return { registered: true };
+  }
+
+  /** 카드가 닫혔다. 토큰까지 같을 때만 지운다 — 늦게 도착한 옛 취소가 새로 받은 토큰의 등록을 지우면 안 된다. */
+  async unregisterLiveActivity(tokenId: string, gameId: string, pushToken: string): Promise<{ removed: number }> {
+    const { count } = await this.prisma.v1WidgetLiveActivity.deleteMany({ where: { tokenId, gameId, pushToken } });
+    return { removed: count };
   }
 
   // ── 내 팀 경기 ─────────────────────────────────────────────────────────────

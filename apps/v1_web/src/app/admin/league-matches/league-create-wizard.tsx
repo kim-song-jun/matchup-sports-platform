@@ -8,7 +8,7 @@ import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin'
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { WizardStepper } from '@/components/admin/wizard-stepper';
 import { GenderCategoryField, genderCategoryLabel } from '@/components/admin/gender-category-field';
-import { periodLabels, switchPeriodCount } from '@/app/admin/tournaments/new/tournament-create-model';
+import { periodLabels, switchPeriodCount } from '@/lib/tournament-period-phases';
 import { v1Get } from '@/lib/api-client';
 import {
   useSaveTournamentPeriodSettings,
@@ -270,7 +270,7 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
         } catch (periodError) {
           setPeriodSaveFailure({
             leagueId: result.leagueId,
-            message: extractErrorMessage(periodError, '리그는 만들었지만 경기 시간을 저장하지 못했어요. 리그 경기 규칙에서 피리어드 설정을 다시 저장해 주세요.'),
+            message: extractErrorMessage(periodError, '리그는 만들었지만 경기 시간을 저장하지 못했어요. 리그 경기 규칙에서 경기 시간을 다시 저장해 주세요.'),
           });
           return;
         }

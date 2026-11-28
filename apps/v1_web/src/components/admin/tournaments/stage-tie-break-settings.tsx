@@ -28,7 +28,7 @@ type StageTieBreakSettingsProps = {
   showToast?: (message: string, tone?: 'success' | 'error') => void;
 };
 
-/** 어드민 정보 화면의 「단계별 동점 순서」 — 단계마다 select 하나, 고르면 바로 저장한다. */
+/** 경기 규칙 시트 안의 「단계마다 다른 순서」 — 단계마다 select 하나, 고르면 바로 저장한다. */
 export function StageTieBreakSettings({ tournamentId, stageTieBreak, stagePlanRevision, canWrite, showToast }: StageTieBreakSettingsProps) {
   const headingId = useId();
   const save = useV1SetStageTieBreakOrder(tournamentId);
@@ -41,8 +41,8 @@ export function StageTieBreakSettings({ tournamentId, stageTieBreak, stagePlanRe
     save.mutate(
       { stageKey: stage.stageKey, expectedRevision: stagePlanRevision, order },
       {
-        onSuccess: () => showToast?.('단계별 동점 순서를 저장했어요.', 'success'),
-        onError: (err) => setError(extractErrorMessage(err, '단계별 동점 순서를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')),
+        onSuccess: () => showToast?.('단계의 순위 정하는 순서를 저장했어요.', 'success'),
+        onError: (err) => setError(extractErrorMessage(err, '단계의 순위 정하는 순서를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')),
       },
     );
   };
@@ -62,11 +62,11 @@ export function StageTieBreakSettings({ tournamentId, stageTieBreak, stagePlanRe
   };
 
   return (
-    <section aria-labelledby={headingId} className="mb-6 grid gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-4">
+    <section aria-labelledby={headingId} className="grid gap-3">
       <div>
-        <h2 id={headingId} className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)]">단계별 동점 순서</h2>
+        <h3 id={headingId} className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">단계마다 다른 순서</h3>
         <p className="mt-1 tm-text-caption text-[var(--text-muted)]">
-          특정 조별리그만 다른 규정을 쓰려면 고르세요. 고르지 않으면 대회 규정({tieBreakOrderName(stageTieBreak.tournamentOrder)})을 따라요.
+          고르지 않은 단계는 위 순서({tieBreakOrderName(stageTieBreak.tournamentOrder)})를 따라요. 단계마다 고르면 바로 저장돼요.
         </p>
       </div>
       {error !== null ? <AlertBanner message={error} /> : null}
@@ -117,7 +117,7 @@ function StageRow({
     return (
       <li className="grid gap-1">
         <span className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">{label}</span>
-        <p className="tm-text-caption text-[var(--text-muted)]">토너먼트는 승부로 가려서 동점 순서가 없어요.</p>
+        <p className="tm-text-caption text-[var(--text-muted)]">토너먼트는 승부로 가려서 순위 정하는 순서가 없어요.</p>
       </li>
     );
   }

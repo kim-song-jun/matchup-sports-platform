@@ -503,7 +503,7 @@ describe('AdminLeagueMatchNewPage — 대회처럼 단계로 만든다', () => {
     next();
     fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
 
-    expect(await screen.findByText(/리그는 만들었지만 경기 시간을 저장하지 못했어요/)).toBeInTheDocument();
+    expect(await screen.findByText('리그는 만들었지만 경기 시간을 저장하지 못했어요. 리그 경기 규칙에서 경기 시간을 다시 저장해 주세요.')).toBeInTheDocument();
     expect(screen.queryByText(/missing period settings version/)).not.toBeInTheDocument();
     expect(savePeriodsMock).not.toHaveBeenCalled();
     expect(pushMock).not.toHaveBeenCalled();

@@ -47,7 +47,7 @@ export function ManualByeEditor({ tournamentId, group, bye, teams, fixtures, gro
       </select></label>
       <label>직행 경기<select disabled={!canWrite || save.isPending} className="tm-input" value={target} onChange={event => setTarget(event.target.value)}>
         <option value="">기존 연결 유지</option>{choices.map(choice => <option key={choice.id} value={choice.id}>
-          {choice.fixture.fixtureNumber}번 경기 · {choice.side === 'HOME' ? '홈' : '어웨이'}
+          {choice.fixture.fixtureNumber}번 경기 · {choice.side === 'HOME' ? '홈' : '원정'}
         </option>)}
       </select></label>
       <button className="tm-btn tm-btn-md tm-btn-primary" disabled={!canWrite || save.isPending}>부전승 저장</button>

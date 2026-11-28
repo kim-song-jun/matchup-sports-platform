@@ -5,16 +5,14 @@ import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useId, useState } from 'react';
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
-import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { FixtureTimePicker } from '@/components/admin/bracket-canvas/fixture-time-picker';
 import { onlyDigits } from '@/lib/number-format';
-import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateBracketBye, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
+import { useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateBracketBye, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
 import type {
   V1AdminTournamentRegistration,
   V1AdminBracketGroup,
   V1AdminBracketFixture,
   V1GenerateLeagueFixturesResponse,
-  V1TournamentStatus,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError, v1Post, v1Patch } from '@/lib/api-client';
@@ -34,7 +32,6 @@ import { BracketGroupQuickAdd } from './bracket-group-quick-add';
 import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
-import { formatDate } from './tournament-admin-shared';
 import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 import { FixtureLabelFields, fixtureLabelDraft, fixtureLabelPatch, type LabelDraft } from '@/components/admin/bracket-canvas/fixture-metadata-editor';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
@@ -51,7 +48,7 @@ import {
 } from './tournament-detail-shared';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { Button } from '@/components/v1-ui/button';
-import { BracketListTemplateTools } from '@/components/admin/bracket-canvas/bracket-list-template-tools';
+import { BracketListSlotTools } from '@/components/admin/bracket-canvas/bracket-list-slot-tools';
 import { CrossGroupRound12Dialog } from '@/components/admin/bracket-canvas/cross-group-round12-dialog';
 import { PeriodOverrideField, useGroupPeriodOverride, useMatchPeriodOverride } from '@/components/admin/period-override-field';
 
@@ -136,27 +133,17 @@ export function BracketTab({
   tournamentId,
   showToast,
   registrations,
-  confirmedTeamCount,
-  confirmedTeamCountStatus,
-  registrationDeadlineAt,
-  tournamentStatus,
-  bracketPublishedAt,
-  bracketPublishScheduledAt,
   canWrite,
   tournamentFormat,
+  unscheduledOnly,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
   registrations: V1AdminTournamentRegistration[];
-  confirmedTeamCount: number;
-  confirmedTeamCountStatus: 'pending' | 'success' | 'error';
-  registrationDeadlineAt: string | null | undefined;
-  /** 접수를 마감 시각 전에 수동으로 닫으면(closed 이후) 마감 시각이 미래여도 접수는 끝난 것이다. */
-  tournamentStatus?: V1TournamentStatus;
-  bracketPublishedAt: string | null | undefined;
-  bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
   tournamentFormat?: 'knockout' | 'league' | 'group_knockout' | 'league_knockouts';
+  /** 도구 줄의 「시간 미정 경기만 보기」 — 경기 일정 전체보기 표에서 시간이 있는 경기를 뺀다. */
+  unscheduledOnly: boolean;
 }) {
   const { v1Post, v1Patch } = useV1DataSource();
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
@@ -170,12 +157,8 @@ export function BracketTab({
   const deleteFixture = useV1DeleteFixture(tournamentId);
   const updateGroup = useV1UpdateGroup(tournamentId);
   const deleteGroup = useV1DeleteGroup(tournamentId);
-  const publishBracket = useV1PublishTournamentBracket(tournamentId);
-  const unpublishBracket = useV1UnpublishTournamentBracket(tournamentId);
   const removeGroupTeam = useV1RemoveGroupTeam(tournamentId);
   const assignTournamentSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
-  // datetime-local 입력값(로컬 시각 문자열). 예약 성공 시 비운다.
-  const [publishScheduleInput, setPublishScheduleInput] = useState('');
 
   // ── 경기 수정 모달 상태 ─────────────────────────────────────────────
   const [sourceFixture, setSourceFixture] = useState<V1AdminBracketFixture | null>(null);
@@ -277,14 +260,14 @@ export function BracketTab({
       showToast('대진 번호는 1부터 2147483647까지의 정수로 입력해 주세요.', 'error');
       return;
     }
-    // 팀 필드는 각각 독립적으로 판단한다 — 홈만 바꾸고 어웨이는 그대로여도 어웨이 필드를
+    // 팀 필드는 각각 독립적으로 판단한다 — 홈만 바꾸고 원정은 그대로여도 원정 필드를
     // 잘못 건드리지 않기 위해서다. '미정'으로 되돌린 경우(editFx*RegId === '')는 서버 계약대로
     // null을 명시적으로 보내 배정을 해제한다 — 필드를 아예 빼면(undefined) 서버가 '미변경'으로
     // 읽어 기존 배정이 그대로 남는다(과거 버그).
     const homeChanged = editFxHomeRegId !== (editFixture.homeRegistrationId ?? '');
     const awayChanged = editFxAwayRegId !== (editFixture.awayRegistrationId ?? '');
     if (editFxHomeRegId && editFxHomeRegId === editFxAwayRegId && (homeChanged || awayChanged)) {
-      showToast('홈 팀과 어웨이 팀은 서로 다른 팀을 선택해 주세요.', 'error');
+      showToast('홈 팀과 원정 팀은 서로 다른 팀을 선택해 주세요.', 'error');
       return;
     }
     // datetime-local 입력값은 오프셋이 없는 KST 벽시계 문자열이다(isoToKstDatetimeLocal 이
@@ -321,7 +304,7 @@ export function BracketTab({
     try {
       for (const assignment of slotAssignments) {
         await assignTournamentSlot.mutateAsync({ slotId: assignment.slotId, registrationId: assignment.registrationId });
-        assignedSides.push(assignment.side === 'HOME' ? '홈' : '어웨이');
+        assignedSides.push(assignment.side === 'HOME' ? '홈' : '원정');
       }
       const complete = async (result: Awaited<ReturnType<typeof updateFixture.mutateAsync>> | null) => {
         // 경기 방식이 그대로면 기다리지 않고 바로 닫는다(async 함수는 첫 await 전까지 동기로 돈다).
@@ -632,180 +615,21 @@ export function BracketTab({
   const groups: V1AdminBracketGroup[] = bracket?.groups ?? [];
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
   const sideLabelContext = buildSideLabelContext(groups, fixtures, bracket?.slots ?? []);
+  const scheduleRows = unscheduledOnly ? fixtures.filter((fixture) => fixture.scheduledAt === null) : fixtures;
   const allStandings = bracket?.standings ?? [];
   const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures, bracket?.slots ?? [])).length;
   const qualifyingGroupCount = groups.filter((group) => group.phase === 'group').length;
   const knockoutStageCount = groups.length - qualifyingGroupCount;
 
-  // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
-  // 예약 시각이 지나면 서버는 공개로 판정하지만 bracketPublishedAt 은 null 로 남는다.
-  // 여기서 bracketPublishedAt 만 보면 이미 공개된 대진표를 계속 "예약됨"으로 표시하고
-  // 공개 버튼도 노출하게 되므로, 서버와 같은 규칙(bracket-visibility)을 쓴다.
-  const isBracketPublished = isBracketPublishedNow(bracketPublishedAt, bracketPublishScheduledAt);
-  // 아직 오지 않은 예약만 "예약됨" 안내·취소 대상이다.
-  const hasPendingSchedule = !!bracketPublishScheduledAt && !isBracketPublished;
-  const deadlinePassed =
-    (tournamentStatus !== undefined && tournamentStatus !== 'draft' && tournamentStatus !== 'open') ||
-    (registrationDeadlineAt ? new Date(registrationDeadlineAt).getTime() < Date.now() : false);
-  // 조가 하나도 없으면 공개해도 참가팀에게 보여줄 대진이 없다. 실수로 빈 대진표를
-  // 공개하는 사고를 막기 위해 공개·예약 진입 자체를 닫는다.
-  const publishBlockedReason = groups.length === 0 ? '조를 먼저 만들어야 공개할 수 있어요.' : null;
-
-  const runPublish = (scheduledAt?: string) => {
-    publishBracket.mutate(scheduledAt ? { scheduledAt } : undefined, {
-      onSuccess: (res) => {
-        if (res.alreadyPublished) showToast('이미 공개된 대진표예요.', 'success');
-        else if (res.bracketPublishScheduledAt)
-          showToast(`${formatDate(res.bracketPublishScheduledAt)}에 공개되도록 예약했어요.`, 'success');
-        else showToast('대진표를 공개했어요.', 'success');
-        setPublishScheduleInput('');
-      },
-      onError: (err) => showToast(extractErrorMessage(err, '대진표 공개에 실패했어요.'), 'error'),
-    });
-  };
-
-  const handlePublishBracket = async () => {
-    if (publishBlockedReason) return;
-    const warningLine = deadlinePassed ? '' : '접수 마감 전이에요. 그래도 공개할까요?\n\n';
-    const ok = await confirmModal({
-      title: '대진표 전체 공개',
-      message: `${warningLine}공개하면 참가팀·방문자가 조/일정/대진표를 볼 수 있어요. 공개를 되돌릴 수는 있지만, 이미 본 참가자에게서 되돌릴 수는 없어요.`,
-      confirmLabel: '전체 공개',
-      tone: deadlinePassed ? 'default' : 'danger',
-    });
-    if (!ok) return;
-    runPublish();
-  };
-
-  const handleSchedulePublish = async () => {
-    if (publishBlockedReason || !publishScheduleInput) return;
-    // datetime-local 은 타임존 표기가 없는 KST 벽시계 문자열이다 — new Date(value)로 바로
-    // 감싸면 브라우저 로컬 타임존으로 해석돼 해외/TZ 다른 기기에서 예약 시각이 밀린다
-    // (bracket-tab.tsx 다른 자리와 동일한 계약: kstDatetimeLocalToIso 로 KST 오프셋 고정).
-    const scheduledIso = kstDatetimeLocalToIso(publishScheduleInput);
-    if (!scheduledIso) {
-      showToast('공개 예약 시각을 다시 확인해 주세요.', 'error');
-      return;
-    }
-    if (new Date(scheduledIso).getTime() <= Date.now()) {
-      showToast('공개 예약 시각은 현재 시각 이후여야 해요.', 'error');
-      return;
-    }
-    const ok = await confirmModal({
-      title: '대진표 공개 예약',
-      message: `${formatDate(scheduledIso)}에 대진표가 자동으로 공개돼요. 그 전까지는 계속 수정할 수 있어요.`,
-      confirmLabel: '예약하기',
-    });
-    if (!ok) return;
-    runPublish(scheduledIso);
-  };
-
-  const handleUnpublishBracket = async () => {
-    const ok = await confirmModal({
-      title: isBracketPublished ? '대진표 공개 취소' : '공개 예약 취소',
-      message: isBracketPublished
-        // 공개 화면의 실제 문구는 대회 상태마다 다르다 — 여기서 특정 문자열을 따옴표로
-        // 못박으면 그쪽이 바뀔 때 이 안내가 조용히 거짓이 된다.
-        ? '대진표를 다시 비공개로 되돌려요. 공개 페이지에서는 대진표가 보이지 않고 준비 중 안내만 남아요. 이미 대진표를 본 참가자의 기억까지 되돌릴 수는 없어요.'
-        : '예약된 공개를 취소해요. 대진표는 계속 비공개로 남아요.',
-      confirmLabel: isBracketPublished ? '비공개로 되돌리기' : '예약 취소',
-      tone: 'danger',
-    });
-    if (!ok) return;
-    unpublishBracket.mutate(undefined, {
-      onSuccess: (res) =>
-        showToast(res.alreadyUnpublished ? '이미 비공개 상태예요.' : '대진표를 비공개로 되돌렸어요.', 'success'),
-      onError: (err) => showToast(extractErrorMessage(err, '공개 취소에 실패했어요.'), 'error'),
-    });
-  };
-
   return (
     <>
-      {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
       {teamChangeDialog}
 
-      {/* ── 대진표 일괄 공개 ──────────────────────────────────────────── */}
-      <div className="tm-content-enter bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] mb-1">대진표 전체 공개</h3>
-            <p className="text-xs text-[var(--text-muted)]">
-              {isBracketPublished
-                ? // 예약 시각이 지나 공개된 경우 bracketPublishedAt 은 null 이고 예약 시각이
-                  // 공개 근거다. fallback 이 없으면 "—에 공개됨"으로 표시된다.
-                  `${formatDate(bracketPublishedAt ?? bracketPublishScheduledAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
-                : hasPendingSchedule
-                ? `${formatDate(bracketPublishScheduledAt ?? null)}에 자동 공개돼요. 그 전까지는 계속 수정할 수 있어요.`
-                : '아직 비공개예요. 공개 전까지는 공개 페이지에서 대진표가 보이지 않아요.'}
-            </p>
-            {!isBracketPublished && publishBlockedReason && (
-              <p className="text-xs text-[var(--orange700)] mt-1">{publishBlockedReason}</p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {canWrite && !isBracketPublished && (
-              <button
-                type="button"
-                onClick={handlePublishBracket}
-                disabled={publishBracket.isPending || !!publishBlockedReason}
-                title={publishBlockedReason ?? undefined}
-                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
-              >
-                지금 전체 공개
-              </button>
-            )}
-            {canWrite && (isBracketPublished || hasPendingSchedule) && (
-              <button
-                type="button"
-                onClick={handleUnpublishBracket}
-                disabled={unpublishBracket.isPending}
-                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--red700)] border border-[var(--tint-red-border)] bg-[var(--card-surface)] hover:bg-[var(--red50)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2 whitespace-nowrap"
-              >
-                {isBracketPublished ? '공개 취소' : '예약 취소'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 예약 공개 — 공개 전에만 노출한다(이미 공개된 대진표는 예약할 대상이 없다). */}
-        {canWrite && !isBracketPublished && (
-          <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-[var(--border)]">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="bracket-publish-schedule" className="text-xs font-medium text-[var(--text-muted)]">
-                공개 예약 시각
-              </label>
-              <input
-                id="bracket-publish-schedule"
-                type="datetime-local"
-                value={publishScheduleInput}
-                onChange={(e) => setPublishScheduleInput(e.target.value)}
-                disabled={!!publishBlockedReason}
-                className="h-[44px] px-3 rounded-xl border border-[var(--border)] text-[length:var(--font-size-label)] text-[var(--text-strong)] disabled:bg-[var(--surface-soft)] disabled:text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleSchedulePublish}
-              disabled={publishBracket.isPending || !publishScheduleInput || !!publishBlockedReason}
-              title={publishBlockedReason ?? undefined}
-              className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] border border-[var(--tint-blue-border)] bg-[var(--card-surface)] hover:bg-[var(--blue50)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
-            >
-              {hasPendingSchedule ? '예약 변경' : '이 시각에 공개 예약'}
-            </button>
-            <p className="text-xs text-[var(--text-muted)] basis-full">
-              예약한 시각이 되면 스케줄러 없이 자동으로 공개돼요. 그 전까지는 조·경기를 계속 수정할 수 있어요.
-            </p>
-          </div>
-        )}
-      </div>
-
     <div className="flex flex-col gap-6">
 
-      {canWrite && tournamentFormat && tournamentFormat !== 'league_knockouts' ? <BracketListTemplateTools tournamentId={tournamentId} format={tournamentFormat}
-        hasExistingBracket={groups.length > 0 || fixtures.length > 0 || (bracket?.slots?.length ?? 0) > 0}
-        groups={groups} slots={bracket?.slots ?? []} registrations={registrations}
-        confirmedTeamCount={confirmedTeamCount} confirmedTeamCountStatus={confirmedTeamCountStatus} showToast={showToast} /> : null}
+      {canWrite && tournamentFormat && tournamentFormat !== 'league_knockouts' ? <BracketListSlotTools tournamentId={tournamentId}
+        groups={groups} slots={bracket?.slots ?? []} registrations={registrations} canWrite={canWrite} showToast={showToast} /> : null}
       {round12AutoOpen ? <CrossGroupRound12Dialog tournamentId={tournamentId} onClose={() => setRound12AutoOpen(false)} showToast={showToast} /> : null}
 
       {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}
@@ -878,6 +702,11 @@ export function BracketTab({
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
           <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">경기 일정 전체보기</h3>
+          {unscheduledOnly ? (
+            <p className="tm-text-caption text-[var(--text-muted)]">
+              {scheduleRows.length === 0 ? '시간 미정 경기가 없어요.' : `시간 미정 ${scheduleRows.length}경기만 보고 있어요.`}
+            </p>
+          ) : null}
           {/* 모바일에서는 경기별 카드로 모든 열과 작업을 볼 수 있다.
               tableMaxWidth="max-w-none" — 조 카드 목록과 별개인 전폭 섹션이라
               기본 900px 캡을 걸 이유가 없고, 오히려 좁은 데스크톱(~1024px)에서
@@ -914,15 +743,15 @@ export function BracketTab({
               },
               {
                 key: 'awayTeamName',
-                header: '어웨이',
+                header: '원정',
                 render: (f) => (
                   <span className="font-medium text-[var(--text-strong)] break-keep break-words">{fixtureSideLabel(f, 'AWAY', sideLabelContext)}</span>
                 ),
               },
               {
                 key: 'scheduledAt',
-                header: '시각 · 경기장',
-                render: (f) => <span className="tm-text-caption text-[var(--text-muted)] break-words">{f.scheduledAt ? `${formatKstDateShort(f.scheduledAt)} ${formatKstTime(f.scheduledAt)}` : '시간 미정'} · {f.venue || '경기장 미정'}</span>,
+                header: '시각 · 구장',
+                render: (f) => <span className="tm-text-caption text-[var(--text-muted)] break-words">{f.scheduledAt ? `${formatKstDateShort(f.scheduledAt)} ${formatKstTime(f.scheduledAt)}` : '시간 미정'} · {f.venue || '구장 미정'}</span>,
               },
               {
                 key: 'result',
@@ -937,7 +766,7 @@ export function BracketTab({
                 ),
               },
             ]}
-            rows={fixtures}
+            rows={scheduleRows}
             keyExtractor={(f) => f.id}
             renderActions={(f) => {
               // 결과 기록·정정은 이제 Game result-revision 플로우로만 이뤄진다 — 레거시
@@ -953,7 +782,7 @@ export function BracketTab({
               const resultConsoleHref = f.result
                 ? `/admin/live/${encodeURIComponent(tournamentId)}/records/corrections?${opsQuery}`
                 : `/admin/live/${encodeURIComponent(tournamentId)}/result-review?${opsQuery}`;
-              const resultConsoleLabel = f.result ? '결과 정정하러 가기' : '결과 검토하러 가기';
+              const resultConsoleLabel = f.result ? '결과 고치기 화면 열기' : '결과 검토하러 가기';
               // T6-4: 아직 뛰고 있거나 곧 시작할 경기는 결과 검토보다 라이브 운영 콘솔이
               // 우선이다 — 같은 자리에 "운영 콘솔 열기"를 추가로 노출한다.
               const canOperate = f.status === 'scheduled' || f.status === 'in_progress';
@@ -1045,7 +874,7 @@ export function BracketTab({
               ? bracketSourceSideOptions({ candidates, fixtures: bracket.fixtures, currentFixtureId: currentSource, oppositeFixtureId: oppositeSource })
               : [];
             const targetPhase = groups.find((group) => group.id === sourceFixture?.groupId)?.phase ?? '';
-            return <label key={side} className="block tm-text-label">{side === 'HOME' ? '홈 자리' : '어웨이 자리'}
+            return <label key={side} className="block tm-text-label">{side === 'HOME' ? '홈 자리' : '원정 자리'}
               <select className={inputCls} disabled={savingSources} value={options.some((fixture) => fixture.id === currentSource) ? currentSource : ''} onChange={(event) => side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value)}>
                 <option value="">연결 없음 · 직접 배정</option>
                 {options.map((fixture) => <option key={fixture.id} value={fixture.id}>{bracketFixtureLabel(fixture, groups)} {targetPhase === 'third_place' ? '패자' : '승자'}</option>)}
@@ -1093,7 +922,7 @@ export function BracketTab({
             disabled={savingFixtureEdit || updateFixture.isPending}
             lockedReason={fixturePeriods.lockedReason}
           />
-          <CompetitionFieldPicker tournamentId={tournamentId} value={editFxFieldId} onChange={value => { setEditFxFieldId(value); if (!value) setEditFxVenue(null); }} allowNew={false} allowEmpty emptyLabel="경기장 미정" disabled={savingFixtureEdit || updateFixture.isPending} />
+          <CompetitionFieldPicker tournamentId={tournamentId} value={editFxFieldId} onChange={value => { setEditFxFieldId(value); if (!value) setEditFxVenue(null); }} allowNew={false} allowEmpty emptyLabel="구장 미정" disabled={savingFixtureEdit || updateFixture.isPending} />
           {!editFxFieldId ? <PlacePicker
             maxLength={PLACE_NAME_MAX_LENGTH.tournament}
             id="edit-fx-venue"
@@ -1118,7 +947,7 @@ export function BracketTab({
               />
             </div>
             <div className="flex min-w-0 flex-col gap-1 flex-1">
-              <label htmlFor="edit-fx-away" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">어웨이 팀</label>
+              <label htmlFor="edit-fx-away" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">원정 팀</label>
               <EntityPicker
                 id="edit-fx-away"
                 value={editFixtureTeamItems.find((it) => it.id === editFxAwayRegId) ?? null}
@@ -1126,7 +955,7 @@ export function BracketTab({
                 items={editPickerItems(editFxAwayRegId, editFxHomeRegId, editFixture?.awaySlotId ?? null)}
                 disabled={updateFixture.isPending || savingFixtureEdit || editFixtureTeamsLocked || slotSideLocked('AWAY') || !!editFixture?.bracketSources?.some((source) => source.side === 'AWAY')}
                 clearLabel="미정"
-                placeholder="어웨이 팀 검색"
+                placeholder="원정 팀 검색"
               />
             </div>
           </div>
@@ -1241,7 +1070,7 @@ export function BracketTab({
               className={inputCls}
             >
               <option value="1">1회전 (싱글 라운드로빈)</option>
-              <option value="2">2회전 (홈/어웨이 더블 라운드로빈)</option>
+              <option value="2">2회전 (홈/원정 더블 라운드로빈)</option>
             </select>
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               모든 팀이 서로 {legsPickerValue}회씩 맞붙는 대진을 자동으로 만들어요.

@@ -196,6 +196,9 @@ function buildRevision(
 // No `QueryClientProvider` needed: `@/hooks/use-tournament-result-review` and
 // `@/hooks/use-v1-api` are entirely mocked above (real `useQuery`/`useMutation`
 // never run), so there is no react-query context to satisfy.
+/** 확정 버튼의 이름은 점수를 담는다(「2 : 1로 결과 확정」). 확인 창의 「결과 확정」과는 조사로 갈린다. */
+const OFFICIALIZE = { name: /(?:으)?로 결과 확정$/ };
+
 function renderWithClient(ui: React.ReactElement) {
   return render(ui);
 }
@@ -268,12 +271,12 @@ describe('actor visibility on a submitted revision (platform_ops / director / op
     hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'SUBMITTED' })];
   });
 
-  it('platform_ops 는 "확인" 과 "고치고 확인" 둘을 보고, 반려·보완 요청 버튼은 없다', () => {
+  it('platform_ops 는 결과 확정과 결과 고치기 둘을 보고, 반려·보완 요청 버튼은 없다', () => {
     hookMocks.game.data = buildGame('platform_ops');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '고치고 확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '결과 고치기' })).toBeInTheDocument();
     // Task 166: 두 명령의 **백엔드가 사라졌다**. 버튼만 남으면 눌러서 404 를 받는다.
     expect(screen.queryByRole('button', { name: '보완 요청' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '반려' })).not.toBeInTheDocument();
@@ -283,16 +286,16 @@ describe('actor visibility on a submitted revision (platform_ops / director / op
     hookMocks.game.data = buildGame('tournament_director');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '고치고 확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '결과 고치기' })).toBeInTheDocument();
   });
 
   it('field_operator ("operator") sees no review actions at all, only a read-only notice', () => {
     hookMocks.game.data = buildGame('field_operator');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '고치고 확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', OFFICIALIZE)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '결과 고치기' })).not.toBeInTheDocument();
     expect(screen.getByText('이 화면에서는 결과를 볼 수만 있어요. 검토·확정 권한이 없어요.')).toBeInTheDocument();
   });
 
@@ -300,12 +303,12 @@ describe('actor visibility on a submitted revision (platform_ops / director / op
     hookMocks.game.data = buildGame('support_readonly');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', OFFICIALIZE)).not.toBeInTheDocument();
   });
 });
 
-describe('"고치고 확인" — SUBMITTED 를 그 자리에서 고쳐 대체한다 (Task 166)', () => {
-  it('SUBMITTED 카드의 "고치고 확인" 이 기존 재제출 모달을 열고 supersede-and-submit 을 부른다', async () => {
+describe('"결과 고치기" — SUBMITTED 를 그 자리에서 고쳐 대체한다 (Task 166)', () => {
+  it('SUBMITTED 카드의 "결과 고치기" 가 기존 재제출 모달을 열고 supersede-and-submit 을 부른다', async () => {
     hookMocks.game.data = buildGame('platform_ops', { version: 4 });
     hookMocks.revisions.data = [
       buildRevision({ id: 'rev-1', revision: 1, state: 'SUBMITTED', score: { home: 1, away: 0 } }),
@@ -313,7 +316,7 @@ describe('"고치고 확인" — SUBMITTED 를 그 자리에서 고쳐 대체한
     const user = userEvent.setup();
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '고치고 확인' }));
+    await user.click(screen.getByRole('button', { name: '결과 고치기' }));
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByLabelText('재제출 사유'), '득점자 정정 반영');
     await user.click(within(dialog).getByRole('button', { name: '다시 제출' }));
@@ -350,7 +353,7 @@ describe('officialize (approve) always available to platform_ops', () => {
     const user = userEvent.setup();
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '확인' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
 
     await waitFor(() => expect(hookMocks.officialize.mutate).toHaveBeenCalledTimes(1));
     expect(hookMocks.officialize.mutate).toHaveBeenCalledWith(
@@ -379,14 +382,14 @@ describe('officialize (approve) always available to platform_ops', () => {
     const user = userEvent.setup();
     const view = renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '확인' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
     // The mocked mutation object mutates in place rather than notifying React on
     // its own (unlike the real `useMutation`, which re-renders itself) -- force one
     // reconciliation pass so this render picks up the freshly mutated mock fields.
     view.rerender(<GameResultReviewPanel gameId="game-1" />);
 
     await screen.findByText(/경기 정보가 그 사이 바뀌었어요/);
-    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
     expect(screen.queryByText(/아직 활성화되지 않았어요/)).not.toBeInTheDocument();
   });
 });
@@ -403,37 +406,37 @@ describe('director officialize/void visibility follows the DIRECTOR_OFFICIALIZE 
     });
 
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
-    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '확인' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', OFFICIALIZE)).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/아직 활성화되지 않았어요/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '다시 확인' }));
-    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
     expect(screen.queryByText(/아직 활성화되지 않았어요/)).not.toBeInTheDocument();
 
     hookMocks.officialize.mutate.mockImplementationOnce((_input: unknown, callbacks?: OfficializeCallbacks) => {
       callbacks?.onSuccess?.();
     });
-    await user.click(screen.getByRole('button', { name: '확인' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
     await waitFor(() => expect(hookMocks.officialize.mutate).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
 
     hookMocks.officialize.mutate.mockImplementationOnce((_input: unknown, callbacks?: OfficializeCallbacks) => {
       callbacks?.onError?.({ code: 'DIRECTOR_OFFICIALIZE_DISABLED', message: 'off again' });
     });
-    await user.click(screen.getByRole('button', { name: '확인' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', OFFICIALIZE)).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/아직 활성화되지 않았어요/)).toBeInTheDocument();
   });
 });
 
-describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)', () => {
+describe('기록 시각 고치기 -- 확정된 결과의 사건 시각 (MD-QA #187)', () => {
   const yellowCard = {
     id: 'event-card-1',
     gameId: 'game-1',
@@ -465,9 +468,9 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.getByText('기록 시각 정정')).toBeInTheDocument();
+    expect(screen.getByText('기록 시각 고치기')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '기록 수정 (옐로카드)' }));
-    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 고치기' });
     expect(within(dialog).getByText('확정된 결과')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
@@ -490,7 +493,7 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     officialGame('tournament_director');
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.queryByText('기록 시각 정정')).not.toBeInTheDocument();
+    expect(screen.queryByText('기록 시각 고치기')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '기록 수정 (옐로카드)' })).not.toBeInTheDocument();
   });
 
@@ -500,7 +503,7 @@ describe('기록 시각 정정 -- 확정된 결과의 사건 시각 (MD-QA #187)
     hookMocks.events.data = { events: [yellowCard], lastSequence: 4, gap: null };
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.queryByText('기록 시각 정정')).not.toBeInTheDocument();
+    expect(screen.queryByText('기록 시각 고치기')).not.toBeInTheDocument();
   });
 });
 
@@ -553,7 +556,7 @@ describe('void -- retiring the current official result', () => {
     await user.click(within(dialog).getByRole('button', { name: '취소' }));
 
     expect(screen.queryByRole('button', { name: '무효화' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '정정 시작' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '결과 고치기' })).toBeInTheDocument();
     expect(screen.getByText(/아직 활성화되지 않았어요/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '다시 확인' }));
@@ -572,11 +575,11 @@ describe('correction -- create against the current official revision, always cap
       participantId: participant.participantId, sideId: participant.sideId, payload: { card: 'YELLOW' },
       period: 2, clockMs: 480000, reversesEventId: null }] };
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
-    fireEvent.click(screen.getByRole('button', { name: '정정 시작' }));
+    fireEvent.click(screen.getByRole('button', { name: '결과 고치기' }));
     expect(screen.getByLabelText('1번째 카드 시간(분)')).toHaveValue(8);
     fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '12' } });
-    fireEvent.change(screen.getByLabelText('정정 사유'), { target: { value: '카드 시간 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    fireEvent.change(screen.getByLabelText('고친 이유'), { target: { value: '카드 시간 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
     expect(hookMocks.createCorrection.mutate.mock.calls[0][0].changes.actualParticipants[0].cards).toEqual({
       yellow: 1, red: 0, events: [{ id: 'existing-yellow', card: 'YELLOW', minute: 12, period: 2 }],
     });
@@ -586,7 +589,7 @@ describe('correction -- create against the current official revision, always cap
     hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' })];
     hookMocks.events.isPending = true;
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
-    fireEvent.click(screen.getByRole('button', { name: '정정 시작' }));
+    fireEvent.click(screen.getByRole('button', { name: '결과 고치기' }));
     expect(screen.getByRole('status')).toHaveTextContent('기존 경기 기록을 불러오고 있어요.');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(hookMocks.createCorrection.mutate).not.toHaveBeenCalled();
@@ -597,15 +600,15 @@ describe('correction -- create against the current official revision, always cap
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '정정 시작' }));
+    await user.click(screen.getByRole('button', { name: '결과 고치기' }));
     const dialog = screen.getByRole('dialog');
     const homeInput = within(dialog).getByLabelText('홈 점수');
     expect(homeInput).toHaveValue(1);
     await user.click(within(dialog).getByRole('button', { name: '득점 추가' }));
     expect(within(dialog).getByText('점수 변경: 1:1 → 2:1')).toBeInTheDocument();
 
-    await user.type(within(dialog).getByLabelText('정정 사유'), '득점 누락 정정');
-    await user.click(within(dialog).getByRole('button', { name: '정정 제출' }));
+    await user.type(within(dialog).getByLabelText('고친 이유'), '득점 누락 정정');
+    await user.click(within(dialog).getByRole('button', { name: '고친 결과로 확정' }));
 
     expect(hookMocks.createCorrection.mutate).toHaveBeenCalledWith(
       {
@@ -646,9 +649,9 @@ describe('correction -- create against the current official revision, always cap
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '정정 시작' }));
+    await user.click(screen.getByRole('button', { name: '결과 고치기' }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: '정정 제출' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: '고친 결과로 확정' })).toBeDisabled();
   });
 
   it('shows a pending correction draft with a confirm CTA instead of "start correction" once one exists', () => {
@@ -659,9 +662,9 @@ describe('correction -- create against the current official revision, always cap
     ];
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.getByText('정정 초안이 대기 중이에요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '정정 확정' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '정정 시작' })).not.toBeInTheDocument();
+    expect(screen.getByText('고친 결과가 확정을 기다려요')).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '결과 고치기' })).not.toBeInTheDocument();
   });
 
   /**
@@ -692,7 +695,7 @@ describe('correction -- create against the current official revision, always cap
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '정정 확정' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
 
     expect(hookMocks.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.stringContaining('2:1로 공식 결과를 확정해요') }),
@@ -723,7 +726,7 @@ describe('correction -- create against the current official revision, always cap
 
     const user = userEvent.setup();
     renderWithClient(<Harness />);
-    await user.click(screen.getByRole('button', { name: '정정 확정' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
     const officializeCall = hookMocks.officialize.mutate.mock.calls[0];
     expect(officializeCall).toBeDefined();
 
@@ -731,7 +734,7 @@ describe('correction -- create against the current official revision, always cap
       officializeCall[1].onSuccess();
     });
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: '경기 결과 정정' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('heading', { name: '경기 결과 고치기' })).toHaveFocus());
   });
 });
 
@@ -758,7 +761,7 @@ describe('몰수·중단 경기의 검토·확정', () => {
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
     expect(screen.getByText('몰수·기권으로 종료된 경기예요. 사유: 원정팀 미출석')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', OFFICIALIZE)).toBeInTheDocument();
   });
 
   it('정상 종료 경기에는 몰수 배너가 뜨지 않는다', () => {
@@ -828,7 +831,7 @@ describe('몰수·중단 경기의 검토·확정', () => {
     const user = userEvent.setup();
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '확인' }));
+    await user.click(screen.getByRole('button', OFFICIALIZE));
 
     const message = hookMocks.confirm.mock.calls[0][0].message as string;
     expect(message).toContain('몰수·기권');
@@ -857,7 +860,7 @@ describe('결선 무승부는 저장 전에 폼이 알려준다', () => {
     const user = userEvent.setup();
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '정정 시작' }));
+    await user.click(screen.getByRole('button', { name: '결과 고치기' }));
     const dialog = screen.getByRole('dialog');
     // 라이브 영역(`role="status"`)은 문구가 생기기 전에도 DOM 에 있어야 스크린리더가
     // 내용 변경을 읽어 준다 -- 그래서 "없음"은 노드 부재가 아니라 빈 문구로 확인한다.
@@ -942,8 +945,8 @@ describe('correction/void unavailable without an official result', () => {
     hookMocks.revisions.data = [];
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    expect(screen.getByText('공식 확정된 결과가 없어서 정정할 수 없어요.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '정정 시작' })).not.toBeInTheDocument();
+    expect(screen.getByText('확정된 결과가 없어서 고칠 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '결과 고치기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '무효화' })).not.toBeInTheDocument();
   });
 });
@@ -964,7 +967,7 @@ describe('re-entry offered once the official result was just voided', () => {
     // 무효 이후에는 '정정 시작'/'무효화' 대신 재입력 CTA 하나만 떠야 해요:
     // 서버는 VOID 리비전을 base 로 한 새 DRAFT(VOID_REENTRY)만 받고,
     // 무효 리비전을 다시 무효화하는 건 여전히 409 예요.
-    expect(screen.queryByRole('button', { name: '정정 시작' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '결과 고치기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '무효화' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '결과 다시 입력' })).toBeInTheDocument();
 
@@ -983,7 +986,7 @@ describe('re-entry offered once the official result was just voided', () => {
 });
 
 // 경고 누적 퇴장 합친 줄 — 확정 뒤 어드민 시각 정정도 옐로와 레드를 같은 시각으로 함께 옮긴다.
-describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)', () => {
+describe('기록 시각 고치기 -- 경고 누적 퇴장 합친 줄 (확정 뒤)', () => {
   const card = (id: string, sequence: number, color: 'YELLOW' | 'RED', period: number, clockMs: number) => ({
     id,
     gameId: 'game-1',
@@ -1016,7 +1019,7 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
     await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
-    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 고치기' });
     expect(within(dialog).getByText('옐로카드와 레드카드가 함께 옮겨져요.')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
@@ -1053,12 +1056,12 @@ describe('기록 시각 정정 -- 경고 누적 퇴장 합친 줄 (확정 뒤)',
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
     await user.click(screen.getByRole('button', { name: '기록 수정 (경고 누적 퇴장)' }));
-    const dialog = await screen.findByRole('dialog', { name: '기록 시각 정정' });
+    const dialog = await screen.findByRole('dialog', { name: '기록 시각 고치기' });
     await user.click(within(dialog).getByRole('button', { name: '1분 빼기' }));
     await user.type(within(dialog).getByLabelText(/정정 사유/), '대조 결과');
     await user.click(within(dialog).getByRole('button', { name: '31:00 → 30:00으로 정정' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('옐로카드 시각은 옮겼지만 레드카드 시각은 못 옮겼어요');
-    expect(screen.getByRole('dialog', { name: '기록 시각 정정' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '기록 시각 고치기' })).toBeInTheDocument();
   });
 });

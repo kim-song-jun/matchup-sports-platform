@@ -51,3 +51,18 @@
 - **이름 규칙은 공개 경기 화면과 같다**(`participant-name-gating`): 대회·리그 경기는 동의 규칙이 켜져 있으면 동의한 참가자만, 이름은 닉네임 기본 + 프로필의 실명 공개 설정. 이름을 보여 줄 수 없으면 `name: null` — 받는 쪽은 「득점」만 보여 준다.
 - **친선 팀 매치**는 공개 화면이 진행 중에 득점자를 보여 주지 않으므로(점수만) 위젯은 **우리 팀 골만** 이름을 붙이고 상대 골은 `name: null` 로 준다.
 - 점수를 가린 경기(`status_only`·`hidden`)는 골 요약도 가려 빈 배열이다. 옛 기록을 옮긴 경기는 공식 결과의 골 목록을 쓴다.
+
+## 실시간 푸시와 실시간 카드 토큰 (2026-11-28)
+
+경기 상태가 바뀌면(득점·구간 시작/끝·일시정지·종료) 서버가 위젯과 실시간 카드에 알린다.
+
+| Method | Path | 인증 | 설명 |
+|---|---|---|---|
+| PUT | `/widget/live-activity-token` | Bearer 위젯 토큰 | `{ gameId, pushToken }` → `{ registered: true }`. 아이폰 실시간 카드(Live Activity)가 받은 푸시 토큰(소문자 16진수)을 등록한다. 기기(위젯 토큰)·경기마다 한 줄이라 토큰이 바뀌면(회전) 같은 줄을 덮어쓴다. 내가 활성 팀원인 팀의 경기가 아니면 404 `NOT_FOUND_OR_ARCHIVED`. 기기당 5개까지(넘치면 오래된 것부터 지운다). |
+| DELETE | `/widget/live-activity-token` | Bearer 위젯 토큰 | 본문 `{ gameId, pushToken }` → `{ removed }`. **토큰까지 같은 줄만** 지운다 — 늦게 도착한 옛 취소가 새로 받은 토큰의 등록을 지우지 않게. |
+
+- 위젯 토큰을 폐기(`DELETE /widget/token`, `DELETE /me/widget-token`)하면 그 토큰의 카드 등록도 함께 지운다.
+- **`live[].endedAt`** (끝난 경기만, 아니면 `null`): 공식 결과가 확정된 시각(ISO). 「방금 끝남」 15분과 실시간 카드 정리 시각의 기준이다.
+- **아이폰 실시간 카드**: 등록된 카드에 APNs `liveactivity` 푸시를 보낸다. 내용(`content-state`)은 `live` 항목에서 득점자 목록을 뺀 것(`gameId, teamName, teamLogoUrl, opponentName, opponentLogoUrl, competitionName, venueName, state, score, penalties, period, updatedAt(ms), endedAt(ms|null)`)이다. 득점·구간·일시정지가 바뀌면 `event: update`, 경기가 끝나면 `event: end` + `dismissal-date`(= 종료 시각 + 15분, 초). 끝난 카드와 Apple이 거절한 토큰의 등록은 지운다.
+- **안드로이드 위젯**: 내 팀 경기가 바뀌면 위젯 토큰이 있는 사용자의 안드로이드 기기에 데이터 전용 FCM(`type=widget_refresh`)을 보내 위젯이 다시 불러오게 한다.
+- **동작 방식**: 경기 기록·친선 공유 기록·시계 만료·관리자 정정 등 상태가 바뀌는 길이 여러 곳이라 각 길에 끼우지 않고, 위젯 홈이 보여 주는 값(`WidgetHomeService.liveFor`)을 10초마다 다시 계산해 지난번과 다르면 보낸다. **`V1_WIDGET_PUSH_ENABLED=true` 일 때만 돈다**(꺼져 있으면 아무것도 보내지 않는다). 마지막으로 보낸 값은 프로세스 메모리에만 있어 재시작하면 진행 중 경기에 한 번씩 더 나가고(무해), API 가 여러 대가 되면 같은 변화가 대수만큼 나간다.

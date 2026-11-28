@@ -322,8 +322,6 @@ import type {
   V1PurgeGuestInquiriesResult,
   V1PublicKakaoMapsKeyResponse,
   V1PlaceSearchResponse,
-  V1TournamentOperationsBoardFilters,
-  V1TournamentOperationsBoardPage,
   V1TournamentStaffListResponse,
   V1TournamentStaffCandidateSearchResponse,
   V1TournamentStaffAssignment,
@@ -5100,7 +5098,11 @@ export function useV1SetStageTieBreakOrder(tournamentId: string) {
         `/admin/tournaments/${encodeURIComponent(tournamentId)}/stages/${encodeURIComponent(input.stageKey)}/tie-break-order`,
         { expectedRevision: input.expectedRevision, order: input.order },
       ),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // 응답이 준 revision 과 순서를 바로 반영한다 — 다시 읽기를 기다리는 동안 이어 고른 저장이 옛 revision 으로 가지 않게.
+      queryClient.setQueryData<V1Tournament>(v1Keys.adminTournament(tournamentId), (current) =>
+        current ? { ...current, stagePlanRevision: saved.revision, stageTieBreak: saved.stageTieBreak } : current,
+      );
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       queryClient.invalidateQueries({ queryKey: ['stages', tournamentId] });
@@ -6020,48 +6022,6 @@ export function useV1DeleteAdminContentAsset() {
 // ─────────────────────────────────────────────────────────────────────────
 // 대회 운영(tournament-ops) 셸/보드/스태프 (Task 19 — 백엔드는 Task 18)
 // ─────────────────────────────────────────────────────────────────────────
-
-/**
- * GET /tournament-ops/tournaments/:tournamentId/operations — 운영 보드 한 페이지.
- * `refetchInterval`로 상단(현재 커서) 페이지를 주기적으로 재조회해 점진 업데이트를
- * 지원한다 — `placeholderData: keepPreviousData`가 재조회 중 목록이 빈 화면으로
- * 깜빡이는 것을 막아, 필터 입력 등 화면의 로컬 상태가 유지된다.
- */
-export function useV1TournamentOperationsBoard(
-  tournamentId: string,
-  filters?: V1TournamentOperationsBoardFilters,
-  options?: QueryOptions,
-) {
-  const { v1Get } = useV1DataSource();
-  return useQuery({
-    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
-    queryFn: () =>
-      v1Get<V1TournamentOperationsBoardPage>(
-        `/tournament-ops/tournaments/${tournamentId}/operations`,
-        filters,
-      ),
-    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
-    placeholderData: keepPreviousData,
-    refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
-  });
-}
-
-/** "더 보기" 등 일회성 다음 페이지 조회용 — 폴링 대상이 아닌 과거 페이지는 훅 없이 직접 fetchQuery로 가져온다. */
-export function fetchV1TournamentOperationsBoardPage(
-  queryClient: QueryClient,
-  tournamentId: string,
-  filters: V1TournamentOperationsBoardFilters,
-  get: typeof v1Get = v1Get,
-) {
-  return queryClient.fetchQuery({
-    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
-    queryFn: () =>
-      get<V1TournamentOperationsBoardPage>(
-        `/tournament-ops/tournaments/${tournamentId}/operations`,
-        filters,
-      ),
-  });
-}
 
 /**
  * GET /tournament-ops/tournaments/:tournamentId/staff — 대회 전체 스태프 배정 목록.

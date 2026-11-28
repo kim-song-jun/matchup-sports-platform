@@ -13,7 +13,8 @@ import type {
   V1AdminTournamentRegistration,
   V1AdminTournamentRosterResponse,
 } from '@/types/api';
-import { RegistrationsTab, RosterModal } from './registrations-tab';
+import { RosterModal } from './registration-roster-modal';
+import { RegistrationsTab } from './registrations-tab';
 
 const registration: V1AdminTournamentRegistration = {
   id: 'registration-identity', tournamentId: 'tournament-identity', teamId: 'team-identity',
@@ -80,7 +81,7 @@ function openRegistrationTab() {
 async function reviewTeam(user: ReturnType<typeof userEvent.setup>, teamName = registration.teamName) {
   const card = (await screen.findByText(teamName ?? '')).closest('li');
   if (!card) throw new Error('실제 신청 카드가 없어요.');
-  await user.click(within(card).getByRole('button', { name: '명단 검토' }));
+  await user.click(within(card).getByRole('button', { name: '명단 보기' }));
   return screen.findByRole('dialog', { name: `명단 검토 — ${teamName}` });
 }
 

@@ -150,7 +150,7 @@ function AccessDenied({ scopeNotYetSupported, fixtureScope = false }: { scopeNot
           className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           style={{ color: 'var(--static-white)' }}
         >
-          {scopeNotYetSupported ? `${TOURNAMENT_STAFF_ENTRY_LABEL}으로 가기` : '서비스로 돌아가기'}
+          {scopeNotYetSupported ? `${TOURNAMENT_STAFF_ENTRY_LABEL}으로 가기` : '홈으로 돌아가기'}
         </Link>
       </div>
     </div>

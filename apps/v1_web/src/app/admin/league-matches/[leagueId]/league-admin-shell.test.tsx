@@ -3,7 +3,8 @@
  * 헤더·상태 변경·공개 설정·섹션 바는 여기서 한 번만 그리고, 섹션 화면은 하위 라우트가 채운다.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
 import { LeagueAdminShell } from './league-admin-shell';
 
 const nav = vi.hoisted(() => ({ pathname: '/admin/league-matches/league-1/schedule', search: '' }));
@@ -52,7 +53,18 @@ function renderShell() {
   return render(<LeagueAdminShell leagueId="league-1"><p>섹션 본문</p></LeagueAdminShell>);
 }
 
+/** 탭 줄에 없는 섹션은 더보기 안에 있다 — 폰·테스트 환경(matchMedia 없음)에서는 시트로 열린다. */
+function openMore() {
+  const bar = screen.getByRole('navigation', { name: '리그 관리 섹션' });
+  fireEvent.click(within(bar).getByRole('button', { name: /더보기/ }));
+  return screen.getByRole('dialog', { name: '더보기' });
+}
+
 describe('LeagueAdminShell', () => {
+  afterEach(() => {
+    __resetOverlayHistoryForTests();
+  });
+
   beforeEach(() => {
     nav.pathname = '/admin/league-matches/league-1/schedule';
     nav.search = '';
@@ -86,7 +98,7 @@ describe('LeagueAdminShell', () => {
     ])('상태 %s·체계 %s에서 전환 메뉴를 올바르게 표시한다', (state, seriesId, visible) => {
       query.value = loaded({ state, seriesId });
       renderShell();
-      const link = screen.queryByRole('link', { name: '리그 체계로 전환' });
+      const link = within(openMore()).queryByRole('link', { name: '리그 체계로 전환' });
       if (visible) expect(link).toHaveAttribute('href', '/admin/league-matches/league-1/series-conversion');
       else expect(link).not.toBeInTheDocument();
     });
@@ -101,7 +113,7 @@ describe('LeagueAdminShell', () => {
     ])('상태 %s·체계 %s에서 다음 시즌 관리 노출(이은 시즌 %s·전환 %s → %s)', (state, seriesId, nextSeason, convertedToSeries, visible) => {
       query.value = loaded({ state, seriesId, nextSeason, convertedToSeries });
       renderShell();
-      const link = screen.queryByRole('link', { name: '다음 시즌 관리' });
+      const link = within(openMore()).queryByRole('link', { name: '다음 시즌 관리' });
       if (visible) expect(link).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
       else expect(link).not.toBeInTheDocument();
     });
@@ -109,39 +121,51 @@ describe('LeagueAdminShell', () => {
     it('다음 시즌을 이은 리그도 같은 다음 시즌 관리 메뉴를 두고(연결 해제를 위해) 리그 체계 전환을 숨긴다', () => {
       query.value = loaded({ state: 'completed', nextSeason: { leagueId: 'league-2', title: '겨울 리그' } });
       renderShell();
-      expect(screen.getByRole('link', { name: '다음 시즌 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
-      expect(screen.queryByRole('link', { name: '다음 시즌 만들기' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: '다음 시즌 보기' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: '리그 체계로 전환' })).not.toBeInTheDocument();
+      const more = openMore();
+      expect(within(more).getByRole('link', { name: '다음 시즌 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
+      expect(within(more).queryByRole('link', { name: '다음 시즌 만들기' })).not.toBeInTheDocument();
+      expect(within(more).queryByRole('link', { name: '다음 시즌 보기' })).not.toBeInTheDocument();
+      expect(within(more).queryByRole('link', { name: '리그 체계로 전환' })).not.toBeInTheDocument();
     });
 
     it('조회 전용 관리자에게는 이은 시즌이 없으면 다음 시즌 관리가 없다', () => {
       adminCanWrite.value = false;
       query.value = loaded({ state: 'completed' });
       renderShell();
-      expect(screen.queryByRole('link', { name: '다음 시즌 관리' })).not.toBeInTheDocument();
+      expect(within(openMore()).queryByRole('link', { name: '다음 시즌 관리' })).not.toBeInTheDocument();
     });
 
     it('조회 전용 관리자도 이은 시즌이 있으면 다음 시즌 관리로 이어진 리그를 볼 수 있다', () => {
       adminCanWrite.value = false;
       query.value = loaded({ state: 'completed', nextSeason: { leagueId: 'league-2', title: '겨울 리그' } });
       renderShell();
-      expect(screen.getByRole('link', { name: '다음 시즌 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
+      expect(within(openMore()).getByRole('link', { name: '다음 시즌 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
     });
 
-    it('운영·설정·사후로 묶고, 각 섹션은 리그 아래 자기 주소를 가진다', () => {
+    it('앞 다섯 섹션은 탭이고 나머지는 더보기「사후」에 있으며, 각 섹션은 리그 아래 자기 주소를 가진다', () => {
       renderShell();
 
       const bar = screen.getByRole('navigation', { name: '리그 관리 섹션' });
-      expect(within(bar).getAllByRole('group').map((group) => group.getAttribute('aria-label'))).toEqual(['운영', '설정', '사후']);
-      const hrefOf = (name: string | RegExp) => within(bar).getByRole('link', { name }).getAttribute('href');
-      expect(hrefOf(/^일정/)).toBe('/admin/league-matches/league-1/schedule');
-      expect(hrefOf(/^신청 관리/)).toBe('/admin/league-matches/league-1/registrations');
+      const tabHref = (name: string | RegExp) => within(bar).getByRole('link', { name }).getAttribute('href');
+      expect(within(bar).getAllByRole('link').map((link) => link.textContent)).toEqual([
+        '일정2',
+        '신청 관리',
+        '징계 현황',
+        '리그 정보',
+        '경기 규칙',
+      ]);
+      expect(tabHref(/^일정/)).toBe('/admin/league-matches/league-1/schedule');
+      expect(tabHref(/^신청 관리/)).toBe('/admin/league-matches/league-1/registrations');
       // 리그 정보의 주소는 예전 "리그 수정" 그대로라 이미 걸려 있는 링크가 깨지지 않는다.
-      expect(hrefOf('리그 정보')).toBe('/admin/league-matches/league-1/edit');
-      expect(hrefOf('경기 규칙')).toBe('/admin/league-matches/league-1/rules');
-      expect(hrefOf('경기 영상')).toBe('/admin/league-matches/league-1/videos');
-      expect(hrefOf('리뷰 관리')).toBe('/admin/league-matches/league-1/reviews');
+      expect(tabHref('리그 정보')).toBe('/admin/league-matches/league-1/edit');
+      expect(tabHref('경기 규칙')).toBe('/admin/league-matches/league-1/rules');
+
+      const more = openMore();
+      expect(within(more).getByText('사후')).toBeInTheDocument();
+      expect(within(more).getByRole('link', { name: '경기 영상' })).toHaveAttribute('href', '/admin/league-matches/league-1/videos');
+      expect(within(more).getByRole('link', { name: '리뷰 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/reviews');
+      // 탭에 있는 섹션은 더보기에 또 나오지 않는다.
+      expect(within(more).queryByRole('link', { name: '리그 정보' })).not.toBeInTheDocument();
     });
 
     // 신청 관리에는 숫자를 붙이지 않는다 — 운영자가 직접 넣은 팀은 '신청' 수에 안 잡혀서 팀이 있는데도 0으로 보인다.

@@ -23,7 +23,7 @@ const nullableStrings = [
 ];
 const allowedKeys = new Set([
   ...requiredStrings, ...nullableStrings, 'placeLatitude', 'placeLongitude',
-  'placeProvider', 'matchStyle', 'periods', 'version',
+  'placeProvider', 'matchStyle', 'periods', 'version', 'teamFoulThreshold',
 ]);
 
 /** Preserve the full allowed form body; UI-only draft metadata must not pass the DTO boundary. */
@@ -43,6 +43,9 @@ export function isTeamMatchRulesPayload(
   if (value.matchStyle !== undefined && (!Array.isArray(value.matchStyle)
     || !value.matchStyle.every((item: unknown) => typeof item === 'string'))) return false;
   if (value.version !== undefined && typeof value.version !== 'string') return false;
+  // 팀 파울 경고 기준 — 생략·null(기본값 5개) 또는 1~20 정수(서버 DTO 와 같은 범위).
+  if (value.teamFoulThreshold != null && !(Number.isInteger(value.teamFoulThreshold)
+    && (value.teamFoulThreshold as number) >= 1 && (value.teamFoulThreshold as number) <= 20)) return false;
   return value.periods === undefined || isPeriods(value.periods);
 }
 

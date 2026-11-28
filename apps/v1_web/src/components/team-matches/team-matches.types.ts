@@ -305,6 +305,8 @@ export type TeamMatchRulesControl = {
   onRetry?: () => void;
   onKeepDefault?: () => void;
   onChange: (periods: readonly V1TeamMatchPeriodInput[]) => void;
+  /** 팀 파울 경고 기준 입력칸 — 경기 시간(periods)과 따로 저장되는 값이라 규칙 잠금과 무관하게 쓴다. */
+  teamFoulThreshold?: { value: string; error?: string; onChange: (value: string) => void };
 };
 
 export type TeamMatchCreateViewModel = {
@@ -339,6 +341,8 @@ export type TeamMatchCreateViewModel = {
     endTime: string;
     deadlineDate: string;
     deadlineTime: string;
+    /** 팀 파울 경고 기준(개). 빈 문자열·생략 = 기본값(5개). */
+    teamFoulThreshold?: string;
   };
   form?: {
     selectedTeamId: string;

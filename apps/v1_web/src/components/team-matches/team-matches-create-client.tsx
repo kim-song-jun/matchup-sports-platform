@@ -28,6 +28,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { readTeamMatchRuleDraft, ruleDraftForOptions, ruleDraftForEdit, ruleDraftMatches, validTeamMatchPeriods, teamMatchEditDraftKey, readTeamMatchEditDraft } from './team-match-rules-draft';
 import { TEAM_MATCH_PERIOD_MINUTES_ERROR } from '@/lib/team-match-periods';
+import { parseTeamFoulThresholdInput, TEAM_FOUL_THRESHOLD_ERROR } from '@/lib/team-foul-counter';
 import { placeFromEditForm, type PlaceValue } from '@/lib/place';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { formatTeamMatchLevelRange } from '@/lib/team-match-level-range';
@@ -248,6 +249,11 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
         if (!options || options.hostTeamId !== selectedTeamId || options.sportId !== selectedSportId) return;
         setDraft((current) => ({ ...current, rules: { ...ruleDraftForOptions(options), periods, confirmed: false } }));
       },
+      teamFoulThreshold: {
+        value: draft.teamFoulThreshold ?? '',
+        error: fieldErrors.teamFoulThreshold,
+        onChange: (value) => setDraft((current) => ({ ...current, teamFoulThreshold: value })),
+      },
     },
     imageUploading,
     uploadImage: async (file) => {
@@ -301,6 +307,12 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
         if (!ruleDraft || (!supported && !preserveDefault) || ruleOptions.isFetching) {
           setAttempted(true);
           setPendingFocusField('rules');
+          return;
+        }
+        // 팀 파울 기준은 선택값이지만 입력했다면 범위 안이어야 다음 단계로 간다.
+        if (parseTeamFoulThresholdInput(draft.teamFoulThreshold ?? '') === 'invalid') {
+          setAttempted(true);
+          setPendingFocusField('teamFoulThreshold');
           return;
         }
         setDraft((current) => ({ ...current, rules: { ...ruleDraft, confirmed: true } }));
@@ -490,6 +502,12 @@ export function TeamMatchEditPageClient({ teamMatchId, rulesStep = false }: { te
         const rules = { ...draft.rules, periods, confirmed: false };
         const changed = JSON.stringify(periods) !== JSON.stringify(editQuery.data.form.periods);
         persistEditDraft({ ...editDraftRef.current, rules }, regionId, changed);
+      },
+      teamFoulThreshold: {
+        value: draft.teamFoulThreshold ?? '',
+        error: editAttempted && parseTeamFoulThresholdInput(draft.teamFoulThreshold ?? '') === 'invalid' ? TEAM_FOUL_THRESHOLD_ERROR : undefined,
+        // 경기 시간(periods)과 따로 저장되는 값이라 규칙이 잠겨 있어도 바꿀 수 있다.
+        onChange: (value) => persistEditDraft({ ...editDraftRef.current, teamFoulThreshold: value }, regionId, editRulesChanged),
       },
     },
     primaryBlocked: rulesStep && editQuery.data?.rulesEditable === true
@@ -837,6 +855,7 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     endTime: end.slice(11, 16),
     deadlineDate: deadline.slice(0, 10),
     deadlineTime: deadline.slice(11, 16),
+    teamFoulThreshold: edit.form.teamFoulThreshold == null ? '' : String(edit.form.teamFoulThreshold),
   };
 }
 

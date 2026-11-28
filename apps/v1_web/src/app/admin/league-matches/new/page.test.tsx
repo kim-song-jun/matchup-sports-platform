@@ -156,8 +156,25 @@ describe('AdminLeagueMatchNewPage — 대회처럼 단계로 만든다', () => {
       minPlayers: 1,
       maxPlayers: null,
       maxTeams: null,
+      // 관전 화면 팀 파울 표시는 기본 켜짐이다.
+      showTeamFouls: true,
     }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
+  });
+
+  it('관전 화면 팀 파울 스위치를 끄고 만들면 꺼짐으로 보낸다', async () => {
+    mockData();
+    const mutateAsync = mockCreate();
+    await toGameSettings();
+    const toggle = screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+    expect(toggle).not.toBeChecked();
+    next();
+    expect(screen.getByText('보여주지 않음', { selector: 'dd' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ showTeamFouls: false })));
   });
 
   // 2026-10-27: 팀을 넣지 않고 참가 신청으로만 모아도 된다.

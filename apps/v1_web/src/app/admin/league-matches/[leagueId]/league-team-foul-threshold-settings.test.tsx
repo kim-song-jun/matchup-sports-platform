@@ -57,6 +57,40 @@ describe('리그 팀 파울 기준', () => {
     await waitFor(() => expect(save).toHaveBeenCalledWith({ teamFoulThreshold: 4 }));
   });
 
+  it('관전 화면 팀 파울 스위치는 누르는 즉시 이 칸만 담아 저장하고, 진행 중인 리그도 바꿀 수 있다', async () => {
+    const toast = vi.fn();
+    render(
+      <LeagueTeamFoulThresholdSettings
+        league={league({ showTeamFouls: true, fixtures: [{ gameState: 'LIVE' }] as never })}
+        canWrite
+        showToast={toast}
+      />,
+    );
+    const toggle = screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ showTeamFouls: false }));
+    expect(toast).toHaveBeenCalledWith('관전 화면에서 팀 파울을 숨겼어요.', 'success');
+  });
+
+  it('필드가 없던 구버전 응답은 스위치를 켜짐으로 읽지만 저장은 막고, 읽기 전용 권한은 스위치를 보여 주지 않는다', () => {
+    const { unmount } = render(<LeagueTeamFoulThresholdSettings league={league({ teamFoulThreshold: undefined })} canWrite showToast={vi.fn()} />);
+    expect(screen.queryByRole('switch')).toBeNull();
+    unmount();
+    render(<LeagueTeamFoulThresholdSettings league={league()} canWrite={false} showToast={vi.fn()} />);
+    expect(screen.queryByRole('switch')).toBeNull();
+  });
+
+  it('표시 설정 저장이 실패하면 이유를 알린다', async () => {
+    save.mockRejectedValueOnce(new Error('boom'));
+    const toast = vi.fn();
+    render(<LeagueTeamFoulThresholdSettings league={league({ showTeamFouls: false })} canWrite showToast={toast} />);
+    fireEvent.click(screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' }));
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.any(String), 'error'));
+  });
+
   it('읽기 전용 권한은 수정을 열지 않는다', () => {
     render(<LeagueTeamFoulThresholdSettings league={league()} canWrite={false} showToast={vi.fn()} />);
     expect(screen.queryByRole('button', { name: '수정' })).toBeNull();

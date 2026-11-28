@@ -79,6 +79,19 @@ export interface PublicEndedPeriod {
 }
 
 /**
+ * 진행 중인 경기의 팀 파울(스코어 카드의 채워지는 바). 선수별 파울은 공개되지 않고, 경기가 끝나면 응답에서 사라진다 —
+ * 기록으로 남기지 않는 값이다.
+ */
+export interface PublicTeamFouls {
+  /** 이 개수가 어느 피리어드의 것인지(팀 파울은 피리어드마다 0부터 다시 센다). */
+  readonly periodNumber: number;
+  /** 이 개수에 이르면 "10m 프리킥" — 대회·리그별 기준이고 지금 저장된 값이다. */
+  readonly threshold: number;
+  readonly home: number;
+  readonly away: number;
+}
+
+/**
  * 참가팀 공개 정책 통일(fix/v1-publish) — teamId/teamName은 대회가 모집
  * 중(status==='open')이고 조회자가 운영자·스태프가 아니면 둘 다 null이다.
  * registrationId는 재식별 경로가 없으므로 항상 남는다.
@@ -369,6 +382,8 @@ export interface PublicMatchDetail {
    * 설정 길이(`periodMinutes`) 대신 쓴다 — 전반을 일찍 끝내면 둘이 다르다.
    */
   readonly endedPeriods?: readonly PublicEndedPeriod[] | null;
+  /** 진행 중 경기의 팀 파울(진행 중 경기에서만, 아니면 null·옛 응답엔 없음). */
+  readonly teamFouls?: PublicTeamFouls | null;
   readonly lineup: PublicLineup | null;
   readonly events: readonly PublicMatchEvent[];
   readonly mvp: PublicMatchMvp | null;

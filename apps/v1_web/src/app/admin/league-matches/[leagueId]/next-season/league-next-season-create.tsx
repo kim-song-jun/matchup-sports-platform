@@ -36,6 +36,7 @@ export function nextSeasonPrefill(
     plannedFixtureCount: league.plannedFixtureCount == null ? '' : String(league.plannedFixtureCount),
     // 지난 리그가 정한 팀 파울 기준을 이어 간다(비워 뒀으면 새 리그도 기본값).
     teamFoulThreshold: league.teamFoulThreshold == null ? '' : String(league.teamFoulThreshold),
+    showTeamFouls: league.showTeamFouls ?? true,
     periodMinutes: periods != null && COPYABLE_PERIOD_COUNTS.has(periods.length)
       ? periods.map((period) => String(period.durationMinutes))
       : null,

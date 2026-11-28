@@ -76,6 +76,7 @@ export function createTournamentInfoFixture(overrides: Partial<V1Tournament> = {
     yellowAccumulationLimit: null,
     redCardSuspensionMatches: null,
     teamFoulThreshold: null,
+    showTeamFouls: true,
     rulesText: null,
     refundPolicyText: null,
     registrationCount: 5,

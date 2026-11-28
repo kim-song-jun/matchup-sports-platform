@@ -25,8 +25,8 @@ WORKDIR /app/apps/v1_api
 # accidental schema edit fails the build instead of shipping a silent drift.
 # Task 172 adds shared record/history tables after Task 149 platformManaged; the frozen StageB builder below retains its own pin.
 RUN npx prisma generate \
-  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = 49c1c6af0bbe8887671747d26963fc7f8acebf75682aca1437154bdee3dc4db0 \
-  && printf '{"schemaVersion":1,"stage":"final","schemaSha256":"49c1c6af0bbe8887671747d26963fc7f8acebf75682aca1437154bdee3dc4db0","generatedClient":true}\n' > .task168-runtime-client-attestation.json
+  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = f24c1aea3ea60f9053230b7b4dd062c318b5c27135f5a3a5a2b83571cb7b71c3 \
+  && printf '{"schemaVersion":1,"stage":"final","schemaSha256":"f24c1aea3ea60f9053230b7b4dd062c318b5c27135f5a3a5a2b83571cb7b71c3","generatedClient":true}\n' > .task168-runtime-client-attestation.json
 RUN npx nest build
 
 # This image is an executable view of the immutable v7 tar. No retired source

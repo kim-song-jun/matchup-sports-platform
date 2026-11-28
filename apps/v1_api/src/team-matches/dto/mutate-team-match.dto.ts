@@ -26,6 +26,7 @@ import {
   UNIFORM_COLOR_MAX_LENGTH,
 } from '../team-match-conditions.constants';
 import { MAX_TEAM_MATCH_PERIOD_MINUTES } from '../team-match-periods.constants';
+import { MAX_TEAM_FOUL_THRESHOLD, MIN_TEAM_FOUL_THRESHOLD } from '../../tournaments/team-foul-threshold';
 
 export class TeamMatchPeriodSettingDto {
   // Preserve JSON number types instead of implicitly converting strings or booleans.
@@ -121,6 +122,16 @@ export class MutateTeamMatchDto {
   @ValidateNested({ each: true })
   @Type(() => TeamMatchPeriodSettingDto)
   periods?: TeamMatchPeriodSettingDto[];
+
+  /**
+   * 팀 파울 경고 기준 — 팀 누적 파울이 이 개수에 이르면 운영 콘솔이 "다음부터 10m 프리킥"으로 예고한다(친선 팀 매치).
+   * 생략·null = 기본값(5개). 수정 요청에서 undefined 는 유지, null 은 기본값으로 되돌리기다.
+   */
+  @IsOptional()
+  @IsInt({ message: '팀 파울 기준은 정수여야 해요.' })
+  @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
+  @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
+  teamFoulThreshold?: number | null;
 
   @IsOptional()
   @IsString()

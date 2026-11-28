@@ -2,6 +2,7 @@
 
 import { useImperativeHandle, useMemo } from 'react';
 import { SixTeamModeField } from '@/components/admin/bracket-canvas/six-team-mode-field';
+import { TeamFoulPublicSwitch } from '@/components/admin/team-foul-public-switch';
 import {
   PeriodSettingsFields,
   periodSummaryText,
@@ -56,6 +57,8 @@ interface RulesDraft {
   yellowLimit: string;
   redSuspension: string;
   teamFoulThreshold: string;
+  /** 진행 중인 경기의 팀 파울을 관전 화면에 보여줄지 — 구버전 응답(필드 없음)은 켜짐으로 읽는다. */
+  showTeamFouls: boolean;
 }
 
 const toDraft = (tournament: V1Tournament): RulesDraft => ({
@@ -68,6 +71,7 @@ const toDraft = (tournament: V1Tournament): RulesDraft => ({
   yellowLimit: numberText(tournament.yellowAccumulationLimit),
   redSuspension: numberText(tournament.redCardSuspensionMatches),
   teamFoulThreshold: numberText(tournament.teamFoulThreshold),
+  showTeamFouls: tournament.showTeamFouls ?? true,
 });
 
 const noteCls = 'text-[length:var(--font-size-caption)] text-[var(--text-muted)]';
@@ -141,6 +145,8 @@ function RulesForm({ base, disabled, ref, onDirtyChange, leaveLinkClick }: InfoS
       if (yellowLimit !== (base.yellowAccumulationLimit ?? null)) changes.yellowAccumulationLimit = yellowLimit;
       if (redSuspension !== (base.redCardSuspensionMatches ?? null)) changes.redCardSuspensionMatches = redSuspension;
       if (teamFoulThreshold !== (base.teamFoulThreshold ?? null)) changes.teamFoulThreshold = teamFoulThreshold;
+      // 관전 화면 팀 파울 표시 — 바뀐 때만 보낸다. 팀 파울 기준처럼 대회가 시작된 뒤에도 바꿀 수 있다.
+      if (draft.showTeamFouls !== (base.showTeamFouls ?? true)) changes.showTeamFouls = draft.showTeamFouls;
 
       const steps = periods.buildSteps(ctx.patchPeriods);
       if (Object.keys(changes).length > 0) {
@@ -315,6 +321,7 @@ function RulesForm({ base, disabled, ref, onDirtyChange, leaveLinkClick }: InfoS
             hint={`한 팀의 파울이 이 개수에 이르면 경기 화면이 '다음부터 10m 프리킥'으로 예고하고, 넘으면 '세컨 파울 · 10m 프리킥'으로 알려요. 비우면 ${DEFAULT_TEAM_FOUL_THRESHOLD}개예요.`}
             error={errorFor(ids.teamFoulThreshold)}
           />
+          <TeamFoulPublicSwitch checked={draft.showTeamFouls} onChange={(checked) => set('showTeamFouls', checked)} disabled={disabled} />
         </div>
       </FormGroup>
       {started ? null : <p className={`pt-2 ${noteCls}`}>첫 경기가 시작되면 출전 인원과 교체는 바꿀 수 없어요.</p>}

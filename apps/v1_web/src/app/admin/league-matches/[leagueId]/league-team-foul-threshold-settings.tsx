@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useV1UpdateLeagueDiscipline } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { TeamFoulPublicSwitch } from '@/components/admin/team-foul-public-switch';
 import {
   DEFAULT_TEAM_FOUL_THRESHOLD,
   parseTeamFoulThresholdInput,
@@ -52,6 +53,18 @@ export function LeagueTeamFoulThresholdSettings({ league, canWrite, showToast }:
     }
   };
 
+  // 관전 화면 팀 파울 표시 — 스위치를 누르면 바로 저장한다(경기 진행 중에도 바꿀 수 있고, 기준 개수와 따로 저장된다).
+  const shown = league.showTeamFouls ?? true;
+  const toggleShown = async (next: boolean) => {
+    if (!canWrite || update.isPending || !loaded) return;
+    try {
+      await update.mutateAsync({ showTeamFouls: next });
+      showToast(next ? '관전 화면에 팀 파울을 보여줘요.' : '관전 화면에서 팀 파울을 숨겼어요.', 'success');
+    } catch (cause) {
+      showToast(extractErrorMessage(cause, '팀 파울 표시 설정을 저장하지 못했어요.'), 'error');
+    }
+  };
+
   return (
     <section aria-label="팀 파울 기준" className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-4">
       <div className="flex items-start justify-between gap-3">
@@ -70,6 +83,7 @@ export function LeagueTeamFoulThresholdSettings({ league, canWrite, showToast }:
       <p className="mt-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
         한 팀의 파울이 이 개수에 이르면 경기 운영 화면이 &lsquo;다음부터 10m 프리킥&rsquo;으로 예고하고, 이 개수를 넘으면 &lsquo;세컨 파울 · 10m 프리킥&rsquo;으로 알려요. 경기 진행 중에도 바꿀 수 있어요.
       </p>
+      {canWrite && loaded && <TeamFoulPublicSwitch checked={shown} onChange={(next) => void toggleShown(next)} disabled={update.isPending} />}
       {editing && <div className="mt-4 border-t border-[var(--border)] pt-4">
         <label className="text-[length:var(--font-size-body-sm)]">팀 파울 기준 (개)
           <input

@@ -1,6 +1,7 @@
 import { StagePlanDto } from '../stages/stage-plan.dto';
 import { Transform, Type } from 'class-transformer';
 import {
+  ValidateIf,
   ValidateNested,
   ArrayMaxSize,
   ArrayMinSize,
@@ -313,6 +314,15 @@ export class CreateTournamentDto {
   @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
   @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
   teamFoulThreshold?: number | null;
+
+  /**
+   * 진행 중인 경기의 팀 파울을 관전 화면(경기 상세)에 보여줄지. 생략 = 생성 시 켜짐, 수정 시 유지.
+   * 운영 콘솔의 팀 파울·경고에는 영향이 없고 경기가 진행 중일 때도 바꿀 수 있다.
+   */
+  // `@IsOptional()` 은 null 도 통과시킨다 — 이 컬럼은 NOT NULL 이라 null 은 막고 생략(undefined)만 허용한다.
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsBoolean({ message: '팀 파울 표시 여부는 켜짐/꺼짐으로 보내 주세요.' })
+  showTeamFouls?: boolean;
 
   @IsOptional()
   @IsString()
@@ -695,6 +705,15 @@ export class UpdateTournamentDto {
   @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
   @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
   teamFoulThreshold?: number | null;
+
+  /**
+   * 진행 중인 경기의 팀 파울을 관전 화면(경기 상세)에 보여줄지. 생략 = 생성 시 켜짐, 수정 시 유지.
+   * 운영 콘솔의 팀 파울·경고에는 영향이 없고 경기가 진행 중일 때도 바꿀 수 있다.
+   */
+  // `@IsOptional()` 은 null 도 통과시킨다 — 이 컬럼은 NOT NULL 이라 null 은 막고 생략(undefined)만 허용한다.
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsBoolean({ message: '팀 파울 표시 여부는 켜짐/꺼짐으로 보내 주세요.' })
+  showTeamFouls?: boolean;
 
   @IsOptional()
   @IsString()

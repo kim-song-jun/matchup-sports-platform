@@ -45,6 +45,20 @@ type FakeGoalEvent = {
   reversesEventId: string | null;
 };
 
+/** 팀 파울 집계 테스트용 — FOUL·CARD 이벤트(되돌림 행 포함). 집계에 쓰는 필드만 채운다. */
+type FakeFoulEvent = {
+  id: string;
+  gameId: string;
+  type: 'FOUL' | 'CARD' | 'CORRECTION';
+  sideId: string | null;
+  participantId: string | null;
+  period: number;
+  clockMs: number;
+  sequence: number;
+  payload: unknown;
+  reversesEventId: string | null;
+};
+
 type FakeConsentLink = { participantId: string; linkId: string; userId: string };
 type FakeConsentSnapshot = { linkId: string; state: 'GRANTED' | 'REVOKED'; effectiveAt: Date };
 
@@ -85,7 +99,11 @@ function buildFakePrisma(options: {
   consentSnapshots: FakeConsentSnapshot[];
   /** 사용자 단위 공개 동의. 프로필 링크(profileHref)는 이 값을 직접 본다. */
   userConsents?: { userId: string; state: 'GRANTED' | 'REVOKED' }[];
-  events: FakeGoalEvent[];
+  events: (FakeGoalEvent | FakeFoulEvent)[];
+  /** 대회에 저장된 팀 파울 기준(`V1Tournament.teamFoulThreshold`). 기본값 undefined = 비어 있음(기본 5개). */
+  teamFoulThreshold?: number | null;
+  /** 대회의 관전 화면 팀 파울 표시 여부(`V1Tournament.showTeamFouls`). 기본값 undefined = 켜짐. */
+  showTeamFouls?: boolean;
   /** Issue #377 -- this fixture's assigned field, for the staff-bypass scope tests below. */
   fieldId?: string | null;
   /**
@@ -151,6 +169,8 @@ function buildFakePrisma(options: {
           status: options.tournamentStatus ?? 'closed',
           bracketPublishedAt: new Date('2026-01-01T00:00:00.000Z'),
           bracketPublishScheduledAt: null,
+          teamFoulThreshold: options.teamFoulThreshold ?? null,
+          showTeamFouls: options.showTeamFouls ?? true,
         };
       },
     },
@@ -1146,6 +1166,99 @@ describe('PublicTournamentRecordsService.getMatch -- endedPeriods (끝난 피리
 
   it('경기가 이미 종료됐으면(status !== live) null이다 — 라이브 전용 값이 끝난 경기 응답에 실리지 않는다', async () => {
     expect(await endedPeriodsFor({ gameState: 'ENDED', periods: [ended(1, 0, 20), ended(2, 25, 45)] })).toBeNull();
+  });
+});
+
+describe('PublicTournamentRecordsService.getMatch -- teamFouls (라이브 전용 팀 파울)', () => {
+  const kickoff = new Date('2026-08-10T04:00:00.000Z');
+  const live = (number: number) => ({ number, state: 'LIVE', startedAt: kickoff, pausedTotalMs: 0, pausedAt: null });
+  const ended = (number: number) => ({ number, state: 'ENDED', startedAt: kickoff, endedAt: kickoff, pausedTotalMs: 0, pausedAt: null });
+  const halftime = (number: number) => ({ number, state: 'HALFTIME', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null });
+  let sequence = 0;
+  const foul = (sideId: string, period: number, id = `foul-${sequence + 1}`): FakeFoulEvent => ({
+    id, gameId: GAME_ID, type: 'FOUL', sideId, participantId: null, period, clockMs: 0, sequence: ++sequence, payload: {}, reversesEventId: null,
+  });
+  const card = (sideId: string, participantId: string, color: 'YELLOW' | 'RED', period: number): FakeFoulEvent => ({
+    id: `card-${sequence + 1}`, gameId: GAME_ID, type: 'CARD', sideId, participantId, period, clockMs: 0, sequence: ++sequence, payload: { card: color }, reversesEventId: null,
+  });
+  const reversal = (reversesEventId: string): FakeFoulEvent => ({
+    id: `reverse-${sequence + 1}`, gameId: GAME_ID, type: 'CORRECTION', sideId: null, participantId: null, period: 1, clockMs: 0, sequence: ++sequence, payload: {}, reversesEventId,
+  });
+  const teamFoulsFor = async (options: {
+    periods: unknown[];
+    events: FakeFoulEvent[];
+    gameState?: string;
+    visibilityMode?: string;
+    teamFoulThreshold?: number | null;
+    showTeamFouls?: boolean;
+  }) => {
+    const prisma = buildFakePrisma({
+      scheduledAt: kickoff,
+      consentLinks: [],
+      consentSnapshots: [],
+      ...options,
+    } as Parameters<typeof buildFakePrisma>[0]);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+    return (await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).teamFouls;
+  };
+
+  it('진행 중인 피리어드의 홈·원정 파울을 센다 — 지난 피리어드 파울은 빠진다', async () => {
+    const result = await teamFoulsFor({
+      periods: [ended(1), live(2)],
+      events: [foul('side-home', 1), foul('side-home', 1), foul('side-away', 1), foul('side-home', 2), foul('side-away', 2), foul('side-away', 2)],
+    });
+    expect(result).toEqual({ periodNumber: 2, threshold: 5, home: 1, away: 2 });
+  });
+
+  it('기준은 대회에 지금 저장된 값을 쓰고, 비어 있으면 기본 5개다', async () => {
+    const base = { periods: [live(1)], events: [] };
+    expect((await teamFoulsFor({ ...base, teamFoulThreshold: 8 }))?.threshold).toBe(8);
+    expect((await teamFoulsFor({ ...base, teamFoulThreshold: null }))?.threshold).toBe(5);
+  });
+
+  it('하프타임에는 방금 끝난 전반의 개수를 보여 준다', async () => {
+    const result = await teamFoulsFor({
+      periods: [ended(1), halftime(2)],
+      events: [foul('side-home', 1), foul('side-away', 1), foul('side-away', 1)],
+    });
+    expect(result).toEqual({ periodNumber: 1, threshold: 5, home: 1, away: 2 });
+  });
+
+  it('되돌린 파울은 세지 않는다', async () => {
+    const first = foul('side-home', 1, 'foul-reversed');
+    const result = await teamFoulsFor({ periods: [live(1)], events: [first, foul('side-home', 1), reversal('foul-reversed')] });
+    expect(result?.home).toBe(1);
+  });
+
+  it('카드도 파울 1개로 세지만 경고 누적(옐로 2장 뒤)으로 붙는 레드는 세지 않는다 — 운영 콘솔과 같은 규칙', async () => {
+    const result = await teamFoulsFor({
+      periods: [live(1)],
+      events: [
+        card('side-home', 'p-1', 'YELLOW', 1),
+        card('side-home', 'p-1', 'YELLOW', 1),
+        card('side-home', 'p-1', 'RED', 1), // 경고 누적 퇴장 — 세지 않는다
+        card('side-away', 'p-2', 'RED', 1), // 다이렉트 레드 — 센다
+      ],
+    });
+    expect(result).toMatchObject({ home: 2, away: 1 });
+  });
+
+  it('시작한 피리어드가 없으면 null이다', async () => {
+    expect(await teamFoulsFor({ periods: [], events: [] })).toBeNull();
+  });
+
+  it('경기가 이미 종료됐으면 null이다 — 기록으로 남기지 않는다', async () => {
+    expect(await teamFoulsFor({ gameState: 'ENDED', periods: [ended(1), ended(2)], events: [foul('side-home', 2)] })).toBeNull();
+  });
+
+  it('대회가 관전 화면 표시를 껐으면 라이브 중에도 싣지 않는다 — 켜면 다시 실린다', async () => {
+    const base = { periods: [live(1)], events: [foul('side-home', 1)] };
+    expect(await teamFoulsFor({ ...base, showTeamFouls: false })).toBeNull();
+    expect((await teamFoulsFor({ ...base, showTeamFouls: true }))?.home).toBe(1);
+  });
+
+  it('상태만 공개하는 경기(status_only)에는 싣지 않는다', async () => {
+    expect(await teamFoulsFor({ visibilityMode: 'STATUS_ONLY', periods: [live(1)], events: [foul('side-home', 1)] })).toBeNull();
   });
 });
 

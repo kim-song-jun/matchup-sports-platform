@@ -54,7 +54,9 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-11-23: additive V1AccessToken (20261123090000_v1_access_tokens); M11 remains unchanged.
 # 2026-11-27: additive V1Tournament.teamFoulThreshold (20261127090000_v1_tournament_team_foul_threshold); M11 remains unchanged.
 # 2026-11-28: additive V1WidgetLiveActivity (20261128090000_v1_widget_live_activities); M11 remains unchanged.
-[[ ( "$schema_sha" == 49c1c6af0bbe8887671747d26963fc7f8acebf75682aca1437154bdee3dc4db0 \
+# 2026-11-28: additive V1Tournament.showTeamFouls + V1TeamMatch.teamFoulThreshold (20261128100000_v1_team_foul_public_display); M11 remains unchanged.
+[[ ( "$schema_sha" == f24c1aea3ea60f9053230b7b4dd062c318b5c27135f5a3a5a2b83571cb7b71c3 \
+  || "$schema_sha" == 49c1c6af0bbe8887671747d26963fc7f8acebf75682aca1437154bdee3dc4db0 \
   || "$schema_sha" == 990db3888d9f8bd012a94f8003d5e51e968cd3969dec27a591cc120e9994a11e \
   || "$schema_sha" == 40d98233092f3d6b8dbbe9c601d2d7081ae6ec141b30cd703c00a03584474d3a \
   || "$schema_sha" == 616ec82475046627e4e58c6982c6312e95ddfd38831e44c5629a8b7eaa3d443b \

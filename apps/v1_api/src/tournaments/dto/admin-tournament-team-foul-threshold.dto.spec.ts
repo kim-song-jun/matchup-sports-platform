@@ -28,3 +28,22 @@ describe.each([
     expect((await errorsOn(make(value), 'teamFoulThreshold')).length).toBeGreaterThan(0);
   });
 });
+
+describe.each([
+  ['CreateTournamentDto', CreateTournamentDto],
+  ['UpdateTournamentDto', UpdateTournamentDto],
+] as const)('%s showTeamFouls', (_name, Dto) => {
+  const toDto = (plain: object) => plainToInstance(Dto as new () => object, plain);
+
+  it.each([true, false])('accepts the boolean %p', async (value) => {
+    expect(await errorsOn(toDto({ showTeamFouls: value }), 'showTeamFouls')).toHaveLength(0);
+  });
+
+  it('accepts omission (create = on, update = keep)', async () => {
+    expect(await errorsOn(toDto({}), 'showTeamFouls')).toHaveLength(0);
+  });
+
+  it.each([null, 'false', 0, 1, 'on'])('rejects the non-boolean %p', async (value) => {
+    expect((await errorsOn(toDto({ showTeamFouls: value }), 'showTeamFouls')).length).toBeGreaterThan(0);
+  });
+});

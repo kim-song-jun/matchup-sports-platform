@@ -69,6 +69,31 @@ describe('경기 규칙 섹션 시트 — 저장 순서(경기 시간 → 경기
     expect(Object.keys(backend.state.patches[0]).sort()).toEqual(['expectedVersion', 'teamFoulThreshold']);
   });
 
+  it('관전 화면 팀 파울 스위치는 켜진 채 열리고, 끄면 그 값만 보낸다(대회가 진행 중이어도)', async () => {
+    const backend = start();
+    const view = await open(backend);
+    const toggle = view.inSheet().getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' });
+    expect(toggle).toBeChecked();
+
+    fireEvent.click(toggle);
+    view.save();
+    await view.saved();
+
+    expect(Object.keys(backend.state.patches[0]).sort()).toEqual(['expectedVersion', 'showTeamFouls']);
+    expect(backend.state.tournament.showTeamFouls).toBe(false);
+  });
+
+  it('스위치를 건드리지 않으면 표시 여부를 보내지 않는다(다른 칸만 고친 저장이 값을 덮어쓰지 않게)', async () => {
+    const backend = start();
+    const view = await open(backend);
+
+    type(view, '팀 파울 기준', '6');
+    view.save();
+    await view.saved();
+
+    expect(backend.state.patches[0]).not.toHaveProperty('showTeamFouls');
+  });
+
   it('경기 시간이 실패하면 경기 규칙은 보내지 않는다', async () => {
     const backend = start();
     const view = await open(backend);

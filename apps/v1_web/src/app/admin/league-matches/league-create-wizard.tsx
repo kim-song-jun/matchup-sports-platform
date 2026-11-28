@@ -28,6 +28,7 @@ import { formatWithComma, onlyDigits } from '@/lib/number-format';
 import { LeagueBasicFields, leagueInputClass as inputClass, leagueLabelClass as labelClass } from './league-basic-fields';
 import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
+import { TeamFoulPublicSwitch } from '@/components/admin/team-foul-public-switch';
 import { LeaguePlannedFixtureField, LeagueRosterLimitField, LeagueTeamCapacityField, LeagueTeamFoulThresholdField, leagueTeamCapacityError, leagueTeamFoulThresholdError, rosterLimitError, type RosterLimitValue } from './league-settings-fields';
 import { parseTeamFoulThresholdInput } from '@/lib/team-foul-counter';
 import type { V1CreateLeaguePayload } from '@/types/league-match';
@@ -67,6 +68,8 @@ export interface LeagueCreatePrefill {
   plannedFixtureCount: string;
   /** 지난 리그의 팀 파울 기준(개). 빈 문자열·생략 = 기본값(5개). */
   teamFoulThreshold?: string;
+  /** 지난 리그의 관전 화면 팀 파울 표시 여부. 생략 = 켜짐. */
+  showTeamFouls?: boolean;
   /** 지난 리그의 피리어드(분). 있으면 만든 직후 새 리그에 저장한다. */
   periodMinutes: string[] | null;
 }
@@ -101,6 +104,8 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
   const [maxTeams, setMaxTeams] = useState(prefill?.maxTeams ?? '');
   // 비워 두면 기본값(5개)이다 — 비워 두는 것이 정상 상태라 기본값을 채워 두지 않는다.
   const [teamFoulThreshold, setTeamFoulThreshold] = useState(prefill?.teamFoulThreshold ?? '');
+  // 관전 화면에 진행 중 팀 파울을 보여줄지 — 기본 켜짐. 리그를 연 뒤에도 규정 탭에서 바꿀 수 있다.
+  const [showTeamFouls, setShowTeamFouls] = useState(prefill?.showTeamFouls ?? true);
   // Covers create + period lookup/save so the button stays locked until the whole flow settles.
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
@@ -243,6 +248,7 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
     ...(typeof parseTeamFoulThresholdInput(teamFoulThreshold) === 'number'
       ? { teamFoulThreshold: parseTeamFoulThresholdInput(teamFoulThreshold) as number }
       : {}),
+    showTeamFouls,
     ...(deadlineIso !== null ? { registrationDeadlineAt: deadlineIso } : {}),
     ...(feeValue !== null ? { entryFee: feeValue } : {}),
     ...(paid ? { bankName: bankName.trim(), bankAccount: bankAccount.trim(), bankHolder: bankHolder.trim() } : {}),
@@ -524,6 +530,7 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
                 onChange={setTeamFoulThreshold}
                 disabled={locked}
               />
+              <TeamFoulPublicSwitch checked={showTeamFouls} onChange={setShowTeamFouls} disabled={locked} />
 
               <div className="tm-on-tint rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
                 순위 규칙: {formatTieBreakRule(LEAGUE_TIE_BREAK_ORDER)} (고정값 — 리그별 변경 미지원)
@@ -549,6 +556,7 @@ export function LeagueCreateWizard({ prefill }: { prefill?: LeagueCreatePrefill 
                 ['총 경기 수', plannedFixtureCount.trim() === '' ? '정하지 않음' : `${plannedFixtureCount}경기`],
                 ['경기 시간', periodMinutes.length === 0 ? '종목 기본값' : periodMinutes.map((value, index) => `${periodNames[index]} ${value}분`).join(' · ')],
                 ['팀 파울 기준', teamFoulThreshold.trim() === '' ? '기본 5개' : `${teamFoulThreshold.trim()}개`],
+                ['관전 화면 팀 파울', showTeamFouls ? '보여줌' : '보여주지 않음'],
               ].map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4">
                   <dt className="shrink-0 text-[var(--text-muted)] sm:w-28">{label}</dt>

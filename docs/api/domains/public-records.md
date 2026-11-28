@@ -290,8 +290,26 @@ projection, computed only when there is no official revision yet:
   (older responses). Gated like `periodBreak` (live mode, not an official result, `status ===
   'live'`), otherwise `null`. Rows without `startedAt`/`endedAt` are left out. Present on
   `getMatch` and `getLeagueFixtureRecord` only.
+- `teamFouls` -- `{ periodNumber, threshold, home, away } | null`, the live team-foul tally the
+  spectator page draws as filling bars under the team names. `home`/`away` count the fouls of
+  `periodNumber` only (team fouls restart every period): the `LIVE` period, or during halftime /
+  after regulation the most recent period that has started. The counting rule is the operations
+  console's `deriveFoulCounts` (`apps/v1_web/src/lib/team-foul-counter.ts`) copied verbatim in
+  `public-team-fouls.ts` (the two apps cannot share code): one `FOUL` event = one foul, a card =
+  one foul except the red that follows a second yellow of the same participant, reversed events
+  are skipped. `threshold` is the competition's **current** `teamFoulThreshold` (blank -> 5), read
+  at request time like the console's `GameDetail.teamFoulThreshold`, so a change made in the
+  tournament/league settings shows on the next poll. Gated like `periodBreak` (live mode, not an
+  official result, `status === 'live'`, a game with a started period), otherwise `null` -- it
+  disappears when the match ends and is **never recorded**. Present on `getMatch` and
+  `getLeagueFixtureRecord` only (friendly team matches and the schedule list do not carry it).
 
-None of these fields is a new privacy tier: all are derived purely from data
+`teamFouls` is the one exception to the next paragraph: it is the only field that exposes
+information `events[]` does not already list (FOUL events are not part of the public event
+timeline). The exposure is deliberately narrow -- a per-team total for the current period, live
+only, no player, no minute, no history; per-player fouls remain absent from every public response.
+
+Apart from `teamFouls`, none of these fields is a new privacy tier: all are derived purely from data
 the `live` mode already exposes elsewhere on the same response (`events[]`
 already lists every GOAL; a running tally of the same GOALs reveals nothing
 new; `periodBreak` reads the same `V1GamePeriod.state` column `clock` already

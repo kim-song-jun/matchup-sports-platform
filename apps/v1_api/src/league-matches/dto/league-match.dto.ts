@@ -102,6 +102,12 @@ export class CreateLeagueMatchDto {
   @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
   teamFoulThreshold?: number | null;
 
+  /** 진행 중인 경기의 팀 파울을 관전 화면에 보여줄지. 생략 = 생성 시 켜짐, 수정 시 유지. 운영 콘솔의 팀 파울·경고와 무관하고 경기 진행 중에도 바꿀 수 있다. */
+  // `@IsOptional()` 은 null 도 통과시킨다 — 이 컬럼은 NOT NULL 이라 null 은 막고 생략(undefined)만 허용한다.
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsBoolean({ message: '팀 파울 표시 여부는 켜짐/꺼짐으로 보내 주세요.' })
+  showTeamFouls?: boolean;
+
   /** 팀당 참가비. 보내면 참가비를 확정한 것으로 본다(0원 = 무료 확정). 0원 초과면 계좌 세 칸이 필수다. */
   @IsOptional()
   @Transform(rawValue)
@@ -514,6 +520,12 @@ export class UpdateLeagueDisciplineDto {
   @Min(MIN_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MIN_TEAM_FOUL_THRESHOLD}개 이상이어야 해요.` })
   @Max(MAX_TEAM_FOUL_THRESHOLD, { message: `팀 파울 기준은 ${MAX_TEAM_FOUL_THRESHOLD}개를 넘을 수 없어요.` })
   teamFoulThreshold?: number | null;
+
+  /** 진행 중인 경기의 팀 파울을 관전 화면에 보여줄지. 생략 = 생성 시 켜짐, 수정 시 유지. 운영 콘솔의 팀 파울·경고와 무관하고 경기 진행 중에도 바꿀 수 있다. */
+  // `@IsOptional()` 은 null 도 통과시킨다 — 이 컬럼은 NOT NULL 이라 null 은 막고 생략(undefined)만 허용한다.
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsBoolean({ message: '팀 파울 표시 여부는 켜짐/꺼짐으로 보내 주세요.' })
+  showTeamFouls?: boolean;
 }
 
 // 정규 리그 대진 템플릿(자리 기반 빈 경기). 팀은 나중에 자리에 넣으므로 teamIds 가 없다.

@@ -29,6 +29,7 @@ import {
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
 import { PublicRedCardPenalty } from './public-red-card-penalty';
+import { PublicTeamFoulsRow } from './public-team-fouls';
 import { ForfeitRecordsCaption } from './forfeit-records-caption';
 import { InlineChevronLink } from './inline-chevron-link';
 import { PlaceCard } from '@/components/v1-ui/place-card';
@@ -477,6 +478,15 @@ export function MatchDetailContent({
               <SideName side={data.away} from={from} />
             </span>
           </div>
+          {/* 팀 파울 — 진행 중인 경기에서만(서버가 끝난 경기엔 값을 싣지 않는다). 팀 이름 바로 아래에 같은 열 폭으로 놓는다. */}
+          {data.status === 'live' && data.teamFouls ? (
+            <PublicTeamFoulsRow
+              teamFouls={data.teamFouls}
+              periodCount={data.periodCount}
+              homeName={sideLabel(data.home)}
+              awayName={sideLabel(data.away)}
+            />
+          ) : null}
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
           <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize="var(--font-size-caption)" />
           {data.visibilityMode === 'official_only' && data.resultState === 'pending' ? (

@@ -3242,8 +3242,8 @@ function verifyTaskOneRelativeGrowthOverride(options, repoRoot, plan, phase, cha
 }
 
 function requireBoundSourcePath(envName, label) {
-  const supplied = process.env[envName];
-  if (!supplied?.trim()) {
+  const supplied = process.env[envName]?.trim();
+  if (!supplied) {
     throw new HarnessError(
       'MALFORMED_INPUT',
       `${envName} must name the local ${label} bound to the Task-1 plan`,

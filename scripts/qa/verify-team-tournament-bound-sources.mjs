@@ -266,8 +266,8 @@ function readCommittedDesign(commit, repoRoot) {
 }
 
 function requiredSourcePath(options, optionName, envName, label) {
-  const value = options[optionName] ?? process.env[envName];
-  if (!value?.trim()) {
+  const value = (options[optionName] ?? process.env[envName])?.trim();
+  if (!value) {
     throw new VerificationError(
       'MALFORMED_INPUT',
       `Missing ${label} path: pass --${optionName} or set ${envName}`,

@@ -15,7 +15,8 @@ struct LockWidgetView: View {
                 let plan = WidgetPresentation.plan(model, updatedAt: entry.snapshot.updatedAt, now: now)
                 if inline {
                     Text((entry.snapshot.stale ? "갱신 지연 · " : "") + WidgetPresentation.inline(plan, now: now))
-                } else { rectangular(plan) }
+                        .privacySensitive(plan.live == nil)
+                } else { rectangular(plan).privacySensitive(plan.live == nil) }
             } else {
                 Text(expired ? "팀밋 · 앱에서 새로고침해 주세요" : entry.snapshot.notice ?? "팀밋에 로그인해 주세요")
                     .font(.caption).lineLimit(inline ? 1 : 3)
@@ -23,6 +24,7 @@ struct LockWidgetView: View {
         }.widgetURL(WidgetEnvironment.current.origin.appendingPathComponent("my/schedule"))
             .modifier(LockBackground())
     }
+    /// 점수는 공개 정보라 잠긴 채로도 보이게 둔다. 일정·응답 상태는 개인 정보에 가까워 잠기면 가린다(`privacySensitive`).
     private func rectangular(_ plan: WidgetPlan) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             if let game = plan.live {
@@ -30,12 +32,13 @@ struct LockWidgetView: View {
                 HStack(spacing: 4) {
                     Text(WidgetPresentation.liveStatus(game) + (entry.snapshot.stale ? " · 갱신 지연" : ""))
                     if let penalties = game.penalties { Text("승부차기 \(WidgetFormat.score(penalties))") }
-                    else if let period = game.period { clock(period, game: game) }
-                }.font(.caption2.bold()).lineLimit(1)
+                    // 갱신이 지연된 값으로 흐르는 시계는 틀릴 수 있어 숨긴다.
+                    else if let period = game.period, !entry.snapshot.stale { clock(period, game: game) }
+                }.font(.caption2.bold()).lineLimit(1).minimumScaleFactor(0.8)
                 Text("\(game.teamName) \(WidgetFormat.score(game.score)) \(game.opponentName ?? "상대팀")")
                     .font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.8)
-                let place = [game.competitionName, game.venueName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
-                Text(place.isEmpty ? (game.state == "ENDED" ? "경기 종료" : "경기 중") : place).font(.caption2).lineLimit(1)
+                let venueLine = [game.competitionName, game.venueName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                Text(venueLine.isEmpty ? (game.state == "ENDED" ? "경기 종료" : "경기 중") : venueLine).font(.caption2).lineLimit(1)
             } else if let schedule = plan.schedule {
                 Text(plan.kind == .pending ? "응답 대기" : WidgetFormat.dayWord(schedule.startAt, now: now)).font(.caption2.bold())
                 Text("\(WidgetFormat.clock(schedule.startAt)) \(schedule.opponentName.map { "vs " + $0 } ?? schedule.title)")
@@ -54,17 +57,21 @@ struct LockWidgetView: View {
         HStack(spacing: 3) {
             if period.phase == "HALFTIME" {
                 if period.restStartedAt >= 0 {
-                    Text("휴식"); Text(WidgetFormat.date(period.restStartedAt), style: .timer).monospacedDigit()
+                    Text("휴식"); timer(period.restStartedAt)
                 } else { Text("휴식 중") }
             } else {
                 Text(WidgetFormat.periodName(period.number))
                 let elapsed = WidgetFormat.elapsedMs(period, now: now)
                 if elapsed >= 0 {
                     if period.pausedAt >= 0 || game.state == "PAUSED" || period.phase == "PAUSED" { Text(WidgetFormat.minuteMark(elapsed)) }
-                    else { Text(WidgetFormat.date(now - elapsed), style: .timer).monospacedDigit() }
+                    else { timer(now - elapsed) }
                 }
             }
         }.font(.caption2).lineLimit(1)
+    }
+    /// `.timer` 글자는 가능한 폭을 다 차지하려 해서 같은 줄의 상태 글자를 밀어낸다 — 폭을 고정한다.
+    private func timer(_ since: Int64) -> some View {
+        Text(WidgetFormat.date(since), style: .timer).monospacedDigit().frame(width: 40, alignment: .leading)
     }
 }
 private struct LockBackground: ViewModifier {

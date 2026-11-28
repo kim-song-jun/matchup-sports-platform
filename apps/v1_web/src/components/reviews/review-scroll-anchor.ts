@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef } from 'react';
  * 스크롤러는 모바일에선 `.tm-scroll-area`, 데스크톱에선 문서다(같은 페이지가 폭에 따라 달라진다).
  * window 기준으로 재거나 쓰면 모바일에서 아무 일도 하지 않는다.
  */
-export function findScrollContainer(from: Element): HTMLElement | null {
+function findScrollContainer(from: Element): HTMLElement | null {
   for (let node = from.parentElement; node !== null; node = node.parentElement) {
     const { overflowY } = getComputedStyle(node);
     if (overflowY === 'auto' || overflowY === 'scroll') return node;

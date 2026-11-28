@@ -110,9 +110,9 @@
     뒤처진 ref를 현행으로 착각하면 이미 고쳐진 것을 다시 고치거나 살아 있는 기능을 dead code로
     오진한다(실사례 2건).
   - **머지 후 (sync back)**: PR이 `origin/dev`에 머지되면 **그 즉시** 메인 작업트리
-    (`/Users/sungjun/Dev/projects/matchup-sports-platform`)의 로컬 `dev`를 따라잡힌다. 머지 하나당 한 번:
+    (첫 번째 worktree)의 로컬 `dev`를 따라잡힌다. 머지 하나당 한 번:
     ```bash
-    cd /Users/sungjun/Dev/projects/matchup-sports-platform
+    cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
     git fetch origin dev -q && git merge --ff-only origin/dev
     ```
     미루면 조용히 벌어진다(실측: 131커밋 → 263커밋 뒤처진 상태로 발견). 사용자는 이 트리에서 직접

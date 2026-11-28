@@ -23,6 +23,10 @@ export interface NativePushPayload {
   title: string;
   body?: string;
   route?: string;
+  /** 알림 없이 앱에 데이터만 보낸다(안드로이드 위젯 새로고침). 있으면 `title`·`body` 는 쓰지 않는다. */
+  dataOnly?: Record<string, string>;
+  /** 아이폰 실시간 카드(Live Activity) 갱신·종료. 있으면 알림이 아니라 카드로 간다. `dismissalDate` 는 초 단위. */
+  liveActivity?: { event: 'update' | 'end'; contentState: Record<string, unknown>; dismissalDate?: number };
 }
 
 export interface NativeDeliverySummary {

@@ -101,21 +101,24 @@ export class FcmPushService implements NativePushAdapter, OnModuleInit {
         method: 'POST',
         headers: { authorization: 'Bearer ' + accessToken, 'content-type': 'application/json' },
         body: JSON.stringify({
-          message: {
-            token: device.token,
-            notification: { title: payload.title, body: payload.body ?? '' },
-            data: {
-              notificationId: payload.notificationId,
-              route: payload.route ?? '/notifications',
-            },
-            android: {
-              priority: 'high',
-              notification: {
-                channel_id: 'teameet_general',
-                tag: payload.notificationId,
+          message: payload.dataOnly
+            // 위젯 새로고침은 늦어도 되는 조용한 메시지라 일반 우선순위 — 높은 우선순위는 화면에 보이는 알림이 따르지 않으면 FCM 이 낮출 수 있고 기기를 깨운다.
+            ? { token: device.token, data: payload.dataOnly, android: { priority: 'normal' } }
+            : {
+                token: device.token,
+                notification: { title: payload.title, body: payload.body ?? '' },
+                data: {
+                  notificationId: payload.notificationId,
+                  route: payload.route ?? '/notifications',
+                },
+                android: {
+                  priority: 'high',
+                  notification: {
+                    channel_id: 'teameet_general',
+                    tag: payload.notificationId,
+                  },
+                },
               },
-            },
-          },
         }),
       });
       if (response.ok) return 'delivered';

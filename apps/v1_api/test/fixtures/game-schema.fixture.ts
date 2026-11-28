@@ -621,8 +621,9 @@ export const gameSchemaSourceManifest = {
   // 2026-11-20: additive V1TeamProfile.membershipFee (20261120100000_v1_team_membership_fee); historical game migration unchanged.
   // 2026-11-23: additive V1AccessToken (20261123090000_v1_access_tokens); historical game migration unchanged.
   // 2026-11-27: additive V1Tournament.teamFoulThreshold (20261127090000_v1_tournament_team_foul_threshold); historical game migration unchanged.
-  // 2026-11-28: additive V1Tournament.showTeamFouls + V1TeamMatch.teamFoulThreshold (20261128090000_v1_team_foul_public_display); historical game migration unchanged.
-  schema: 'd331d93ccfb8fa6bc04139465b630052ca77abc287893390c80234bf9eb6086b',
+  // 2026-11-28: additive V1WidgetLiveActivity (20261128090000_v1_widget_live_activities); historical game migration unchanged.
+  // 2026-11-28: additive V1Tournament.showTeamFouls + V1TeamMatch.teamFoulThreshold (20261128100000_v1_team_foul_public_display); historical game migration unchanged.
+  schema: 'f24c1aea3ea60f9053230b7b4dd062c318b5c27135f5a3a5a2b83571cb7b71c3',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -21,6 +21,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+const listStatus = vi.hoisted(() => ({ value: 'in_progress' }));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: [] } }),
   useV1UpdateTournamentVisibility: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -28,7 +30,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateMockTournament: () => ({ mutate: vi.fn(), isPending: false }),
   useV1AdminTournaments: () => ({
     data: {
-      items: [row],
+      items: [{ ...row, status: listStatus.value }],
       pageInfo: { page: 1, limit: 20, totalPages: 1, total: 1 },
       summary: { total: 1, byStatus: { in_progress: 1 } },
     },
@@ -41,6 +43,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 beforeEach(() => {
+  listStatus.value = 'in_progress';
   window.history.replaceState(null, '', '/admin/tournaments');
 });
 
@@ -66,5 +69,18 @@ describe('AdminTournamentsPage 실제 날짜 열 · MD-QA #27', () => {
     const table = within(screen.getByRole('table'));
     expect(table.getByRole('cell', { name: '10.12 01:24 ~ 10.12 09:24' })).toBeInTheDocument();
     expect(table.getByRole('cell', { name: '10.5 00:24' })).toBeInTheDocument();
+  });
+});
+
+describe('AdminTournamentsPage 상태 이름', () => {
+  it('접수 마감 대회의 알약과 상태 필터가 상세 머리와 같은 「접수 마감」 이름을 쓴다', () => {
+    listStatus.value = 'closed';
+    render(<AdminTournamentsPage />);
+
+    // 표의 알약과 상태 필터 칸이 같은 이름을 쓴다.
+    const inTable = within(screen.getByRole('table')).getAllByText('접수 마감').length;
+    expect(inTable).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('접수 마감').length).toBeGreaterThan(inTable);
+    expect(screen.queryByText('마감', { exact: true })).not.toBeInTheDocument();
   });
 });

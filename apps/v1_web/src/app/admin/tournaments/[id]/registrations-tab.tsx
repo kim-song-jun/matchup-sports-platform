@@ -1,493 +1,31 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { AdminPlayerSettingsEditor } from '@/components/admin/admin-player-settings-editor';
-import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
-import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1CarryOverPlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
-import type { V1AdminTournamentRegistration, V1UpdatePlayerEligibilityPayload } from '@/types/api';
+import { useState } from 'react';
+import { AdminEmpty, AdminListSkeleton } from '@/components/admin';
+import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest } from '@/hooks/use-v1-api';
+import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
-import { V1ApiError } from '@/lib/api-client';
-import { formatRosterBirthDate } from '@/lib/roster-birth-date';
-import { v1Keys } from '@/lib/query-keys';
-import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
-import { AdminRegistrationGameRosters } from '@/components/game-roster/admin-registration-game-rosters';
+import { RosterLockControls } from './registration-roster-lock-controls';
+import { RosterModal } from './registration-roster-modal';
+import { CancelRequestSheet } from './registrations-cancel-request';
+import { RegistrationsDraftSection, RegistrationsWaitlistCancelledSection } from './registrations-collapsed-sections';
+import { RegistrationsConfirmedSection } from './registrations-confirmed-section';
 import {
-  EligibilityEvidence,
-  EligibilityFilterChips,
-  EligibilityRulingPanel,
-  PreviousEligibilityRuling,
-  isEligibilityReviewed,
-  matchesEligibilityFilter,
-  type EligibilityFilter,
-} from '@/components/admin/admin-player-eligibility-review';
-import { JOINKFA_CERTIFICATE_GUIDE, JOINKFA_PRIVACY_NOTE, JoinKfaLink } from '@/components/tournaments/player-eligibility';
-import { formatDate } from './tournament-admin-shared';
-import {
-  ADMIN_CANCELLABLE,
-  ActionButton,
-  ELIGIBILITY_LABEL,
-  GENDER_LABEL,
-  PHONE_LABEL,
-  REGISTRATION_STATUS_FILTERS,
-  SimpleModal,
-  formatGenderQuotaError,
-  formatPhoneNumber,
-  formatRegistrationPaymentSubtitle,
-  submitBtnCls,
-  textareaCls,
-} from './tournament-detail-shared';
+  groupRegistrations,
+  type RegistrationHandlers,
+  type RegistrationViewContext,
+  type ShowToast,
+} from './registrations-model';
+import { RegistrationsTodoSection } from './registrations-todo-section';
+import { SimpleModal, textareaCls } from './tournament-detail-shared';
 
-
-// ── Registration roster modal ─────────────────────────────────────────────
-
-export function RosterModal({
-  open,
-  onClose,
-  registration,
-  showToast,
-  canWrite,
-}: {
-  open: boolean;
-  onClose: () => void;
-  registration: V1AdminTournamentRegistration | null;
-  showToast: (msg: string, v?: 'success' | 'error') => void;
-  canWrite: boolean;
-}) {
-  const queryClient = useQueryClient();
-  const visibleRegistrationId = open ? registration?.id ?? '' : '';
-  const previousVisibleRegistrationId = useRef('');
-  const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(
-    visibleRegistrationId,
-  );
-  // 모달은 닫혀도 마운트되어 있어 같은 신청을 재열면 캐시만 남는다.
-  // 보이는 신청만 관찰하고, 열릴 때마다 현재 프로필이 반영된 명단을 다시 받는다.
-  useEffect(() => {
-    const previousRegistrationId = previousVisibleRegistrationId.current;
-    previousVisibleRegistrationId.current = visibleRegistrationId;
-    if (previousRegistrationId && previousRegistrationId !== visibleRegistrationId) {
-      void queryClient.cancelQueries({
-        queryKey: v1Keys.adminTournamentRoster(previousRegistrationId),
-        exact: true,
-      });
-    }
-    if (visibleRegistrationId) void refetch({ cancelRefetch: false });
-  }, [visibleRegistrationId, refetch, queryClient]);
-  const updateEligibility = useV1UpdatePlayerEligibility(registration?.id ?? '');
-  const carryOverEligibility = useV1CarryOverPlayerEligibility(registration?.id ?? '');
-  // 판정 패널은 한 번에 한 선수만 연다 — 여러 패널이 열리면 "판정 저장" 이 여럿 보인다.
-  const [rulingPlayerId, setRulingPlayerId] = useState<string | null>(null);
-  const [eligibilityFilter, setEligibilityFilter] = useState<EligibilityFilter>('all');
-  const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
-  const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');
-
-  // 팀의 활성 멤버를 불러와 고르게 한다. 예전에는 userId 를 직접 입력받았는데, 운영자가
-  // UUID 를 얻을 경로가 화면에 없어 사실상 쓸 수 없었다(2026-08-04 alpha UI 검수).
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [addError, setAddError] = useState<string | null>(null);
-  const eligible = useV1AdminRosterEligibleMembers(registration?.id ?? '', open && canWrite);
-  const members = eligible.data?.members ?? [];
-  // 멤버는 있는데 전원 자격 미달인 경우(정원 초과·취소된 신청 등)를 "멤버 0명" 과 구분한다.
-  const hasEligibleMember = members.some((m) => m.eligible);
-  const selectedMember = members.find((m) => m.userId === selectedUserId) ?? null;
-  // 버튼은 "무언가 골랐는지" 가 아니라 "그게 지금도 추가 가능한지" 를 봐야 한다. 목록이
-  // 갱신되는 사이(다른 운영자가 먼저 추가, 팀 탈퇴 등) 고른 사람이 자격을 잃을 수 있다.
-  const canAddSelectedMember = !!selectedMember?.eligible && !!selectedMember.realName?.trim();
-
-  // 다른 신청으로 모달을 다시 열면 앞선 선택이 남는다 — RosterModal 은 항상 마운트돼 있고
-  // 숨겨질 뿐이라 useState 가 초기화되지 않는다. 같은 사람이 두 팀에 속하면 이전 팀에서
-  // 고른 userId 가 새 팀에서도 유효한 선택으로 보인다.
-  useEffect(() => {
-    setSelectedUserId('');
-    setAddError(null);
-    setRulingPlayerId(null);
-    setEligibilityFilter('all');
-  }, [registration?.id, open]);
-
-  // 고른 팀원이 목록에서 사라지거나 자격을 잃으면 선택을 비운다 — select 는 없는 값을 못
-  // 그려 빈칸이 되는데, 상태만 남아 있으면 화면과 어긋난다.
-  useEffect(() => {
-    if (!selectedUserId || !eligible.data) return;
-    const still = eligible.data.members.find((m) => m.userId === selectedUserId);
-    if (!still || !still.eligible) setSelectedUserId('');
-  }, [eligible.data, selectedUserId]);
-
-  const players = [...(data?.players ?? [])].sort(
-    (left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain),
-  );
-  // 감사 finding #53: 잠금(확정) 이후에도 어드민 추가·제거는 성별 쿼터를 재검증하지 않아
-  // "확정" 표시가 남은 채 인원 조건이 깨질 수 있다(서버는 위반 시 자동 잠금 해제로 대응한다 —
-  // tournament-players.service.ts의 reconcileGenderQuotaAfterRosterChange 참조). 화면에는 최소한
-  // 현재 성별 구성을 항상 보여서, 운영자가 몇 명을 추가·제외하기 전에 바로 인지할 수 있게 한다.
-  const maleCount = players.filter((p) => p.genderSnapshot === 'male').length;
-  const femaleCount = players.filter((p) => p.genderSnapshot === 'female').length;
-  const unknownGenderCount = players.length - maleCount - femaleCount;
-
-  const handleAddPlayer = () => {
-    if (!selectedMember) {
-      setAddError('추가할 팀원을 선택해주세요.');
-      return;
-    }
-    // 버튼이 열려 있어도 마지막에 한 번 더 본다 — 목록 갱신과 클릭이 겹치면 버튼 상태가
-    // 한 박자 늦을 수 있다.
-    if (!selectedMember.eligible) {
-      setAddError(selectedMember.ineligibleReason ?? '지금은 추가할 수 없는 팀원이에요.');
-      return;
-    }
-    // 실명은 서버가 팀원 프로필에서 다시 읽지만, DTO 가 필수로 받으므로 함께 보낸다.
-    const realName = selectedMember.realName?.trim();
-    if (!realName) {
-      setAddError('실명이 등록되지 않은 팀원이에요.');
-      return;
-    }
-    setAddError(null);
-    addPlayer.mutate(
-      { userId: selectedMember.userId, realName },
-      {
-        onSuccess: () => {
-          setSelectedUserId('');
-          showToast('선수를 명단에 추가했어요.', 'success');
-        },
-        onError: (err) => setAddError(extractErrorMessage(err, '선수를 추가하지 못했어요.')),
-      },
-    );
-  };
-
-  const handleRemovePlayer = (playerId: string, realName: string) => {
-    removePlayer.mutate(playerId, {
-      onSuccess: () => showToast(`${realName} 선수를 명단에서 제외했어요.`, 'success'),
-      onError: (err) => showToast(extractErrorMessage(err, '선수를 제외하지 못했어요.'), 'error'),
-    });
-  };
-
-  // 판정 + 확인 방법 + 메모를 한 번에 저장한다. 실패는 패널이 문구로 보여 주도록 다시 던진다.
-  const handleSaveRuling = async (playerId: string, body: V1UpdatePlayerEligibilityPayload) => {
-    await updateEligibility.mutateAsync({ playerId, ...body });
-    setRulingPlayerId(null);
-    showToast('선출 판정을 저장했어요.', 'success');
-  };
-
-  const handleKeepPreviousRuling = (playerId: string, sourcePlayerId: string) => {
-    carryOverEligibility.mutate(
-      { playerId, sourcePlayerId },
-      {
-        onSuccess: () => showToast('이전 판정을 이 대회 판정으로 남겼어요.', 'success'),
-        onError: (err) => showToast(extractErrorMessage(err, '이전 판정을 유지하지 못했어요.'), 'error'),
-      },
-    );
-  };
-
-  const visiblePlayers = players.filter((player) => matchesEligibilityFilter(player, eligibilityFilter));
-
-  return (
-    <SimpleModal
-      open={open}
-      title={`명단 검토 — ${registration?.teamName ?? registration?.teamId ?? ''}`}
-      onClose={onClose}
-    >
-      {!isPending && !isError && players.length > 0 ? (
-        <>
-          <p className="mb-2 text-xs text-[var(--text-muted)]">
-            {`현재 성별 구성 · 남 ${maleCount}명 · 여 ${femaleCount}명`}
-            {unknownGenderCount > 0 ? ` · 성별 미등록 ${unknownGenderCount}명` : ''}
-          </p>
-          <EligibilityFilterChips players={players} value={eligibilityFilter} onChange={setEligibilityFilter} />
-        </>
-      ) : null}
-      {isPending ? (
-        <p className="text-sm text-[var(--text-muted)]">불러오는 중…</p>
-      ) : isError ? (
-        <div role="alert" className="rounded-xl bg-[var(--red50)] p-4 text-sm text-[var(--red700)]">
-          <p>{extractErrorMessage(error, '명단을 불러오지 못했어요.')}</p>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="mt-3 h-[44px] rounded-lg bg-[var(--card-surface)] px-4 font-semibold text-[var(--red700)]"
-          >
-            다시 시도
-          </button>
-        </div>
-      ) : players.length === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">등록된 선수가 없어요.</p>
-      ) : visiblePlayers.length === 0 ? (
-        <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">이 조건에 맞는 선수가 없어요.</p>
-      ) : (
-        <ul className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto" role="list">
-          {visiblePlayers.map((p) => (
-            <li
-              key={`${registration?.id}-${p.id}-${open}`}
-              className="flex flex-wrap items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"
-            >
-              <div className="flex-1 min-w-[140px]">
-                <div className="flex min-w-0 items-center gap-2">
-                  {/* 정본 §3 "명단 공개 = 등번호·이름". 번호 없는 선수는 자리를 비우지 않고
-                      "—" 로 둔다 — 열이 들쭉날쭉하면 번호가 있는지 없는지가 안 읽힌다.
-                      `0` 은 유효한 번호라 falsy 검사로 거르면 0번이 "—" 로 사라진다. */}
-                  <span
-                    className="shrink-0 tab-num text-sm font-semibold text-[var(--text-muted)]"
-                    style={{ minWidth: 24, textAlign: 'right' }}
-                    aria-label={p.jerseyNumber === null ? '등번호 없음' : `등번호 ${p.jerseyNumber}번`}
-                  >
-                    {p.jerseyNumber === null ? '—' : p.jerseyNumber}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="break-words text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">{p.realName}</p>
-                    <p className="mt-0.5 break-words text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-                      닉네임 {p.nickname?.trim() || '미등록'}
-                    </p>
-                  </div>
-                  {p.isTeamCaptain ? (
-                    <span className="shrink-0 rounded-md bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
-                  ) : null}
-                </div>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {p.birthDateSnapshot ? formatRosterBirthDate(p.birthDateSnapshot) : '생년월일 미등록'} ·{' '}
-                  {p.genderSnapshot ? GENDER_LABEL[p.genderSnapshot] : '성별 미등록'}
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                  {PHONE_LABEL} {formatPhoneNumber(p.phone)}
-                </p>
-                <p className="mt-1 flex items-center gap-2">
-                  <span
-                    className={`tm-badge ${p.eligibilityStatus === 'pro' ? 'tm-badge-orange' : p.eligibilityStatus === 'non_pro' ? 'tm-badge-green' : 'tm-badge-grey'}`}
-                  >
-                    {ELIGIBILITY_LABEL[p.eligibilityStatus]}
-                  </span>
-                </p>
-                <EligibilityEvidence player={p} />
-              </div>
-              <button
-                type="button"
-                onClick={() => setRulingPlayerId((current) => (current === p.id ? null : p.id))}
-                disabled={!canWrite}
-                aria-expanded={rulingPlayerId === p.id}
-                aria-label={`${p.realName} 선출 판정`}
-                className="h-[44px] shrink-0 rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
-              >
-                {isEligibilityReviewed(p) ? '다시 판정' : '판정하기'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRemovePlayer(p.id, p.realName)}
-                disabled={!canWrite || removePlayer.isPending}
-                aria-label={`${p.realName} 선수를 명단에서 제외`}
-                className="h-[44px] shrink-0 rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--red700)] transition-colors hover:bg-[var(--red50)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-red-950/30"
-              >
-                제외
-              </button>
-              <AdminPlayerSettingsEditor
-                registrationId={registration?.id ?? ''}
-                player={p}
-                canWrite={canWrite}
-                showToast={showToast}
-              />
-              {p.previousEligibilityRuling ? (
-                <div className="w-full">
-                  <PreviousEligibilityRuling
-                    player={p}
-                    canWrite={canWrite}
-                    isPending={carryOverEligibility.isPending}
-                    onKeep={() => {
-                      const previous = p.previousEligibilityRuling;
-                      if (previous) handleKeepPreviousRuling(p.id, previous.sourcePlayerId);
-                    }}
-                  />
-                </div>
-              ) : null}
-              {canWrite && rulingPlayerId === p.id ? (
-                <EligibilityRulingPanel
-                  player={p}
-                  isSaving={updateEligibility.isPending}
-                  onCancel={() => setRulingPlayerId(null)}
-                  onSave={(body) => handleSaveRuling(p.id, body)}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      {canWrite ? (
-        <div className="mt-4 rounded-xl border border-[var(--border)] p-3 dark:border-gray-700">
-          <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] dark:text-white">선수 추가</p>
-          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-            팀의 활성 멤버만 추가할 수 있어요. 명단이 잠기거나 제출 마감이 지나도 운영자는 추가할 수 있어요.
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <div className="flex-1">
-              <label htmlFor="admin-roster-member" className="sr-only">
-                추가할 팀원
-              </label>
-              <select
-                id="admin-roster-member"
-                value={selectedUserId}
-                onChange={(e) => {
-                  setSelectedUserId(e.target.value);
-                  setAddError(null);
-                }}
-                disabled={eligible.isPending || members.length === 0}
-                className="h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)] transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="">
-                  {/* 조회 실패를 "멤버 없음" 으로 말하지 않는다 — 목록이 비어 있는 이유가
-                      다르면 운영자가 팀 구성을 의심하며 엉뚱한 데를 찾게 된다. */}
-                  {eligible.isPending
-                    ? '팀원 불러오는 중…'
-                    : eligible.isError
-                      ? '팀원 목록을 불러오지 못했어요'
-                      : members.length === 0
-                        ? '팀에 활성 멤버가 없어요'
-                        : hasEligibleMember
-                          ? '팀원 선택'
-                          : '추가할 수 있는 팀원이 없어요'}
-                </option>
-                {members.map((m) => (
-                  // 못 고르는 팀원도 이유와 함께 보여 준다 — 목록에서 지워 버리면 운영자가
-                  // "왜 이 사람이 없지?" 를 화면 밖에서 찾아야 한다.
-                  <option key={m.userId} value={m.userId} disabled={!m.eligible}>
-                    {(m.realName ?? m.nickname ?? m.userId.slice(0, 8))}
-                    {m.role === 'owner' ? ' (팀장)' : m.role === 'manager' ? ' (매니저)' : ''}
-                    {m.eligible ? '' : ` — ${m.ineligibleReason}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddPlayer}
-              // isError 도 막는다 — 재조회가 실패하면 React Query 는 직전 데이터를 그대로
-              // 들고 있어서, 아래에 에러가 떠 있는데도 옛 판정으로 추가가 가능해진다.
-              disabled={
-                addPlayer.isPending ||
-                eligible.isFetching ||
-                eligible.isError ||
-                !canAddSelectedMember
-              }
-              className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-label)] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-            >
-              {addPlayer.isPending ? '추가 중…' : '추가'}
-            </button>
-          </div>
-          {eligible.isError ? (
-            <p role="alert" className="mt-2 text-xs text-[var(--red700)]">
-              {extractErrorMessage(eligible.error, '팀원 목록을 불러오지 못했어요.')}
-            </p>
-          ) : null}
-          {addError ? (
-            <p role="alert" className="mt-2 text-xs text-[var(--red700)]">
-              {addError}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-caption)]">{JOINKFA_PRIVACY_NOTE} 대한축구협회 공식 사이트에서 직접 확인해 주세요.</p>
-        <JoinKfaLink label="JoinKFA 열기" />
-        <p className="m-0 w-full text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{JOINKFA_CERTIFICATE_GUIDE}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onClose}
-        className="tm-on-tint mt-4 w-full h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-      >
-        닫기
-      </button>
-    </SimpleModal>
-  );
-}
-
-// ── Export CSV buttons (팀별 = 행마다 훅 하나, 전체 = 탭에 하나) ────────────
-
-function CsvExportButton({
-  exportCsv,
-  label,
-  fallbackFilename,
-  disabled,
-  showToast,
-}: {
-  exportCsv: ReturnType<typeof useV1ExportRosterCsv>;
-  label: string;
-  fallbackFilename: string;
-  disabled?: boolean;
-  showToast: (msg: string, v?: 'success' | 'error') => void;
-}) {
-  const handleClick = () => {
-    exportCsv.mutate(undefined, {
-      onSuccess: (res) => {
-        // BOM 이 없으면 Windows 엑셀이 UTF-8 을 CP949 로 읽어 한글(팀명·실명)이 깨진다.
-        const blob = new Blob(['\uFEFF', res.csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = res.filename || fallbackFilename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        showToast('CSV를 다운로드했어요.', 'success');
-      },
-      onError: (err) =>
-        showToast(extractErrorMessage(err, 'CSV 다운로드에 실패했어요.'), 'error'),
-    });
-  };
-
-  return (
-    <ActionButton
-      onClick={handleClick}
-      disabled={disabled || exportCsv.isPending}
-      icon={<Download size={13} />}
-      label={exportCsv.isPending ? '…' : label}
-      tone="gray"
-    />
-  );
-}
-
-function ExportCsvButton({
-  registrationId,
-  showToast,
-}: {
-  registrationId: string;
-  showToast: (msg: string, v?: 'success' | 'error') => void;
-}) {
-  const exportCsv = useV1ExportRosterCsv(registrationId);
-  return (
-    <CsvExportButton
-      exportCsv={exportCsv}
-      label="CSV"
-      fallbackFilename={`roster_${registrationId}.csv`}
-      showToast={showToast}
-    />
-  );
-}
-
-/** 대회(리그) 전체 명단 — 팀별 CSV 를 팀 수만큼 누르지 않게. 임시저장·취소 신청은 서버가 뺀다. */
-function ExportAllCsvButton({
-  tournamentId,
-  disabled,
-  showToast,
-}: {
-  tournamentId: string;
-  disabled: boolean;
-  showToast: (msg: string, v?: 'success' | 'error') => void;
-}) {
-  const exportCsv = useV1ExportTournamentRosterCsv(tournamentId);
-  return (
-    <CsvExportButton
-      exportCsv={exportCsv}
-      label="전체 명단 CSV"
-      fallbackFilename={`roster_${tournamentId}_all.csv`}
-      disabled={disabled}
-      showToast={showToast}
-    />
-  );
-}
+type CancelSurface = 'modal' | 'sheet';
 
 // ── Tab: Registrations ────────────────────────────────────────────────────
 
-// exported for component-level testing (roster deadline override toggle) — see
-// tournament-detail-registrations-tab.test.tsx
+// exported for component-level testing — see tournament-detail-registrations-tab.test.tsx
 export function RegistrationsTab({
   tournamentId,
   showToast,
@@ -499,7 +37,7 @@ export function RegistrationsTab({
   rosterDeadlineAt = null,
 }: {
   tournamentId: string;
-  showToast: (msg: string, v?: 'success' | 'error') => void;
+  showToast: ShowToast;
   /** 정원(팀 수) — 참가 확정 시 정원 초과 경고에 사용. 로딩 중이면 undefined */
   tournamentTeamCount?: number;
   canWrite: boolean;
@@ -515,7 +53,7 @@ export function RegistrationsTab({
   isFreeEntry?: boolean;
   /**
    * 명단 제출 마감. 없으면(리그는 늘 없다) 마감 예외가 아무 차이를 만들지 않으므로 '마감 예외 허용'을
-   * 숨긴다(MD-QA #202). 이미 준 예외를 거두는 '예외 해제'는 그대로 보인다.
+   * 숨긴다. 이미 준 예외를 거두는 '예외 해제'는 그대로 보인다.
    */
   rosterDeadlineAt?: string | null;
 }) {
@@ -524,45 +62,29 @@ export function RegistrationsTab({
   const confirmRegistration = useV1ConfirmRegistration();
   const cancelRegistration = useV1CancelRegistrationAdmin();
   const rejectCancelRequest = useV1RejectCancelRequest();
-  const rosterLock = useV1RosterLock();
-  const rosterUnlock = useV1RosterUnlock();
-  const rosterDeadlineOverrideGrant = useV1RosterDeadlineOverrideGrant();
-  const rosterDeadlineOverrideRevoke = useV1RosterDeadlineOverrideRevoke();
-  const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
-  const [rosterOpen, setRosterOpen] = useState(false);
-  // 경기별 명단 펼침(Task 179) — 한 번에 한 팀만 연다.
+  // 창은 id 로 신청을 찾는다 — 잠금처럼 목록을 다시 받는 조작 뒤에도 낡은 신청을 들고 있지 않고, 신청이 사라지면 닫힌다.
+  const [rosterRegistrationId, setRosterRegistrationId] = useState<string | null>(null);
+  // 경기별 명단 펼침 — 한 번에 한 팀만 연다.
   const [gameRostersRegistrationId, setGameRostersRegistrationId] = useState<string | null>(null);
-  // 펼친 표의 저장 전 칸 변경 — 펼침을 닫거나(다른 팀·접기·필터) 화면을 떠나면 사라진다.
+  // 펼친 표의 저장 전 칸 변경 — 펼침을 닫거나(다른 팀·접기) 화면을 떠나면 사라진다.
   const [gameRostersDirty, setGameRostersDirty] = useState(false);
   const { confirm: confirmDialog, ConfirmModal } = useConfirm();
   const { UnsavedChangesModal } = useUnsavedChangesGuard(gameRostersDirty);
-  // 거부 사유 모달 — 대상이 있으면 열려 있다.
+  // 취소 처리 대상 — 데스크톱은 사유 창, 폰은 아래 시트가 같은 상태를 쓴다.
   const [cancelTarget, setCancelTarget] = useState<V1AdminTournamentRegistration | null>(null);
+  const [cancelSurface, setCancelSurface] = useState<CancelSurface>('modal');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  // P1-2: 상태 필터
-  const [statusFilter, setStatusFilter] = useState('all');
-  // P2-7: 일괄 입금 확인 선택
+  // 일괄 입금 확인 선택
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
   const registrations = data?.items ?? [];
-  const filteredRegistrations =
-    statusFilter === 'all' ? registrations : registrations.filter((r) => r.status === statusFilter);
-  const statusCounts: Record<string, number> = { all: registrations.length };
-  for (const r of registrations) {
-    statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
-  }
-  const registrationStatusFilters = REGISTRATION_STATUS_FILTERS.map((filter) =>
-    isFreeEntry && ['awaiting_payment', 'payment_checking', 'paid'].includes(filter.value)
-      ? { ...filter, label: filter.value === 'awaiting_payment' ? '신청 작성 중' : filter.value === 'payment_checking' ? '신청 확인 중' : '신청 완료' }
-      : filter,
-  );
+  const groups = groupRegistrations(registrations);
+  const rosterRegistration = registrations.find((r) => r.id === rosterRegistrationId) ?? null;
   // 무료 대회에는 확인할 입금이 없다 — 같은 awaiting_payment 처리를 「신청 확인」으로 부른다.
   const confirmNoun = isFreeEntry ? '신청 확인' : '입금 확인';
-  // 처리 대기 = 확인 중(payment_checking — 무료 대회는 「신청 확인 중」) + 취소 요청(cancel_requested)
-  const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);
 
   /** 펼친 경기별 명단을 닫게 되는 조작 — 저장 전 변경이 있으면 버릴지 물은 뒤에만 한다. */
   const closingGameRosters = (apply: () => void) => {
@@ -583,13 +105,6 @@ export function RegistrationsTab({
 
   const toggleGameRosters = (registrationId: string) =>
     closingGameRosters(() => setGameRostersRegistrationId((current) => (current === registrationId ? null : registrationId)));
-
-  const changeStatusFilter = (next: string) => {
-    const expanded = registrations.find((r) => r.id === gameRostersRegistrationId);
-    const hidesExpanded = expanded !== undefined && next !== 'all' && expanded.status !== next;
-    if (hidesExpanded) closingGameRosters(() => setStatusFilter(next));
-    else setStatusFilter(next);
-  };
 
   const handleConfirmPayment = (reg: V1AdminTournamentRegistration) => {
     confirmPayment.mutate(
@@ -623,23 +138,21 @@ export function RegistrationsTab({
     );
   };
 
-  // P1-1: 참가 확정은 정원 정보를 포함한 확인 모달을 경유한다
+  // 참가 확정은 정원 정보를 포함한 확인 모달을 경유한다
   const handleConfirmClick = async (reg: V1AdminTournamentRegistration) => {
     if (admissionsBlockedReason) {
       showToast(admissionsBlockedReason, 'error');
       return;
     }
-    const confirmedCount = registrations.filter((r) => r.status === 'confirmed').length;
+    const confirmedCount = groups.confirmed.length;
     const nextCount = confirmedCount + 1;
     const capacityLine =
       tournamentTeamCount != null
         ? `현재 ${confirmedCount}/${tournamentTeamCount}팀 확정 — 이 팀을 확정하면 ${nextCount}/${tournamentTeamCount}팀이 돼요.`
         : `현재 ${confirmedCount}팀이 확정됐어요.`;
     const overCapacity = tournamentTeamCount != null && nextCount > tournamentTeamCount;
-    // 감사 finding #0: 정원 초과 시 이 모달이 "대기 명단 처리될 수 있어요"라고 안내해 놓고
-    // 확인 버튼은 항상 decision='confirm'만 보내, 서버가 409 TOURNAMENT_CAPACITY_FULL로
-    // 거절했다 — 운영자는 안내를 믿고 눌렀다가 아무 처리도 되지 않은 채 에러 토스트만 봤다.
-    // 정원 초과일 땐 버튼 자체를 "대기로 처리"로 바꿔, 버튼 라벨과 실제 동작을 일치시킨다.
+    // 정원 초과일 땐 서버가 409 TOURNAMENT_CAPACITY_FULL 로 확정을 거절한다 — 확인 버튼 자체를
+    // "대기로 처리"로 바꿔 버튼 라벨과 실제 동작(waitlist 결정)을 일치시킨다.
     const message = overCapacity
       ? `${capacityLine} 정원을 초과해 확정할 수 없어요 — 대신 대기 명단으로 처리할까요?`
       : capacityLine;
@@ -653,14 +166,14 @@ export function RegistrationsTab({
     handleConfirm(reg, overCapacity ? 'waitlist' : 'confirm');
   };
 
-  // **사유를 받는 전용 모달을 연다**(FE-4 B안). 예전에는 예/아니오 확인만 받고 사유 없이
-  // 보냈는데, 리그는 서버가 사유를 필수로 요구해서(`LEAGUE_CANCEL_REASON_REQUIRED`)
-  // **어드민이 리그 신청을 거부할 방법이 아예 없었다.**
+  // **사유를 받는 전용 창(폰은 시트)을 연다.** 리그는 서버가 사유를 필수로 요구해서(`LEAGUE_CANCEL_REASON_REQUIRED`)
+  // 예/아니오 확인만으로는 신청을 거부할 방법이 없다.
   // 팀이 낸 취소 요청(cancel_requested)을 받아 주는 것은 거부가 아니라 승인이다 — 같은 API 를
   // 쓰지만 문구와 사유 필수 여부(승인은 선택)가 갈린다.
   const isCancelApproval = cancelTarget?.status === 'cancel_requested';
-  const handleCancel = (reg: V1AdminTournamentRegistration) => {
+  const handleCancel = (reg: V1AdminTournamentRegistration, surface: CancelSurface = 'modal') => {
     setCancelTarget(reg);
+    setCancelSurface(surface);
     setCancelReason('');
     setCancelError(null);
   };
@@ -688,88 +201,37 @@ export function RegistrationsTab({
     );
   };
 
-  // P1-6: 취소 요청 거부(잔류)
-  const handleRejectCancel = async (reg: V1AdminTournamentRegistration) => {
-    const ok = await confirmDialog({
-      title: '취소 요청 거부',
-      message: '취소 요청을 거부하고 이전 상태로 되돌릴까요? 팀이 남긴 취소 사유는 기록에 남아요.',
-      confirmLabel: '거부하고 되돌리기',
-    });
-    if (!ok) return;
+  const keepRegistration = (reg: V1AdminTournamentRegistration, onFailure: (message: string) => void, onDone: () => void) => {
     rejectCancelRequest.mutate(
       { registrationId: reg.id },
       {
-        onSuccess: () => showToast('취소 요청을 거부했어요.', 'success'),
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '취소 요청 거부에 실패했어요.'), 'error'),
-      },
-    );
-  };
-
-  const handleRosterLock = (reg: V1AdminTournamentRegistration) => {
-    rosterLock.mutate(
-      { registrationId: reg.id },
-      {
-        onSuccess: () => showToast('명단을 잠갔어요.', 'success'),
-        onError: (err) => {
-          if (err instanceof V1ApiError && err.code === 'TOURNAMENT_GENDER_QUOTA_NOT_MET') {
-            showToast(
-              formatGenderQuotaError(err.details) ??
-                extractErrorMessage(err, '명단 잠금에 실패했어요.'),
-              'error',
-            );
-            return;
-          }
-          showToast(extractErrorMessage(err, '명단 잠금에 실패했어요.'), 'error');
+        onSuccess: () => {
+          onDone();
+          showToast('참가를 유지했어요.', 'success');
         },
+        onError: (err) => onFailure(extractErrorMessage(err, '참가 유지 처리에 실패했어요.')),
       },
     );
   };
 
-  const handleRosterUnlock = (reg: V1AdminTournamentRegistration) => {
-    rosterUnlock.mutate(
-      reg.id,
-      {
-        onSuccess: () => showToast('명단 잠금을 해제했어요.', 'success'),
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '명단 잠금 해제에 실패했어요.'), 'error'),
-      },
-    );
+  // 데스크톱은 인라인 선택 뒤 한 번 더 확인한다. 폰 시트는 고른 뒤 확정 버튼이 그 확인이다.
+  const handleKeepRegistration = async (reg: V1AdminTournamentRegistration) => {
+    const ok = await confirmDialog({
+      title: '참가 유지',
+      message: '취소 요청을 거절하고 이전 상태로 돌릴까요? 팀이 남긴 취소 사유는 기록에 남아요.',
+      confirmLabel: '참가 유지하기',
+    });
+    if (!ok) return;
+    keepRegistration(reg, (message) => showToast(message, 'error'), () => undefined);
   };
 
-  const handleRosterDeadlineOverrideGrant = (reg: V1AdminTournamentRegistration) => {
-    // 감사 finding #52: 예외 허용은 잠금(rosterLockedAt)과 무관하게 성공하는데, 잠긴 신청은
-    // 여전히 명단을 못 고친다(서버가 잠금 검사를 마감 검사보다 먼저 본다) — 무조건 성공 토스트만
-    // 뜨면 운영자가 "팀이 이제 고칠 수 있다"고 잘못 믿는다. 잠겨 있으면 그 사실을 함께 알린다.
-    const stillLocked = !!reg.rosterLockedAt;
-    rosterDeadlineOverrideGrant.mutate(
-      reg.id,
-      {
-        onSuccess: () =>
-          showToast(
-            stillLocked
-              ? '명단 제출 마감 예외를 허용했어요. 다만 명단이 아직 잠겨 있어 팀이 수정하려면 잠금 해제도 함께 해야 해요.'
-              : '명단 제출 마감 예외를 허용했어요.',
-            'success',
-          ),
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '마감 예외 허용에 실패했어요.'), 'error'),
-      },
-    );
+  const keepFromSheet = () => {
+    const target = cancelTarget;
+    if (target === null || rejectCancelRequest.isPending) return;
+    keepRegistration(target, setCancelError, () => setCancelTarget(null));
   };
 
-  const handleRosterDeadlineOverrideRevoke = (reg: V1AdminTournamentRegistration) => {
-    rosterDeadlineOverrideRevoke.mutate(
-      reg.id,
-      {
-        onSuccess: () => showToast('예외를 해제했어요.', 'success'),
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '예외 해제에 실패했어요.'), 'error'),
-      },
-    );
-  };
-
-  // P2-7: payment_checking으로 넘어가기 전(awaiting_payment) 신청만 일괄 입금 확인 대상 —
+  // payment_checking으로 넘어가기 전(awaiting_payment) 신청만 일괄 입금 확인 대상 —
   // confirmPayment 훅의 BE 가드가 status=awaiting_payment만 허용한다.
   const toggleSelected = (registrationId: string) => {
     setSelectedIds((prev) => {
@@ -810,6 +272,32 @@ export function RegistrationsTab({
     }
   };
 
+  const ctx: RegistrationViewContext = {
+    canWrite,
+    isFreeEntry,
+    confirmNoun,
+    admissionsBlockedReason,
+    busy:
+      confirmPayment.isPending ||
+      confirmRegistration.isPending ||
+      cancelRegistration.isPending ||
+      rejectCancelRequest.isPending ||
+      isBatchProcessing,
+    showToast,
+  };
+
+  const handlers: RegistrationHandlers = {
+    onViewRoster: (reg) => setRosterRegistrationId(reg.id),
+    onConfirmPayment: handleConfirmPayment,
+    onConfirm: (reg) => void handleConfirmClick(reg),
+    onWaitlist: (reg) => handleConfirm(reg, 'waitlist'),
+    onApproveCancel: (reg) => handleCancel(reg),
+    onKeepRegistration: (reg) => void handleKeepRegistration(reg),
+    onOpenCancelSheet: (reg) => handleCancel(reg, 'sheet'),
+    onReject: (reg) => handleCancel(reg),
+    onToggleGameRosters: (reg) => toggleGameRosters(reg.id),
+  };
+
   return (
     <>
       {admissionsBlockedReason && <p role="status" className="mb-3 text-[length:var(--font-size-body-sm)] text-[var(--text-caption)]">{admissionsBlockedReason}</p>}
@@ -819,315 +307,54 @@ export function RegistrationsTab({
           신청이 1,000건을 넘어 일부만 불러왔어요. 아래 목록과 카운트가 전체보다 적을 수 있어요.
         </p>
       )}
-      {/* P1-2: 상태 필터 칩 + 전체 명단 CSV(필터와 무관한 탭 단위 액션이라 필터 그룹 밖에 둔다) */}
-      <div className="tm-content-enter flex items-start justify-between gap-2 flex-wrap mb-3">
-        <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="신청 상태 필터">
-          {registrationStatusFilters.map((opt) => {
-            const active = statusFilter === opt.value;
-            const count = statusCounts[opt.value] ?? 0;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => changeStatusFilter(opt.value)}
-                aria-pressed={active}
-                className={[
-                  'inline-flex items-center gap-2 px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
-                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                  active
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
-                ].join(' ')}
-              >
-                {opt.label}
-                {opt.value !== 'all' && count > 0 && (
-                  <span
-                    className={[
-                      'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[length:var(--font-size-caption)] font-semibold tabular-nums',
-                      // active 상태의 카운트 배지는 파란 칩(bg-blue-500, 테마 불변) 위에 얹히는
-                      // 반투명 흰 원이라 --static-white 를 써야 한다 — --card-surface 는 다크에서
-                      // 거의 검정이라 파란 칩 위에서 탁하게 죽는 회귀가 있었다(전수검수 발견).
-                      active ? 'bg-[var(--static-white)]/25 text-white' : 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)]',
-                    ].join(' ')}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        <ExportAllCsvButton
-          tournamentId={tournamentId}
-          disabled={registrations.length === 0}
-          showToast={showToast}
-        />
-      </div>
 
-      {/* P1-2: 처리 대기 주의 배너 */}
-      {pendingReviewCount > 0 && (
-        <div className="mb-3 flex items-center gap-2 rounded-xl bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] px-4 py-3 text-[length:var(--font-size-label)] text-[var(--orange700)]">
-          <AlertCircle size={14} aria-hidden="true" className="shrink-0" />
-          <span>처리 대기 중인 신청이 {pendingReviewCount}건 있어요.</span>
-        </div>
-      )}
-
-      {/* P2-7: 일괄 처리 바 */}
-      {selectedIds.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--blue50)] border border-blue-100 px-4 py-3">
-          <span className="text-[length:var(--font-size-label)] text-[var(--blue700)]">{selectedIds.size}건 선택됨</span>
+      {isError ? (
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
+          <p className="text-[length:var(--font-size-body-sm)] text-[var(--red700)] font-medium">{extractErrorMessage(error, '신청 목록을 불러오지 못했어요.')}</p>
           <button
             type="button"
-            onClick={() => void handleBatchConfirmPayment()}
-            disabled={isBatchProcessing}
-            className={submitBtnCls}
+            onClick={() => void refetch()}
+            className="text-[length:var(--font-size-body-sm)] text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
-            <Check size={14} aria-hidden="true" />
-            선택 {selectedIds.size}건 {confirmNoun}
+            다시 시도하기
           </button>
+        </div>
+      ) : isPending ? (
+        <div aria-busy="true" aria-live="polite" className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
+          <AdminListSkeleton rows={4} />
+        </div>
+      ) : registrations.length === 0 ? (
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
+          <AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />
+        </div>
+      ) : (
+        <div className="tm-content-enter flex flex-col gap-7">
+          <RegistrationsTodoSection
+            rows={groups.todo}
+            ctx={ctx}
+            handlers={handlers}
+            selectedIds={selectedIds}
+            onToggleSelected={toggleSelected}
+            onClearSelected={() => setSelectedIds(new Set())}
+            onBatchConfirm={() => void handleBatchConfirmPayment()}
+          />
+          <RegistrationsConfirmedSection
+            rows={groups.confirmed}
+            teamCapacity={tournamentTeamCount}
+            tournamentId={tournamentId}
+            ctx={ctx}
+            handlers={handlers}
+            expandedGameRostersId={gameRostersRegistrationId}
+            onGameRostersDirtyChange={setGameRostersDirty}
+          />
+          <RegistrationsWaitlistCancelledSection rows={[...groups.waitlisted, ...groups.cancelled]} ctx={ctx} handlers={handlers} />
+          <RegistrationsDraftSection rows={groups.drafts} ctx={ctx} handlers={handlers} />
         </div>
       )}
 
-      {/* f8: AdminCardList — registrations as card grid */}
-      <AdminCardList<V1AdminTournamentRegistration>
-        rows={filteredRegistrations}
-        keyExtractor={(r) => r.id}
-        actionLayout="compact"
-        card={(r) => ({
-          title: (
-            <span className="inline-flex items-center gap-2 min-w-0">
-              <label
-                className={[
-                  // 시각 크기는 체크박스(18px)만 차지하되 히트 영역은 padding + 상쇄 margin으로 36px+ 확보
-                  'inline-flex items-center justify-center p-3 -m-3 shrink-0 rounded',
-                  r.status === 'awaiting_payment' ? 'cursor-pointer' : 'invisible pointer-events-none',
-                ].join(' ')}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(r.id)}
-                  onChange={() => toggleSelected(r.id)}
-                  disabled={r.status !== 'awaiting_payment'}
-                  aria-label={`${r.teamName ?? r.teamId} 일괄 선택`}
-                  className="w-[18px] h-[18px] rounded border-[var(--border)] text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                />
-              </label>
-              <span className="truncate">{r.teamName ?? r.teamId}</span>
-            </span>
-          ),
-          subtitle: formatRegistrationPaymentSubtitle(r.payment),
-          status: r.status,
-          meta: [
-            {
-              icon: <Users size={14} aria-hidden="true" />,
-              label: r.playerCount > 0 ? `${r.playerCount}명` : '명단 미등록',
-            },
-            // **자동 확정 명단임을 알린다.** 시즌 시작까지 명단을 안 낸 팀은 잡이 현재
-            // 멤버로 명단을 만든다 — 그건 **팀이 검토한 적 없는 명단**이라, 운영자가
-            // 인원·자격을 볼 때 판단이 달라진다. 그동안 이 사실이 화면 어디에도 없었다.
-            ...(r.rosterAutoConfirmedAt
-              ? [{
-                  icon: <Clock size={14} aria-hidden="true" />,
-                  label: `자동 확정 ${formatDate(r.rosterAutoConfirmedAt)}`,
-                  wrap: true,
-                }]
-              : []),
-            ...(r.depositorName
-              ? [
-                  {
-                    icon: <User size={14} aria-hidden="true" />,
-                    label: `입금자 ${r.depositorName}`,
-                  },
-                ]
-              : []),
-            {
-              icon: <Clock size={14} aria-hidden="true" />,
-              label: `신청 ${formatDate(r.createdAt)}`,
-              wrap: true,
-            },
-            ...(r.cancelRequestedAt
-              ? [{
-                  icon: <Clock size={14} aria-hidden="true" />,
-                  label: `취소 요청 ${formatDate(r.cancelRequestedAt)}`,
-                  wrap: true,
-                }]
-              : []),
-          ],
-          statusLabel: r.status === 'cancelled' && r.cancelOutcome ? registrationCancelOutcomeLabel(r.cancelOutcome) : isFreeEntry ? registrationStatusFilters.find((filter) => filter.value === r.status)?.label : undefined,
-          description: r.cancelReason || r.adminCancelReason ? (
-            <>
-              {r.cancelReason ? <span className="block">{`팀 취소 사유: ${r.cancelReason}`}</span> : null}
-              {r.adminCancelReason ? <span className="block">{`운영진 사유: ${r.adminCancelReason}`}</span> : null}
-            </>
-          ) : undefined,
-          tone:
-            r.status === 'cancelled' || r.status === 'cancel_requested'
-              ? 'danger'
-              : r.status === 'awaiting_payment' || r.status === 'payment_checking'
-              ? 'warning'
-              : undefined,
-        })}
-        loading={isPending}
-        error={isError ? extractErrorMessage(error, '신청 목록을 불러오지 못했어요.') : undefined}
-        onRetry={() => void refetch()}
-        empty={
-          <AdminEmpty
-            title={statusFilter === 'all' ? '신청이 없어요' : '선택한 상태의 신청이 없어요'}
-            description={statusFilter === 'all' ? '아직 신청한 팀이 없어요.' : '다른 상태를 선택하거나 전체 신청을 확인해 보세요.'}
-          />
-        }
-        skeletonCards={8}
-        minCardWidth="360px"
-        renderExpanded={(reg) =>
-          reg.status === 'confirmed' && gameRostersRegistrationId === reg.id ? (
-            <AdminRegistrationGameRosters
-              tournamentId={tournamentId}
-              registrationId={reg.id}
-              teamName={reg.teamName ?? reg.teamId}
-              correctionHref={`/admin/live/${encodeURIComponent(tournamentId)}/records/corrections`}
-              onDirtyChange={setGameRostersDirty}
-            />
-          ) : null
-        }
-        renderActions={(reg) => {
-          const isLocked = !!reg.rosterLockedAt;
-          return (
-            <>
-              {canWrite && reg.status === 'awaiting_payment' && (
-                <ActionButton
-                  onClick={() => handleConfirmPayment(reg)}
-                  disabled={confirmPayment.isPending}
-                  icon={<Check size={13} />}
-                  label={confirmNoun}
-                  tone="blue"
-                />
-              )}
-              {canWrite && (reg.status === 'payment_checking' || reg.status === 'paid') && (
-                <>
-                  <ActionButton
-                    onClick={() => void handleConfirmClick(reg)}
-                    disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
-                    icon={<Check size={13} />}
-                    label="확정"
-                    tone="blue"
-                  />
-                  <ActionButton
-                    onClick={() => handleConfirm(reg, 'waitlist')}
-                    disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
-                    icon={<X size={13} />}
-                    label="대기"
-                    tone="gray"
-                  />
-                </>
-              )}
-              {/* 감사 finding(reg-confirm-reapply-state-machine #1): waitlisted 는 확정 전이
-                  코드 경로 자체가 없어 자리가 나도 대기 팀을 영구히 승격할 수 없었다 —
-                  ADMIN_CONFIRMABLE_STATUSES에 waitlisted를 추가한 서버 수정과 짝을 이루는 버튼. */}
-              {canWrite && reg.status === 'waitlisted' && (
-                <ActionButton
-                  onClick={() => void handleConfirmClick(reg)}
-                  disabled={confirmRegistration.isPending || Boolean(admissionsBlockedReason)}
-                  icon={<Check size={13} />}
-                  label="확정"
-                  tone="blue"
-                />
-              )}
-              {/* 감사 finding(reg-confirm-reapply-state-machine #2/#3, D-small-ux-consistency #1):
-                  rosterUnlock 서버는 status 가드가 없어 어떤 상태의 신청에도 성공한다 — 그런데
-                  rosterLockedAt이 실제로 하는 일은 명단(TournamentPlayer) 수정 차단뿐이고(
-                  tournament-players.service.ts allowLockedAndExpired 가드), 그게 뜻이 있는 상태는
-                  '아직 명단이 쓰일 수 있는' confirmed·cancel_requested 뿐이다. rosterLock은 confirmed
-                  에서만 걸리므로 잠긴 신청은 이 두 상태에서 시작해 admin cancel()로 넘어가면 cancelled
-                  로 종료된다(취소 후 재신청은 위 draft 재활성화 경로가 rosterLockedAt을 이미 null로
-                  리셋한다) — cancelled 는 팀이 대회에서 완전히 빠진 종결 상태라 명단을 다시 열어줄
-                  이유가 없다. 취소 요청(cancel_requested)은 잔류 처리(rejectCancelRequest)로 confirmed
-                  복귀가 가능하므로 여전히 노출한다. */}
-              {canWrite && isLocked && (reg.status === 'confirmed' || reg.status === 'cancel_requested') && (
-                <ActionButton
-                  onClick={() => handleRosterUnlock(reg)}
-                  disabled={rosterUnlock.isPending}
-                  icon={<Unlock size={13} />}
-                  label="잠금 해제"
-                  tone="gray"
-                />
-              )}
-              {canWrite && !isLocked && reg.status === 'confirmed' && (
-                <ActionButton
-                  onClick={() => handleRosterLock(reg)}
-                  disabled={rosterLock.isPending}
-                  icon={<Lock size={13} />}
-                  label="명단 잠금"
-                  tone="gray"
-                />
-              )}
-              {canWrite && reg.status === 'confirmed' &&
-                (reg.rosterDeadlineOverrideAt ? (
-                  <ActionButton
-                    onClick={() => handleRosterDeadlineOverrideRevoke(reg)}
-                    disabled={rosterDeadlineOverrideRevoke.isPending}
-                    icon={<TimerOff size={13} />}
-                    label="예외 해제"
-                    tone="gray"
-                  />
-                ) : rosterDeadlineAt === null ? null : (
-                  <ActionButton
-                    onClick={() => handleRosterDeadlineOverrideGrant(reg)}
-                    disabled={rosterDeadlineOverrideGrant.isPending}
-                    icon={<Timer size={13} />}
-                    label="마감 예외 허용"
-                    tone="gray"
-                  />
-                ))}
-              {canWrite && reg.status === 'cancel_requested' && (
-                <ActionButton
-                  onClick={() => void handleRejectCancel(reg)}
-                  disabled={rejectCancelRequest.isPending}
-                  icon={<Undo2 size={13} />}
-                  label="취소 거부(잔류)"
-                  tone="gray"
-                />
-              )}
-              <ActionButton
-                onClick={() => {
-                  setRosterRegistration(reg);
-                  setRosterOpen(true);
-                }}
-                icon={<ClipboardList size={13} />}
-                label="명단 검토"
-                tone="gray"
-              />
-              {/* 경기별 출전 명단 — 참가 명단이 경기 명단의 기준이 되는 확정 신청만. */}
-              {reg.status === 'confirmed' && (
-                <ActionButton
-                  onClick={() => toggleGameRosters(reg.id)}
-                  icon={<ListChecks size={13} />}
-                  label={gameRostersRegistrationId === reg.id ? '경기별 명단 접기' : '경기별 명단'}
-                  tone="gray"
-                  expanded={gameRostersRegistrationId === reg.id}
-                />
-              )}
-              <ExportCsvButton registrationId={reg.id} showToast={showToast} />
-              {canWrite && ADMIN_CANCELLABLE.has(reg.status) && (
-                <ActionButton
-                  onClick={() => void handleCancel(reg)}
-                  disabled={cancelRegistration.isPending}
-                  icon={<X size={13} />}
-                  // 모달·토스트와 같은 말을 쓴다. 팀의 취소 요청이면 승인, 그 밖에는 운영자가
-                  // 신청을 물리는 거부다(그래서 리그는 사유가 필수다). 위쪽 상태 필터 칩의
-                  // "취소" 는 **신청 상태 이름**이라 다른 뜻이다. BE 경로는 `.../cancel` 그대로.
-                  label={reg.status === 'cancel_requested' ? '취소 승인' : '거부'}
-                  tone="red"
-                />
-              )}
-            </>
-          );
-        }}
-      />
-
-      {/* 신청 거부 모달 — 사유를 받는다(리그는 필수). */}
+      {/* 신청 거부·취소 승인 창 — 사유를 받는다(리그의 거부는 필수). 폰의 취소 요청은 아래 시트가 맡는다. */}
       <SimpleModal
-        open={cancelTarget !== null}
+        open={cancelTarget !== null && cancelSurface === 'modal'}
         title={isCancelApproval ? '취소 승인' : '신청 거부'}
         onClose={() => setCancelTarget(null)}
         pending={cancelRegistration.isPending}
@@ -1162,7 +389,7 @@ export function RegistrationsTab({
             className={textareaCls}
           />
           {cancelError !== null ? (
-            <p role="alert" className="text-xs text-[var(--red600,#dc2626)]">
+            <p role="alert" className="text-xs text-[var(--red700)]">
               {cancelError}
             </p>
           ) : null}
@@ -1189,15 +416,40 @@ export function RegistrationsTab({
         </div>
       </SimpleModal>
 
+      <CancelRequestSheet
+        open={cancelTarget !== null && cancelSurface === 'sheet'}
+        registration={cancelTarget}
+        reason={cancelReason}
+        error={cancelError}
+        busy={cancelRegistration.isPending || rejectCancelRequest.isPending}
+        onReasonChange={(value) => {
+          setCancelReason(value);
+          setCancelError(null);
+        }}
+        onApprove={submitCancel}
+        onKeep={keepFromSheet}
+        onClose={() => setCancelTarget(null)}
+      />
+
       <RosterModal
-        open={rosterOpen}
-        onClose={() => setRosterOpen(false)}
+        open={rosterRegistration !== null}
+        onClose={() => setRosterRegistrationId(null)}
         registration={rosterRegistration}
         showToast={showToast}
         canWrite={canWrite}
+        footer={
+          rosterRegistration ? (
+            <RosterLockControls
+              registration={rosterRegistration}
+              canWrite={canWrite}
+              rosterDeadlineAt={rosterDeadlineAt}
+              showToast={showToast}
+            />
+          ) : null
+        }
       />
 
-      {/* 신청 관리 confirm modal (취소·취소거부·참가확정·일괄처리 공용) */}
+      {/* 신청 관리 confirm modal (참가확정·참가유지·일괄처리 공용) */}
       {ConfirmModal}
       {UnsavedChangesModal}
     </>

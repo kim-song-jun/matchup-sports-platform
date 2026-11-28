@@ -98,13 +98,13 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
       '8강 1번 경기 승자',
       '8강 2번 경기 승자',
     ]);
-    expect((screen.getByLabelText('어웨이 자리') as HTMLSelectElement).value).toBe('');
+    expect((screen.getByLabelText('원정 자리') as HTMLSelectElement).value).toBe('');
   });
 
   it('고른 원천을 보내고, 비운 쪽은 null 로 보낸다', () => {
     const props = renderDialog('link');
     fireEvent.change(screen.getByLabelText('연결할 경기'), { target: { value: 's1' } });
-    fireEvent.change(screen.getByLabelText('어웨이 자리'), { target: { value: 'q2' } });
+    fireEvent.change(screen.getByLabelText('원정 자리'), { target: { value: 'q2' } });
     fireEvent.change(screen.getByLabelText('홈 자리'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: '연결 저장' }));
     expect(mocks.setSources).toHaveBeenCalledWith(
@@ -119,7 +119,7 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
   it('반대편에 이미 고른 경기는 후보에서 제외하고 서로 다른 출처를 저장한다', () => {
     renderDialog('link');
     fireEvent.change(screen.getByLabelText('연결할 경기'), { target: { value: 's1' } });
-    const away = screen.getByLabelText('어웨이 자리') as HTMLSelectElement;
+    const away = screen.getByLabelText('원정 자리') as HTMLSelectElement;
     expect(Array.from(away.options).map((option) => option.value)).toEqual(['', 'q2']);
     fireEvent.change(away, { target: { value: 'q2' } });
     fireEvent.click(screen.getByRole('button', { name: '연결 저장' }));

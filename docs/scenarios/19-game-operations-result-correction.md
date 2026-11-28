@@ -52,7 +52,7 @@
 
 각 단계 screenshot·실제 파울 이벤트/피리어드·console/network·viewport별 overflow 판정을 기록한다. 검증 중 생성한 데이터의 정리 가능 여부와 소유 브라우저/프로세스 cleanup을 남긴다. 위 2026-08-19 증거는 이 변경의 after 증거가 아니다.
 
-자동 회귀: `apps/v1_web/src/shared/game-operations/team-foul-counter-bar.test.tsx`, `operate-console-core.test.tsx`. 집계 근거는 `deriveFoulCounts`이며 실제 운영 시나리오는 별도 실행한다.
+자동 회귀: `apps/v1_web/src/shared/game-operations/console-score-card.test.tsx`, `operate-console-core.test.tsx`. 집계 근거는 `deriveFoulCounts`이며 실제 운영 시나리오는 별도 실행한다.
 
 **집계 규칙 변경(2026-11-18 사용자 결정, 위 `집계 규칙 유지` 결정을 바꾼다):** 팀 파울은 `FOUL` 이벤트에 더해 **카드(옐로·레드) 1장을 파울 1개로** 센다. 카드는 반칙에 대한 제재라 파울을 따로 기록하지 않아도 숫자가 오른다. 단 한 선수의 **옐로 2장 뒤에 붙는 레드(경고 누적 퇴장)는 세지 않는다** — 두 번째 옐로가 이미 그 반칙으로 1개를 셌다. 취소한 이벤트는 세지 않고, 피리어드마다 0부터 센다는 규칙과 표시는 그대로다. 옐로·레드 모두 선수 개인 파울 통계(`V1GameResultParticipant.fouls`)는 바꾸지 않았다. 같은 반칙을 파울과 카드로 둘 다 기록하면 2개로 센다.
 

@@ -1,28 +1,22 @@
 'use client';
 import { FixtureAssignmentWorkspace } from '@/components/admin/bracket-canvas/fixture-assignment-workspace';
-import { BracketResetButton } from '@/components/admin/bracket-canvas/bracket-reset-button';
-import { StagePlanToolbar } from '@/components/admin/stages/stage-plan-toolbar';
-import { MultiFinalsWizard } from '@/components/admin/bracket-canvas/multi-finals-wizard';
-import { useState } from 'react';
-import { Button } from '@/components/v1-ui/button';
-
-import { Suspense } from 'react';
+import { BracketEmptyState } from '@/components/admin/bracket-canvas/bracket-empty-state';
+import { BracketToolsBar } from '@/components/admin/bracket-canvas/bracket-tools-bar';
+import { useBracketTools } from '@/components/admin/bracket-canvas/use-bracket-tools';
+import { useBracketViewControls } from '@/components/admin/bracket-canvas/use-bracket-view-controls';
+import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BracketCanvasMobileScreen } from '@/components/admin/bracket-canvas/bracket-canvas-mobile-screen';
 import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
 import { BracketCanvasWorkspace } from '@/components/admin/bracket-canvas/bracket-canvas-workspace';
 import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
-import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+import { BRACKET_CANVAS_WIDE_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { useV1AdminTournament, useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
 import { BracketTab } from '../bracket-tab';
+import { tournamentInfoHref } from '../info-sections';
 import { useTournamentAdmin } from '../tournament-admin-context';
 
 type BracketView = 'canvas' | 'list';
-
-const VIEW_ITEMS = [
-  { id: 'canvas', label: '그림' },
-  { id: 'list', label: '목록' },
-];
 
 export default function AdminTournamentBracketPage() {
   return (
@@ -34,11 +28,11 @@ export default function AdminTournamentBracketPage() {
 
 function BracketPageBody() {
   const { tournamentId, role, canWrite, showToast } = useTournamentAdmin();
-  const [multiFinalsOpen, setMultiFinalsOpen] = useState(false);
-  const [multiFinalsMode, setMultiFinalsMode] = useState<'create' | 'rules' | 'assign'>('create');
   const { data: tournament } = useV1AdminTournament(tournamentId);
   const [stageKey, setStageKey] = useState('');
   const [poolKey, setPoolKey] = useState('');
+  const [assignmentMode, setAssignmentMode] = useState<'time' | 'court' | null>(null);
+  const controls = useBracketViewControls();
   const stages = tournament?.stagePlan?.stages ?? [];
   const stage = stages.find(item => item.key === stageKey) ?? stages[0];
   const pool = stage?.pools.find(item => item.key === poolKey) ?? stage?.pools[0];
@@ -47,7 +41,12 @@ function BracketPageBody() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const view: BracketView = searchParams.get('view') === 'list' ? 'list' : 'canvas';
+  const wide = useMediaQuery(BRACKET_CANVAS_WIDE_MEDIA_QUERY);
+  // 폰은 보기가 하나다 — 주소에 view=list 가 있어도 폰에서는 무시한다.
+  const view: BracketView = wide && searchParams.get('view') === 'list' ? 'list' : 'canvas';
+  // 보기를 바꾸면 못 연 「경기 열기」 요청은 버린다 — 목록에서 만든 경기가 나중에 그림으로 돌아올 때 패널을 뜻밖에 열지 않게.
+  const { clearFocusRequest } = controls;
+  useEffect(() => { clearFocusRequest(); }, [view, clearFocusRequest]);
   const registrations = regData?.items ?? [];
   // 캐시된 목록은 재조회가 실패해도 쓰되, 실패는 refetchFailed 로 드러낸다.
   const registrationsState: RegistrationsLoadState = {
@@ -57,33 +56,31 @@ function BracketPageBody() {
     error: regError,
     onRetry: () => void refetchRegistrations(),
   };
+  const tools = useBracketTools({
+    tournamentId, tournament, registrations, registrationsState, canWrite, role, showToast, controls, view, onAssignmentModeChange: setAssignmentMode,
+  });
 
   // 주소가 보기 방식의 정본이다 — 새로고침·뒤로가기에서도 유지되고, 다른 쿼리는 건드리지 않는다.
-  const changeView = (next: BracketView) => {
+  const viewHref = (next: BracketView) => {
     const params = new URLSearchParams(searchParams.toString());
     if (next === 'list') params.set('view', 'list');
     else params.delete('view');
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    return query ? `${pathname}?${query}` : pathname;
   };
+  const changeView = (next: BracketView) => router.replace(viewHref(next), { scroll: false });
 
-  const assignmentToolbar = tournament?.stagePlan ? <StagePlanToolbar tournamentId={tournamentId} tournamentStatus={tournament.status} canWrite={canWrite} canOverride={role === 'PLATFORM_OPS'} /> : (tournament?.format === 'league_knockouts' && canWrite ? <>
-        <div className="contents">
-          <Button variant="primary" onClick={() => { setMultiFinalsMode('create'); setMultiFinalsOpen(true); }}>예선·토너먼트 대진 생성</Button>
-          <Button variant="neutral" onClick={() => { setMultiFinalsMode('rules'); setMultiFinalsOpen(true); }}>토너먼트 배정 규칙</Button>
-          <Button variant="neutral" onClick={() => { setMultiFinalsMode('assign'); setMultiFinalsOpen(true); }}>토너먼트별 진출팀 배정</Button>
-        </div>
-        <MultiFinalsWizard tournamentId={tournamentId} mode={multiFinalsMode} open={multiFinalsOpen} onClose={() => setMultiFinalsOpen(false)} onApplied={() => showToast(multiFinalsMode === 'assign' ? '진출팀을 대진에 배정했어요.' : multiFinalsMode === 'rules' ? '토너먼트 배정 규칙을 저장했어요.' : '토너먼트 대진을 생성했어요.', 'success')} />
-      </> : null);
-  const content = (
+  const body = view === 'canvas' && tools.isEmpty ? (
+    <BracketEmptyState
+      canWrite={canWrite}
+      create={tools.create}
+      onCreate={tools.openCreate}
+      sixTeamNotice={tournament?.format === 'knockout' && tournament.teamCount === 6 && !tournament.sixTeamMode}
+      infoHref={tournamentInfoHref(tournamentId, 'rules')}
+      listHref={wide && tournament?.format !== 'league_knockouts' ? viewHref('list') : undefined}
+    />
+  ) : (
     <div className="flex flex-col gap-4">
-      <SegmentedTabs
-        ariaLabel="대진 보기 방식"
-        role="tablist"
-        items={VIEW_ITEMS}
-        activeId={view}
-        onSelect={(id) => changeView(id === 'list' ? 'list' : 'canvas')}
-      />
       {view === 'canvas' && stage && pool && (
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1 tm-text-label">단계
@@ -105,14 +102,11 @@ function BracketPageBody() {
               tournamentId={tournamentId}
               format={tournament?.format}
               sixTeamState={tournament?.sixTeamBracket}
-              kind={tournament?.kind}
               registrations={registrations}
               registrationsState={registrationsState}
-              bracketPublishedAt={tournament?.bracketPublishedAt}
-              bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
               canWrite={canWrite}
               showToast={showToast}
-              onShowList={() => changeView('list')}
+              controls={controls}
             />
           }
           narrow={
@@ -124,6 +118,7 @@ function BracketPageBody() {
               format={tournament?.format}
               sixTeamState={tournament?.sixTeamBracket}
               showToast={showToast}
+              controls={controls}
             />
           }
         />
@@ -133,17 +128,17 @@ function BracketPageBody() {
           tournamentId={tournamentId}
           showToast={showToast}
           registrations={registrations}
-          confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
-          confirmedTeamCountStatus={registrationsState.status}
-          registrationDeadlineAt={tournament?.registrationDeadlineAt}
-          tournamentStatus={tournament?.status}
-          bracketPublishedAt={tournament?.bracketPublishedAt}
-          bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
           canWrite={canWrite}
+          unscheduledOnly={controls.unscheduledOnly}
         />
       )}
     </div>
   );
+  const content = (
+    <BracketToolsBar tools={tools} tournament={tournament} tournamentId={tournamentId} canWrite={canWrite} view={view} onViewChange={changeView} controls={controls} showToast={showToast}>
+      {body}
+    </BracketToolsBar>
+  );
   return tournament ? <FixtureAssignmentWorkspace tournamentId={tournamentId} canWrite={canWrite}
-    canManageFields={role === 'PLATFORM_OPS'} showToast={showToast} toolbar={<>{assignmentToolbar}<BracketResetButton tournamentId={tournamentId} canWrite={canWrite} showToast={showToast} /></>}>{content}</FixtureAssignmentWorkspace> : content;
+    canManageFields={role === 'PLATFORM_OPS'} showToast={showToast} mode={assignmentMode} onModeChange={setAssignmentMode}>{content}</FixtureAssignmentWorkspace> : content;
 }

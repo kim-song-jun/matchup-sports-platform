@@ -4,7 +4,9 @@ import type { StagePlan } from '@/types/stage-plan';
 import {
   INFO_NEED_TIER_LABEL,
   TOURNAMENT_INFO_SECTIONS,
+  TOURNAMENT_INFO_SECTION_META,
   infoNeedHref,
+  parseInfoEditParam,
   tournamentInfoHref,
   tournamentInfoNeeds,
 } from './info-sections';
@@ -227,5 +229,26 @@ describe('tournamentInfoNeeds', () => {
     expect(new Set(needs.map((need) => need.key)).size).toBe(needs.length);
     const order = { required: 0, review: 1, optional: 2 } as const;
     expect(needs.map((need) => order[need.tier])).toEqual([...needs.map((need) => order[need.tier])].sort());
+  });
+});
+
+describe('parseInfoEditParam', () => {
+  it.each(TOURNAMENT_INFO_SECTIONS)('%s 는 그대로 섹션 키다', (key) => {
+    expect(parseInfoEditParam(key)).toBe(key);
+  });
+
+  it.each([null, '', 'foo', 'BASIC', ' basic', 'basic,rules'])('%j 는 섹션이 아니다', (raw) => {
+    expect(parseInfoEditParam(raw)).toBeNull();
+  });
+});
+
+describe('TOURNAMENT_INFO_SECTION_META', () => {
+  it('여섯 섹션의 이름과 한 줄 설명을 가진다', () => {
+    expect(TOURNAMENT_INFO_SECTIONS.map((key) => TOURNAMENT_INFO_SECTION_META[key].title)).toEqual([
+      '기본', '일정·장소', '참가', '경기 규칙', '공개 화면', '홍보',
+    ]);
+    for (const key of TOURNAMENT_INFO_SECTIONS) {
+      expect(TOURNAMENT_INFO_SECTION_META[key].description).toMatch(/요\.$/);
+    }
   });
 });

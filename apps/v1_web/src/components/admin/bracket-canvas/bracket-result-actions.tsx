@@ -101,7 +101,7 @@ export function BracketResultActions({
       setStep('idle');
       showToast('점수를 고쳤어요.', 'success');
     } catch (error) {
-      setModalError(`${describeBracketCanvasError(error, '정정을 확정하지 못했어요.')} 정정 초안은 남아 있어요. 칸의 "결과 확정"이나 결과 정정 화면에서 이어서 처리해 주세요.`);
+      setModalError(`${describeBracketCanvasError(error, '결과를 고치지 못했어요.')} 고치던 내용은 남아 있어요. 칸의 "결과 확정"이나 결과 고치기 화면에서 이어서 처리해 주세요.`);
     } finally {
       setBusy(false);
     }
@@ -131,7 +131,7 @@ export function BracketResultActions({
     }
     const ok = await confirm({
       title: '결과를 확정할까요?',
-      message: `${formatGameResultScoreWithPenalties(revision.score)} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
+      message: `${formatGameResultScoreWithPenalties(revision.score)} 결과를 공식 결과로 확정해요. 확정 후에는 결과 고치기로만 바꿀 수 있어요.`,
       confirmLabel: '확정',
     });
     if (!ok) return;
@@ -159,10 +159,10 @@ export function BracketResultActions({
       {game.hasLiveRecords ? (
         <>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-            라이브로 득점이 기록된 경기예요. 결과 정정 화면에서 고쳐 주세요.
+            라이브로 득점이 기록된 경기예요. 결과 고치기 화면에서 고쳐 주세요.
           </p>
           <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline self-start">
-            결과 정정 화면 열기
+            결과 고치기 화면 열기
           </Link>
         </>
       ) : null}
@@ -183,7 +183,7 @@ export function BracketResultActions({
               결과 확정
             </Button>
             <Link href={correctionsHref} className="tm-text-caption underline" style={{ color: 'var(--text-muted)' }}>
-              결과 정정 화면에서 정리하기
+              결과 고치기 화면에서 정리하기
             </Link>
           </div>
         )
@@ -210,8 +210,8 @@ export function BracketResultActions({
         open={step === 'reason'}
         title="점수를 고칠까요?"
         message={`${draftScore === null ? '' : josa(formatGameResultScoreWithPenalties(draftScore), ['으로', '로'])} 고쳐요. 사유를 남겨 주세요.`}
-        reasonLabel="정정 사유"
-        confirmLabel="정정 확정"
+        reasonLabel="고치는 이유"
+        confirmLabel="결과 고치기"
         submitting={busy}
         errorMessage={modalError}
         onCancel={() => setStep('form')}

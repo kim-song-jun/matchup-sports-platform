@@ -210,10 +210,10 @@ describe('BracketTemplateDialog — 리그 방식 대회', () => {
     renderDialog({ format: 'league' });
     typeTeams('6');
     expect(screen.getByRole('radio', { name: '단일 리그' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: '홈·어웨이 리그' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: '홈·어웨이 리그' }));
+    expect(screen.getByRole('radio', { name: '홈·원정 리그' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: '홈·원정 리그' }));
     expect(screen.getByText('경기 30개 · 자리 6개')).toBeInTheDocument();
-    expect(screen.getByText('진행 순서: 홈·어웨이 리그 · 10라운드 · 라운드마다 3경기')).toBeInTheDocument();
+    expect(screen.getByText('진행 순서: 홈·원정 리그 · 10라운드 · 라운드마다 3경기')).toBeInTheDocument();
     create();
     expect(mocks.apply).toHaveBeenCalledWith({ kind: 'league', teamCount: 6, legs: 2 }, expect.any(Object));
   });
@@ -227,7 +227,7 @@ describe('BracketTemplateDialog — 리그 방식 대회', () => {
 
   it('경기가 240개를 넘으면 만들 수 없다(경계: 16팀 2회전 240개는 가능, 17팀은 불가)', () => {
     renderDialog({ format: 'league' });
-    fireEvent.click(screen.getByRole('radio', { name: '홈·어웨이 리그' }));
+    fireEvent.click(screen.getByRole('radio', { name: '홈·원정 리그' }));
     typeTeams('16');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
     typeTeams('17');

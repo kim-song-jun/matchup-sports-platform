@@ -166,12 +166,12 @@ describe('useV1GameOperationsConsole — 로컬 저장 실패 통지', () => {
     denySubscriptionFromNowOn();
     act(() => fire('game.permission.revoked'));
     await waitFor(() =>
-      expect(result.current.bannerMessage).toBe('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.'),
+      expect(result.current.bannerMessage).toBe('이 경기의 기록 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.'),
     );
 
     // 저장이 계속 실패하는 기기에서 큐가 한 번 더 바뀌어도 그 공지를 지우면 안 된다.
     await recordGoal(result.current.submitEvent as never, 120_000);
-    expect(result.current.bannerMessage).toBe('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
+    expect(result.current.bannerMessage).toBe('이 경기의 기록 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
 
     unmount();
   });

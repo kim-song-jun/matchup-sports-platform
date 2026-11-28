@@ -96,11 +96,11 @@ describe('parseTypedClock', () => {
 
 describe('copy', () => {
   it('CTA 는 받침에 따라 로/으로를 고른다', () => {
-    expect(correctionCtaLabel(11 * MIN, 9 * MIN)).toBe('11:00 → 9:00으로 정정');
-    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 10_000)).toBe('11:00 → 9:10으로 정정');
-    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 30_000)).toBe('11:00 → 9:30으로 정정');
-    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 31_000)).toBe('11:00 → 9:31로 정정');
-    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 32_000)).toBe('11:00 → 9:32로 정정');
+    expect(correctionCtaLabel(11 * MIN, 9 * MIN)).toBe('11:00 → 9:00으로 고치기');
+    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 10_000)).toBe('11:00 → 9:10으로 고치기');
+    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 30_000)).toBe('11:00 → 9:30으로 고치기');
+    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 31_000)).toBe('11:00 → 9:31로 고치기');
+    expect(correctionCtaLabel(11 * MIN, 9 * MIN + 32_000)).toBe('11:00 → 9:32로 고치기');
   });
   it('범위 안내와 오류 문장', () => {
     expect(correctionRangeHint('전반', 22 * MIN + 30_000)).toBe('전반 0:00–22:30 사이에서 고를 수 있어요. 전·후반은 바꿀 수 없어요.');
@@ -113,6 +113,11 @@ describe('copy', () => {
     const err = Object.assign(new Error('raw'), { code: 'RESULT_ALREADY_OFFICIAL' });
     expect(eventTimeCorrectionErrorMessage(err)).toContain('결과가 이미 확정');
     expect(eventTimeCorrectionErrorMessage(new Error('boom'))).toBe('boom');
-    expect(eventTimeCorrectionErrorMessage(null)).toBe('시각을 정정하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    expect(eventTimeCorrectionErrorMessage(null)).toBe('시각을 고치지 못했어요. 잠시 후 다시 시도해 주세요.');
+  });
+  it('안내에 「정정」을 쓰지 않는다', () => {
+    const coded = (code: string) => eventTimeCorrectionErrorMessage(Object.assign(new Error('raw'), { code }));
+    expect(coded('EVENT_TIME_REASON_REQUIRED')).toBe('고친 이유를 적어 주세요.');
+    expect(coded('RESULT_ALREADY_OFFICIAL')).toBe('결과가 이미 확정돼서 운영 콘솔에서는 고칠 수 없어요. 플랫폼 관리자에게 고쳐 달라고 요청해 주세요.');
   });
 });

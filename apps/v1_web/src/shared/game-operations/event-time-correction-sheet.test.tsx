@@ -20,7 +20,7 @@ function renderSheet(overrides: Partial<EventTimeCorrectionSheetProps> = {}) {
     <EventTimeCorrectionSheet
       open
       mode="operator"
-      title="옐로카드 기록 수정"
+      title="옐로카드 기록 고치기"
       summary="2 한달 · 오렌지 FS"
       periodLabel="전반"
       currentClockMs={11 * MIN}
@@ -38,29 +38,29 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
   it('큰 시각과 범위 안내를 보여주고, 바꾸기 전에는 정정 버튼이 비활성이다', () => {
     renderSheet();
 
-    const dialog = screen.getByRole('dialog', { name: '옐로카드 기록 수정' });
+    const dialog = screen.getByRole('dialog', { name: '옐로카드 기록 고치기' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(screen.getByRole('button', { name: /정정할 시각 11:00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /고칠 시각 11:00/ })).toBeInTheDocument();
     expect(screen.getByText('전반 0:00–22:30 사이에서 고를 수 있어요. 전·후반은 바꿀 수 없어요.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '시각을 바꾸면 정정할 수 있어요' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '시각을 바꾸면 고칠 수 있어요' })).toBeDisabled();
   });
 
-  it('분 ±1, 10초 ±10 버튼으로 맞추고 "11:00 → 9:00으로 정정"을 보낸다', async () => {
+  it('분 ±1, 10초 ±10 버튼으로 맞추고 "11:00 → 9:00으로 고치기"를 보낸다', async () => {
     const user = userEvent.setup();
     const { onSubmit, onClose } = renderSheet();
 
     await user.click(screen.getByRole('button', { name: '1분 빼기' }));
     await user.click(screen.getByRole('button', { name: '1분 빼기' }));
-    expect(screen.getByRole('button', { name: /정정할 시각 9:00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /고칠 시각 9:00/ })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '10초 더하기' }));
     await user.click(screen.getByRole('button', { name: '10초 빼기' }));
 
-    await user.click(screen.getByRole('button', { name: '11:00 → 9:00으로 정정' }));
+    await user.click(screen.getByRole('button', { name: '11:00 → 9:00으로 고치기' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit).toHaveBeenCalledWith({
       clockMs: 9 * MIN,
-      reason: '경기 중 기록 시각 정정 (11:00 → 9:00)',
+      reason: '경기 중 기록 시각 고치기 (11:00 → 9:00)',
     });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -70,34 +70,34 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     renderSheet();
 
     await user.click(screen.getByRole('button', { name: '1분 빼기' }));
-    expect(screen.getByRole('button', { name: '11:00 → 10:00으로 정정' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '11:00 → 10:00으로 고치기' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: '10초 더하기' }));
-    expect(screen.getByRole('button', { name: '11:00 → 10:10으로 정정' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '11:00 → 10:10으로 고치기' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: '10초 더하기' }));
     await user.click(screen.getByRole('button', { name: '10초 더하기' }));
-    expect(screen.getByRole('button', { name: '11:00 → 10:30으로 정정' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '11:00 → 10:30으로 고치기' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: '10초 더하기' }));
-    expect(screen.getByRole('button', { name: '11:00 → 10:40으로 정정' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '11:00 → 10:40으로 고치기' })).toBeEnabled();
   });
 
   it('시각을 탭해 숫자로 직접 입력할 수 있다 (inputmode=numeric, Enter 로 확정)', async () => {
     const user = userEvent.setup();
     renderSheet();
 
-    await user.click(screen.getByRole('button', { name: /정정할 시각 11:00/ }));
+    await user.click(screen.getByRole('button', { name: /고칠 시각 11:00/ }));
     const input = screen.getByRole('textbox', { name: /숫자로 입력/ });
     expect(input).toHaveAttribute('inputmode', 'numeric');
     await user.type(input, '930{Enter}');
 
-    expect(screen.getByRole('button', { name: /정정할 시각 9:30/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '11:00 → 9:30으로 정정' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /고칠 시각 9:30/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '11:00 → 9:30으로 고치기' })).toBeEnabled();
   });
 
   it('초가 59를 넘는 숫자는 받지 않고 이유를 말한다', async () => {
     const user = userEvent.setup();
     renderSheet();
 
-    await user.click(screen.getByRole('button', { name: /정정할 시각 11:00/ }));
+    await user.click(screen.getByRole('button', { name: /고칠 시각 11:00/ }));
     const input = screen.getByRole('textbox', { name: /숫자로 입력/ });
     await user.type(input, '975{Enter}');
 
@@ -105,15 +105,15 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     expect(screen.getByText('초는 59까지만 쓸 수 있어요.')).toBeInTheDocument();
   });
 
-  it('범위 밖이면 안내가 오류 문장으로 바뀌고 정정 버튼이 막힌다', async () => {
+  it('범위 밖이면 안내가 오류 문장으로 바뀌고 고치기 버튼이 막힌다', async () => {
     const user = userEvent.setup();
     const { onSubmit } = renderSheet();
 
-    await user.click(screen.getByRole('button', { name: /정정할 시각 11:00/ }));
+    await user.click(screen.getByRole('button', { name: /고칠 시각 11:00/ }));
     await user.type(screen.getByRole('textbox', { name: /숫자로 입력/ }), '2300{Enter}');
 
     expect(screen.getByText('전반 0:00–22:30 밖이에요. 범위 안으로 맞춰 주세요.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '11:00 → 23:00으로 정정' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '11:00 → 23:00으로 고치기' })).toBeDisabled();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -124,11 +124,11 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     await user.click(screen.getByRole('button', { name: '10초 빼기' }));
     await user.click(screen.getByRole('button', { name: '10초 빼기' }));
     expect(screen.getByRole('button', { name: '10초 빼기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /정정할 시각 0:00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /고칠 시각 0:00/ })).toBeInTheDocument();
 
     for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: '10초 더하기' }));
     expect(screen.getByRole('button', { name: '10초 더하기' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /정정할 시각 0:40/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /고칠 시각 0:40/ })).toBeInTheDocument();
   });
 
   it('저장이 실패하면 서버 코드를 해요체로 풀어 보여주고 시트를 열어 둔다', async () => {
@@ -139,21 +139,21 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     const { onClose } = renderSheet({ onSubmit });
 
     await user.click(screen.getByRole('button', { name: '1분 빼기' }));
-    await user.click(screen.getByRole('button', { name: '11:00 → 10:00으로 정정' }));
+    await user.click(screen.getByRole('button', { name: '11:00 → 10:00으로 고치기' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('이미 취소된 기록은 시각을 고칠 수 없어요.');
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '11:00 → 10:00으로 정정' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '11:00 → 10:00으로 고치기' })).toBeEnabled();
   });
 
   it('"기록 취소" 탭에서 기존 취소 흐름으로 넘긴다', async () => {
     const user = userEvent.setup();
     const { onRequestCancelRecord } = renderSheet();
 
-    expect(screen.getByRole('tab', { name: '시간 정정' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '시각 고치기' })).toHaveAttribute('aria-selected', 'true');
     await user.click(screen.getByRole('tab', { name: '기록 취소' }));
     expect(screen.getByRole('tab', { name: '기록 취소' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.queryByRole('button', { name: /으로 정정$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /으로 고치기$/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '이 기록 취소하기' }));
     expect(onRequestCancelRecord).toHaveBeenCalledTimes(1);
@@ -163,7 +163,7 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     const user = userEvent.setup();
     renderSheet();
 
-    screen.getByRole('tab', { name: '시간 정정' }).focus();
+    screen.getByRole('tab', { name: '시각 고치기' }).focus();
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: '기록 취소' })).toHaveAttribute('aria-selected', 'true');
   });
@@ -186,10 +186,10 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
 
     await user.click(screen.getByRole('button', { name: '1분 빼기' }));
     await user.click(screen.getByRole('button', { name: '1분 빼기' }));
-    expect(screen.getByRole('button', { name: '11:00 → 9:00으로 정정' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '11:00 → 9:00으로 고치기' })).toBeDisabled();
 
-    await user.type(screen.getByLabelText(/정정 사유/), '  심판 기록지 대조 결과 9분 경고  ');
-    await user.click(screen.getByRole('button', { name: '11:00 → 9:00으로 정정' }));
+    await user.type(screen.getByLabelText(/고친 이유/), '  심판 기록지 대조 결과 9분 경고  ');
+    await user.click(screen.getByRole('button', { name: '11:00 → 9:00으로 고치기' }));
 
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({ clockMs: 9 * MIN, reason: '심판 기록지 대조 결과 9분 경고' }),
@@ -201,8 +201,8 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     renderSheet({ mode: 'admin', onRequestCancelRecord: undefined });
 
     await user.click(screen.getByRole('button', { name: '1분 빼기' }));
-    await user.type(screen.getByLabelText(/정정 사유/), '   ');
-    expect(screen.getByRole('button', { name: '11:00 → 10:00으로 정정' })).toBeDisabled();
+    await user.type(screen.getByLabelText(/고친 이유/), '   ');
+    expect(screen.getByRole('button', { name: '11:00 → 10:00으로 고치기' })).toBeDisabled();
   });
 
   it('모든 조작 버튼은 44px 터치 타깃 클래스를 가진다', () => {
@@ -210,7 +210,7 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
     for (const name of ['1분 빼기', '1분 더하기', '10초 빼기', '10초 더하기']) {
       expect(screen.getByRole('button', { name }).className).toContain('h-11 w-11');
     }
-    expect(screen.getByRole('tab', { name: '시간 정정' }).className).toContain('min-h-[44px]');
+    expect(screen.getByRole('tab', { name: '시각 고치기' }).className).toContain('min-h-[44px]');
   });
 });
 
@@ -221,7 +221,7 @@ describe('EventTimeCorrectionSheet (MD-QA #187)', () => {
 describe('EventTimeCorrectionSheet — 글자 크기 (리셋에 눌리지 않기)', () => {
   it('큰 시각 버튼이 인라인으로 heading×1.75 / 800 을 지정한다', () => {
     renderSheet();
-    const clock = screen.getByRole('button', { name: /정정할 시각 11:00/ });
+    const clock = screen.getByRole('button', { name: /고칠 시각 11:00/ });
     expect(clock.style.fontSize).toBe('calc(var(--font-size-heading) * 1.75)');
     expect(clock.style.fontWeight).toBe('800');
     expect(clock.className).not.toContain('font-extrabold');
@@ -230,7 +230,7 @@ describe('EventTimeCorrectionSheet — 글자 크기 (리셋에 눌리지 않기
 
   it('탭 라벨 버튼이 인라인으로 body-sm / 700 을 지정한다', () => {
     renderSheet();
-    for (const name of ['시간 정정', '기록 취소']) {
+    for (const name of ['시각 고치기', '기록 취소']) {
       const tab = screen.getByRole('tab', { name });
       expect(tab.style.fontSize).toBe('var(--font-size-body-sm)');
       expect(tab.style.fontWeight).toBe('700');

@@ -567,9 +567,10 @@ export class UpdateTournamentDto {
   @Max(50, { message: '최대 선수 수는 50명을 넘을 수 없어요.' })
   maxPlayers?: number;
 
+  /** 생략하면 저장값을 유지한다. null 은 성별 구분 없음으로 되돌리고, 혼성 인원 4칸도 함께 지운다. */
   @IsOptional()
   @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
-  genderCategory?: TournamentGenderCategory;
+  genderCategory?: TournamentGenderCategory | null;
 
   @IsOptional()
   @Type(() => Number)

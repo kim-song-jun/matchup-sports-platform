@@ -1,715 +1,284 @@
-/**
- * info-section.test.tsx
- *
- * 이 화면은 같은 값을 두 번 그리고 같은 편집 버튼을 두 곳에 두고 있었다(요약표 2개,
- * '대회 정보 수정' + '기본 정보 수정', 상금은 읽기 2곳 + 편집 1곳). 아래는 그 통합이
- * 되돌아가지 않도록 "한 번만 나온다"를 고정하고, 함께 고친 권한 게이팅을 검증한다.
- */
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { V1Sport, V1Tournament } from '@/types/api';
-import { resolveNextImageSrc } from '@/test/next-image';
+import { setupServer } from 'msw/node';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { currentPath, settleHistory } from '@/test/history-router';
+import { createTournamentInfoServer } from '@/test/msw/tournament-info-handlers';
+import type { V1Tournament } from '@/types/api';
 import { TournamentInfoSection } from './info-section';
+import { TOURNAMENT_INFO_SECTION_META, type TournamentInfoSectionKey } from './info-sections';
 import { TournamentAdminProvider } from './tournament-admin-context';
 
-const { hooks } = vi.hoisted(() => ({
-  hooks: { tournament: undefined as unknown, stageMutate: vi.fn(), mutate: vi.fn(), showToast: vi.fn(), isPending: false, masterSports: vi.fn<() => V1Sport[]>(() => []) },
-}));
+// 주소를 실제 jsdom history 로 움직이는 라우터 — `?edit=` 로 여닫는 것과 뒤로가기를 함께 본다.
+vi.mock('next/navigation', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const listeners = new Set<() => void>();
+  const notify = () => listeners.forEach((listener) => listener());
+  window.addEventListener('popstate', notify);
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
+  const router = {
+    replace: vi.fn((url: string) => {
+      window.history.replaceState(window.history.state, '', url);
+      notify();
+    }),
+    push: vi.fn(),
+    back: vi.fn(),
+  };
+  return {
+    usePathname: () => useSyncExternalStore(subscribe, () => window.location.pathname),
+    useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => window.location.search)),
+    useRouter: () => router,
+  };
+});
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
-
-vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AdminTournament: () => ({ data: hooks.tournament }),
-  useV1UpdateTournament: () => ({ mutate: hooks.mutate, isPending: hooks.isPending }),
-  useV1SetStageTieBreakOrder: () => ({ mutate: hooks.stageMutate, isPending: false }),
-  useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1MasterSports: () => ({ data: hooks.masterSports() }),
+vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
-  useV1LineupSizeOptions: () => ({ data: [], isPending: false, isError: false }),
 }));
 
-vi.mock('@/hooks/use-tournament-period-settings', () => ({
-  useTournamentPeriodSettings: () => ({
-    data: {
-      tournamentId: 'tournament-1',
-      competitionConfigVersionId: 'config-1',
-      expectedVersion: 'version-1',
-      periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false }],
-      legacyPeriodCount: null,
-      requiresDurationInput: false,
-      kind: 'regular_tournament',
-      stageOverrides: [], groupOverrides: [],
-    },
-    isPending: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
-  useUpdateTournamentPeriodSettings: () => ({ mutate: vi.fn(), isPending: false, error: null }),
-}));
+const OVERVIEW = '/admin/tournaments/tournament-1';
+const INFO = `${OVERVIEW}/info`;
+const server = setupServer();
+const showToast = vi.fn();
 
-const tournament = {
-  id: 'tournament-1',
-  sportId: 'sport-1',
-  title: 'Teameet Futsal Cup',
-  status: 'open',
-  format: 'group_knockout',
-  registrationDeadlineAt: '2026-08-25T00:00:00.000Z',
-  rosterDeadlineAt: '2026-08-28T00:00:00.000Z',
-  bracketPublishedAt: null,
-  bracketPublishScheduledAt: null,
-  scheduledAt: '2026-08-30T00:00:00.000Z',
-  scheduledEndAt: null,
-  venue: '성수 풋살장',
-  parkingInfo: null,
-  latitude: null,
-  longitude: null,
-  coverImageUrl: null,
-  teamCount: 8,
-  minPlayers: 8,
-  maxPlayers: 12,
-  competitionConfigVersionId: null,
-  lineupMaxPlayers: 5,
-  lineupMinPlayers: 3,
-  lineupSizeOptions: [],
-  substitutionMode: 'rolling',
-  maxSubstitutions: null,
-  substitutionModeOptions: ['limited', 'rolling'],
-  genderCategory: null,
-  genderMinMale: null,
-  genderMaxMale: null,
-  genderMinFemale: null,
-  genderMaxFemale: null,
-  minMatchesPerTeam: null,
-  entryFee: 50000,
-  prizePool: 1000000,
-  prizeSummary: '우승 트로피 + 상금',
-  prizeBreakdown: '우승 600,000원',
-  promoHomeEnabled: false,
-  promoHomePriority: 0,
-  promoListEnabled: false,
-  promoListPriority: 0,
-  bankName: '국민은행',
-  bankAccount: '123-456',
-  bankHolder: '티밋',
-  rulesText: null,
-  refundPolicyText: null,
-  registrationCount: 5,
-  createdAt: '2026-08-01T00:00:00.000Z',
-  updatedAt: '2026-08-01T00:00:00.000Z',
-} as unknown as V1Tournament;
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterAll(() => server.close());
+beforeEach(() => {
+  showToast.mockReset();
+  __resetOverlayHistoryForTests();
+  __resetNavigationHistoryForTests();
+  window.history.replaceState(null, '', OVERVIEW);
+  installNavigationHistory();
+});
+afterEach(() => {
+  cleanup();
+  server.resetHandlers();
+  __resetOverlayHistoryForTests();
+  __resetNavigationHistoryForTests();
+});
 
-function renderSection(canWrite: boolean, overrides: Partial<V1Tournament> = {}) {
-  hooks.tournament = { ...tournament, ...overrides };
-  // useV1AdminTournament/useV1UpdateTournament는 위에서 모킹되지만, CAS 충돌(409) 처리를
-  // 위해 컴포넌트가 직접 부르는 useQueryClient()는 실제 QueryClientProvider가 있어야 한다.
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast: hooks.showToast }}>
+/** 개요에서 대회 정보로 들어온 것처럼 항목을 하나 쌓고 그린다. */
+async function renderPage({ canWrite = true, initial = {}, search = '' }: { canWrite?: boolean; initial?: Partial<V1Tournament>; search?: string } = {}) {
+  const backend = createTournamentInfoServer(initial);
+  server.use(...backend.handlers);
+  window.history.pushState({}, '', `${INFO}${search}`);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const view = render(
+    <QueryClientProvider client={client}>
+      <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast }}>
         <TournamentInfoSection />
       </TournamentAdminProvider>
     </QueryClientProvider>,
   );
+  await screen.findByRole('region', { name: '기본' });
+  return { backend, ...view };
 }
+const sheetOf = (key: TournamentInfoSectionKey) => screen.findByRole('dialog', { name: TOURNAMENT_INFO_SECTION_META[key].title });
+const noSheet = () => expect(screen.queryByRole('dialog')).toBeNull();
 
-describe('TournamentInfoSection', () => {
-  it('상세 이미지 숨김은 CAS 버전과 함께 저장하고 사진을 지우지 않는다', () => {
-    renderSection(true, { listImageUrl: '/uploads/list.webp', coverImageUrl: '/uploads/detail.webp', showDetailImage: true });
-    fireEvent.click(screen.getByRole('switch', { name: '상세 이미지 표시' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ showDetailImage: false, expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
+describe('대회 정보 — 섹션 요약 카드', () => {
+  it('카드 여섯 장이 정해진 순서로 나오고, 카드마다 「수정」 이 하나다', async () => {
+    await renderPage();
 
-  it('같은 값을 두 번 그리지 않는다', () => {
-    renderSection(true);
-
-    for (const label of ['신청 마감', '명단 마감', '참가비', '팀 수', '출전 인원', '교체 방식', '입금 계좌']) {
-      expect(screen.getAllByText(label)).toHaveLength(1);
-    }
-    expect(screen.getAllByText('목록 이미지 (선택)')).toHaveLength(1);
-    expect(screen.getAllByText('상세 이미지 (선택)')).toHaveLength(1);
-  });
-
-  it('편집 진입점은 관심사마다 하나씩이다', () => {
-    renderSection(true);
-
-    expect(screen.getAllByRole('button', { name: '대회 정보 수정' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: '홍보 카드 수정' })).toHaveLength(1);
-    // 같은 모달을 여는 두 번째 버튼이 있었다.
-    expect(screen.queryByRole('button', { name: '기본 정보 수정' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '프로모 설정' })).not.toBeInTheDocument();
-  });
-
-  it('상금은 편집기 한 곳에서만 읽고 고친다', () => {
-    renderSection(true);
-
-    expect(screen.getAllByRole('region', { name: '상금·시상 정보' })).toHaveLength(1);
-    expect(screen.getAllByLabelText('상품 및 상금')).toHaveLength(1);
-    // '상금 배분'은 편집기 안에서 한 번만 나온다 — 요약표가 같은 텍스트를 또 뿌리던
-    // 읽기 블록이 사라졌다는 뜻이다.
-    expect(screen.getAllByText('상금 배분')).toHaveLength(1);
-  });
-
-  it('상금 편집기는 저장된 값으로 채워져 열린다', () => {
-    renderSection(true);
-
-    // 초기값은 렌더 도중 setState 가 아니라 useState 초기화 함수로 한 번만 계산된다 —
-    // 비어 있는 폼이 뜨면 운영자가 기존 상금을 지운 채 저장하게 된다.
-    expect(screen.getByLabelText('상품 및 상금')).toHaveValue('우승 트로피 + 상금');
-    expect(screen.getByDisplayValue('우승')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('600,000원')).toBeInTheDocument();
-  });
-
-  it('읽기 전용 관리자에게는 저장 경로를 열어 주지 않는다', () => {
-    renderSection(false);
-
-    expect(screen.queryByRole('button', { name: '대회 정보 수정' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '홍보 카드 수정' })).not.toBeInTheDocument();
-    // 상금 저장 버튼과 입력이 함께 잠긴다 — 예전에는 둘 다 그대로 노출됐다.
-    expect(screen.queryByRole('button', { name: '상금 정보 저장' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('상품 및 상금')).toBeDisabled();
-    expect(screen.getByRole('switch', { name: '상세 이미지 표시' })).toBeDisabled();
-    expect(screen.getByLabelText('목록 이미지')).toBeDisabled();
-  });
-});
-
-describe('TournamentInfoSection — 종목 기본 이미지', () => {
-  beforeEach(() => {
-    hooks.masterSports.mockReturnValue([
-      { id: 'sport-1', code: 'futsal', name: '풋살', levels: [] },
+    expect(screen.getAllByRole('region').map((card) => card.getAttribute('aria-labelledby') && within(card).getByRole('heading', { level: 2 }).textContent)).toEqual([
+      '기본', '일정·장소', '참가', '경기 규칙', '공개 화면', '홍보',
     ]);
-  });
-  afterEach(() => {
-    hooks.masterSports.mockReturnValue([]);
-  });
-
-  it('이미지가 없는 풋살 대회는 목록과 상세 미리보기에 풋살 기본 이미지를 표시한다', () => {
-    // Given: 종목 코드와 표시 이름이 다른 실제 마스터 응답, 업로드 이미지가 없는 대회.
-    const images = { listImageUrl: null, coverImageUrl: null };
-
-    // When: 실제 관리자 정보 섹션과 공유 이미지 필드를 렌더한다.
-    renderSection(true, images);
-
-    // Then: 두 미리보기 모두 공용 그래픽이 아닌 해당 종목의 이미지를 고른다.
-    const listPreview = screen.getByRole('img', { name: '목록 이미지 미리보기' });
-    const detailPreview = screen.getByRole('img', { name: '상세 이미지 미리보기' });
-    expect.soft(resolveNextImageSrc(listPreview.querySelector('img'))).toBe('/illustrations/sport-futsal-640.webp');
-    expect.soft(resolveNextImageSrc(detailPreview.querySelector('img'))).toBe('/illustrations/sport-futsal-640.webp');
-  });
-});
-
-describe('TournamentInfoSection — 상금 행 모바일 전체 폭 actual caller (#1439)', () => {
-  beforeEach(() => {
-    hooks.mutate.mockReset();
-    hooks.showToast.mockReset();
-    hooks.isPending = false;
-  });
-  afterEach(() => {
-    hooks.isPending = false;
-  });
-
-  it('저장된 공유 행의 반응형 class/DOM을 유지하며 연속 입력·미리보기·저장 payload를 연결한다', async () => {
-    const user = userEvent.setup();
-    renderSection(true, { prizeBreakdown: '우승 600,000원 / 상품 우승 트로피' });
-    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
-    const name = card.getByRole('combobox', { name: '상금 항목 1 이름' });
-    const value = card.getByRole('textbox', { name: '상금 항목 1 내용' });
-    const remove = card.getByRole('button', { name: '상금 항목 1 삭제' });
-    const row = name.parentElement;
-
-    // 실제 shared renderer 연결을 검증한다. jsdom class assertion은 CSS pixel/alpha after가 아니다.
-    expect(row).toHaveClass(
-      'grid-cols-[minmax(0,1fr)_44px]',
-      'sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_44px]',
-    );
-    expect(value).toHaveClass(
-      'col-span-2', 'col-start-1', 'row-start-2',
-      'sm:col-span-1', 'sm:col-start-2', 'sm:row-start-1',
-    );
-    expect(Array.from(row!.querySelectorAll('input, button'))).toEqual([name, value, remove]);
-    expect(name).toHaveValue('우승');
-    expect(value).toHaveValue('600,000원');
-    expect(card.getByRole('textbox', { name: '상금 항목 2 내용' })).toHaveValue('우승 트로피');
-    expect(name).toBeEnabled();
-    expect(value).toBeEnabled();
-
-    name.focus();
-    await user.tab();
-    expect(value).toHaveFocus();
-    await user.tab();
-    expect(remove).toHaveFocus();
-    await user.clear(name);
-    await user.type(name, '1위');
-    await user.clear(value);
-    await user.type(value, '650000');
-    expect(card.getByRole('textbox', { name: '상금 항목 1 내용' })).toBe(value);
-    expect(value).toHaveFocus();
-    expect(value).toHaveValue('650000');
-    const item = card.getByRole('textbox', { name: '상금 항목 2 내용' });
-    await user.clear(item);
-    await user.type(item, '우승 트로피·상품권');
-    const pool = card.getByRole('textbox', { name: '총상금' });
-    await user.clear(pool);
-    await user.type(pool, '650000');
-    const summary = card.getByRole('textbox', { name: '상품 및 상금' });
-    await user.clear(summary);
-    await user.type(summary, '수정된 시상 안내');
-
-    expect(pool).toHaveValue('650,000');
-    expect(card.getByText('650,000원')).toBeInTheDocument();
-    expect(card.getByText('우승 트로피·상품권')).toBeInTheDocument();
-    expect(card.getByText('배분 합계 650,000원')).toBeInTheDocument();
-    expect(hooks.mutate).not.toHaveBeenCalled();
-    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
-
-    // 실제 component가 작성한 DTO payload를 mock mutation 경계에서 확인한다.
-    // HTTP, 권한의 서버 재검증, 실제 저장/재조회는 이 fixture의 검증 범위 밖이다.
-    expect(hooks.mutate).toHaveBeenCalledTimes(1);
-    expect(hooks.mutate).toHaveBeenCalledWith({
-      prizePool: 650000,
-      prizeSummary: '수정된 시상 안내',
-      prizeBreakdown: '@teameet/prizes/v1:' + JSON.stringify([{ category: '팀 시상', label: '1위', amount: '650,000원' }, { category: '기타 시상', label: '상품', amount: '우승 트로피·상품권' }]),
-      expectedVersion: tournament.updatedAt,
-    }, expect.anything());
-  });
-
-  it('바뀐 게 없으면 저장 요청을 보내지 않고 안내만 한다', async () => {
-    const user = userEvent.setup();
-    renderSection(true);
-    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
-    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
-    expect(hooks.mutate).not.toHaveBeenCalled();
-    expect(hooks.showToast).toHaveBeenCalledWith('바뀐 내용이 없어요.');
-  });
-
-  it('값을 바꾸면 저장 요청을 보낸다', async () => {
-    const user = userEvent.setup();
-    renderSection(true);
-    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
-    const summary = card.getByRole('textbox', { name: '상품 및 상금' });
-    await user.type(summary, '!');
-    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith(expect.objectContaining({ prizeSummary: '우승 트로피 + 상금!' }), expect.anything());
-  });
-
-  it('시상 항목을 모두 삭제해 저장하면 null을 보내 기존 시상을 비운다', async () => {
-    const user = userEvent.setup();
-    renderSection(true);
-    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
-    await user.click(card.getByRole('button', { name: '상금 항목 1 삭제' }));
-    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith(expect.objectContaining({ prizeBreakdown: null }), expect.anything());
-  });
-
-  it.each([
-    { label: '읽기 전용', canWrite: false, pending: false },
-    { label: '저장 중', canWrite: true, pending: true },
-  ])('$label 상태에서는 실제 행·추가·삭제를 잠그고 저장된 입력값을 유지한다', async ({ canWrite, pending }) => {
-    const user = userEvent.setup();
-    hooks.isPending = pending;
-    renderSection(canWrite);
-    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
-    const name = card.getByRole('combobox', { name: '상금 항목 1 이름' });
-    const value = card.getByRole('textbox', { name: '상금 항목 1 내용' });
-    const remove = card.getByRole('button', { name: '상금 항목 1 삭제' });
-    const add = card.getByRole('button', { name: '팀 시상 추가' });
-    for (const control of [name, value, remove, add, card.getByRole('textbox', { name: '총상금' }), card.getByRole('textbox', { name: '상품 및 상금' })]) {
-      expect(control).toBeDisabled();
+    for (const title of ['기본', '일정·장소', '참가', '경기 규칙', '공개 화면', '홍보']) {
+      expect(within(screen.getByRole('region', { name: title })).getAllByRole('button')).toHaveLength(1);
+      expect(screen.getByRole('button', { name: `${title} 수정` })).toBeInTheDocument();
     }
-    await user.type(name, '변경');
-    await user.type(value, '999');
-    await user.click(remove);
-    await user.click(add);
+  });
 
-    expect(name).toHaveValue('우승');
-    expect(value).toHaveValue('600,000원');
-    expect(card.getAllByRole('textbox', { name: /상금 항목 \d+ 내용/ })).toHaveLength(1);
-    if (canWrite) {
-      const save = card.getByRole('button', { name: '저장 중…' });
-      expect(save).toBeDisabled();
-      await user.click(save);
-    } else {
-      expect(card.queryByRole('button', { name: '상금 정보 저장' })).not.toBeInTheDocument();
+  it('쉬는 화면에는 입력칸이 하나도 없고, 섹션 바로가기 줄도 없다', async () => {
+    const { container } = await renderPage();
+
+    expect(container.querySelectorAll('input, select, textarea')).toHaveLength(0);
+    expect(screen.queryByRole('navigation')).toBeNull();
+    noSheet();
+  });
+
+  it('예전 편집 입구와 카드는 없다', async () => {
+    const { container } = await renderPage();
+
+    for (const name of ['대회 정보 수정', '홍보 카드 수정', '상금 정보 저장']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
     }
-    expect(hooks.mutate).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('피리어드');
+    expect(container.textContent).not.toContain('롤링');
+  });
+
+  it('경기 시간과 출전 인원 요약은 서버 값이 도착하면 채워진다', async () => {
+    await renderPage();
+    const rules = within(screen.getByRole('region', { name: '경기 규칙' }));
+
+    expect(await rules.findByText('전·후반 20분 / 20분')).toBeInTheDocument();
+    await waitFor(() => expect(rules.getAllByText('종목 기본값')).toHaveLength(3));
   });
 });
 
-// 명단 마감이 신청 마감보다 앞서면 신청을 받는 중에 명단이 먼저 닫힌다. 서버도 같은 규칙으로 400 을 준다.
-describe('TournamentInfoSection — 명단 제출 마감은 신청 마감과 같거나 그 뒤', () => {
-  beforeEach(() => {
-    hooks.mutate.mockReset();
-    hooks.showToast.mockReset();
+describe('대회 정보 — 채워야 할 것', () => {
+  it('비어 있는 필요 항목을 세고, 버튼이 그 섹션 시트를 첫 빈칸에 초점을 둔 채 연다', async () => {
+    await renderPage();
+    const strip = within(screen.getByRole('status'));
+
+    expect(strip.getByText('채워야 할 것 2')).toBeInTheDocument();
+    expect(strip.getByText('장소·명단 제출 마감이 비어 있어요.')).toBeInTheDocument();
+    fireEvent.click(strip.getByRole('button', { name: '장소·명단 제출 마감 입력하기' }));
+
+    const sheet = within(await sheetOf('schedule'));
+    expect(currentPath()).toBe(`${INFO}?edit=schedule`);
+    expect(sheet.getByLabelText('장소')).toHaveFocus();
   });
 
-  function submitEdit(edit: () => void) {
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    edit();
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-  }
+  it('유료인데 계좌가 없으면 참가 섹션 버튼이 따로 생긴다', async () => {
+    await renderPage({ initial: { entryFee: 30000 } });
+    const strip = within(screen.getByRole('status'));
 
-  it('신청 마감보다 앞선 명단 마감은 저장하지 않고 알린다', () => {
-    renderSection(true);
-    submitEdit(() => fireEvent.change(screen.getByLabelText('명단 제출 마감일'), { target: { value: '2026-08-20T09:00' } }));
+    expect(strip.getByText('채워야 할 것 3')).toBeInTheDocument();
+    fireEvent.click(strip.getByRole('button', { name: '정산 계좌 입력하기' }));
 
-    expect(hooks.showToast).toHaveBeenCalledWith('명단 제출 마감은 신청 마감과 같거나 그 뒤여야 해요.', 'error');
-    expect(hooks.mutate).not.toHaveBeenCalled();
+    expect(within(await sheetOf('entry')).getByLabelText('계좌번호')).toHaveFocus();
   });
 
-  it.each([
-    ['신청 마감 뒤로', '2026-08-26T09:00'],
-    ['비우면', ''],
-  ])('대조군: 명단 마감을 %s 저장한다', (_label, value) => {
-    renderSection(true);
-    submitEdit(() => fireEvent.change(screen.getByLabelText('명단 제출 마감일'), { target: { value } }));
+  it('대조군: 필요 항목이 다 채워졌으면 상자가 없다', async () => {
+    await renderPage({ initial: { venue: '성수 풋살장', rosterDeadlineAt: '2026-12-18T14:59:00.000Z' } });
 
-    expect(hooks.mutate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/채워야 할 것/)).toBeNull();
   });
 
-  it('순서가 어긋난 채 만들어진 대회라도 마감을 안 건드리는 수정은 막지 않는다', () => {
-    renderSection(true, { rosterDeadlineAt: '2026-08-20T00:00:00.000Z' });
-    submitEdit(() => fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } }));
+  it('읽기 전용 역할에게는 상자에 버튼이 없다', async () => {
+    await renderPage({ canWrite: false });
 
-    expect(hooks.mutate).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('TournamentInfoSection — 장소 스냅샷', () => {
-  beforeEach(() => {
-    hooks.mutate.mockReset();
-    hooks.showToast.mockReset();
-  });
-
-  function save(edit: () => void) {
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    edit();
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    return hooks.mutate.mock.calls[0][0] as Record<string, unknown>;
-  }
-
-  it('장소를 건드리지 않은 수정은 장소 필드를 하나도 보내지 않는다 — 서버가 스냅샷을 교체하지 않게', () => {
-    renderSection(true, { venueProvider: 'kakao', venueProviderId: 'kakao-1', latitude: 37.5, longitude: 127 } as Partial<V1Tournament>);
-    const body = save(() => fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } }));
-
-    expect(Object.keys(body).filter((key) => key.startsWith('venue') || key === 'latitude')).toEqual([]);
-  });
-
-  it('장소 이름을 바꾸면 venue 를 보낸다 — 이름만 직접 입력한 값이라 좌표 키는 없다', () => {
-    renderSection(true);
-    const body = save(() => fireEvent.change(screen.getByLabelText('장소'), { target: { value: '뚝섬 풋살장' } }));
-
-    expect(body).toMatchObject({ venue: '뚝섬 풋살장' });
-    expect(Object.keys(body)).not.toContain('venueLatitude');
+    expect(screen.getByText('채워야 할 것 2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /입력하기$/ })).toBeNull();
   });
 });
 
+describe('대회 정보 — ?edit= 로 여닫는 수정 시트', () => {
+  it('?edit=schedule 로 들어오면 일정·장소 시트가 열리고 첫 빈칸(장소)에 초점이 간다', async () => {
+    await renderPage({ search: '?edit=schedule' });
 
-describe('대회 형식 수정', () => {
-  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
-
-  it('단계형은 형식·팀 수를 잠그고 다른 정보는 변경된 값만 저장한다', () => {
-    renderSection(true, { format: 'league_knockouts', formatChangeBlockedReason: null, stagePlan: {
-      version: 1, stages: [{ key: 'main', name: '본선', pools: [{ key: 'main-league', name: '본선 리그', format: 'league', capacity: 8, legs: 1, sources: [] }] }],
-    } });
-    expect(screen.getByText('단계형 대회', { exact: true })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByLabelText('대회 형식')).toBeDisabled();
-    expect(screen.getByLabelText('팀 수')).toBeDisabled();
-    expect(screen.getByRole('link', { name: '단계·편성 구성에서 확인' })).toHaveAttribute('href', '/admin/tournaments/tournament-1/bracket');
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '단계형 새 이름' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ title: '단계형 새 이름', expectedVersion: tournament.updatedAt }, expect.any(Object));
+    expect(within(await sheetOf('schedule')).getByLabelText('장소')).toHaveFocus();
   });
 
-  it.each(['league', 'knockout'] as const)('현재 형식을 채우고 %s 변경을 저장 요청에 포함한다', (format) => {
-    renderSection(true, { formatChangeBlockedReason: null });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByLabelText('대회 형식')).toHaveValue('group_knockout');
-    fireEvent.change(screen.getByLabelText('대회 형식'), { target: { value: format } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ format, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  it.each(['?edit=foo', '?edit=BASIC', '?edit='])('%s 는 시트를 열지 않고 화면도 그대로다', async (search) => {
+    await renderPage({ search });
+
+    noSheet();
+    expect(screen.getAllByRole('region')).toHaveLength(6);
   });
 
-  it('조/대진이 있으면 선택을 잠그고 서버의 해제 안내를 보여준다', () => {
+  it('읽기 전용 역할은 ?edit=rules 로 들어와도 시트도 수정 버튼도 없다', async () => {
+    await renderPage({ canWrite: false, search: '?edit=rules' });
+
+    noSheet();
+    expect(screen.queryByRole('button', { name: /수정$/ })).toBeNull();
+  });
+
+  it('「수정」 은 주소에 edit 을 넣어 시트를 열고, 닫으면 edit 만 지운다', async () => {
+    await renderPage({ search: '?from=overview' });
+
+    fireEvent.click(screen.getByRole('button', { name: '참가 수정' }));
+    const sheet = await sheetOf('entry');
+    expect(currentPath()).toBe(`${INFO}?from=overview&edit=entry`);
+
+    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+    await waitFor(() => expect(currentPath()).toBe(`${INFO}?from=overview`));
+    noSheet();
+  });
+
+  it('닫은 뒤의 뒤로가기는 시트를 다시 열지 않고 들어오기 전 화면으로 간다', async () => {
+    await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: '기본 수정' }));
+    fireEvent.click(within(await sheetOf('basic')).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(currentPath()).toBe(INFO));
+
+    await act(async () => {
+      window.history.back();
+      await settleHistory();
+    });
+
+    expect(currentPath()).toBe(OVERVIEW);
+    noSheet();
+  });
+
+  it('열린 시트에서 뒤로가기를 누르면 시트만 닫히고 주소에서 edit 이 지워진다', async () => {
+    await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: '기본 수정' }));
+    await sheetOf('basic');
+
+    await act(async () => {
+      window.history.back();
+      await settleHistory();
+    });
+
+    await waitFor(() => noSheet());
+    expect(currentPath()).toBe(INFO);
+  });
+
+  it('저장하면 시트가 닫히고 카드 요약이 새 값으로 바뀐다', async () => {
+    const { backend } = await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: '기본 수정' }));
+    const sheet = within(await sheetOf('basic'));
+
+    fireEvent.change(sheet.getByLabelText(/^대회명/), { target: { value: '겨울 풋살컵' } });
+    fireEvent.click(sheet.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('기본 설정을 저장했어요.', 'success'));
+    await waitFor(() => noSheet());
+    expect(await within(screen.getByRole('region', { name: '기본' })).findByText('겨울 풋살컵')).toBeInTheDocument();
+    expect(backend.state.patches).toHaveLength(1);
+    await waitFor(() => expect(currentPath()).toBe(INFO));
+  });
+
+  it('대진이 있어 잠긴 진행 방식은 요약 줄과 기본 시트 양쪽에서 잠겨 있다', async () => {
     const reason = '조나 대진이 만들어져 있어요. 경기와 조를 모두 삭제한 뒤 변경해 주세요.';
-    renderSection(true, { formatChangeBlockedReason: reason });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByLabelText('대회 형식')).toBeDisabled();
-    expect(screen.getByText(reason)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '변경된 이름' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ title: '변경된 이름', expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
+    await renderPage({ initial: { formatChangeBlockedReason: reason }, search: '?edit=basic' });
+    const sheet = within(await sheetOf('basic'));
 
-  it.each(['in_progress', 'completed'] as const)('%s 대회는 형식 선택을 잠근다', (status) => {
-    renderSection(true, { status });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByLabelText('대회 형식')).toBeDisabled();
+    expect(within(screen.getByRole('region', { name: '기본' })).getByText(reason)).toBeInTheDocument();
+    expect(sheet.getByLabelText('진행 방식')).toBeDisabled();
   });
 });
 
+describe('대회 정보 — 예전 수정 창의 칸이 옮겨 간 곳', () => {
+  const moved: Array<[TournamentInfoSectionKey, string]> = [
+    ['basic', '종목'], ['basic', '대회명'], ['basic', '진행 방식'], ['basic', '성별'],
+    ['schedule', '대회 시작'], ['schedule', '대회 종료'], ['schedule', '신청 마감'], ['schedule', '명단 제출 마감'], ['schedule', '장소'], ['schedule', '주차 안내'],
+    ['entry', '팀 수'], ['entry', '명단 인원'], ['entry', '참가비'], ['entry', '은행명'], ['entry', '계좌번호'], ['entry', '예금주'],
+    ['rules', '출전 인원'], ['rules', '경기 시간'], ['rules', '교체'], ['rules', '순위 정하는 순서'], ['rules', '경고 누적 출전정지'], ['rules', '퇴장 출전정지'], ['rules', '팀 파울 기준'],
+    ['public', '목록 이미지'], ['public', '상세 이미지 표시'], ['public', '총상금'], ['public', '상금과 시상 요약'], ['public', '대회 규정'], ['public', '환불 정책'],
+    ['promo', '홈 오늘의 추천'], ['promo', '대회 목록 상단'],
+  ];
 
-describe('6강 방식 수정 payload', () => {
-  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
-  it('6팀 토너먼트에서 선택한 방식만 CAS 버전과 함께 저장한다', () => {
-    renderSection(true, { format: 'knockout', teamCount: 6, sixTeamMode: false });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    fireEvent.change(screen.getByLabelText('6팀 토너먼트 진행'), { target: { value: 'six' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ sixTeamMode: true, expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-  it('이미 선택된 6강 방식은 불러오고 다른 필드 수정에 끼워 보내지 않는다', () => {
-    renderSection(true, { format: 'knockout', teamCount: 6, sixTeamMode: true });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByLabelText('6팀 토너먼트 진행')).toHaveValue('six');
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-});
+  it.each(moved)('%s 시트에 「%s」 가 있다', async (section, label) => {
+    await renderPage({ search: `?edit=${section}` });
+    const sheet = within(await sheetOf(section));
 
-describe('동점일 때 순서 수정', () => {
-  const GOALS_FIRST: V1Tournament['tieBreakOrder'] = ['points', 'goal_difference', 'goals_for', 'head_to_head', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
-  const DEFAULT_ORDER: V1Tournament['tieBreakOrder'] = ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'];
-  const CUSTOM: V1Tournament['tieBreakOrder'] = ['points', 'head_to_head', 'goal_difference', 'fair_play', 'goals_for', 'fewest_goals_against', 'seeded_draw'];
-  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
-
-  it('요약 카드에 프리셋 이름과 지금 쓰는 순서를 보여준다 — 안 고른 대회는 기본 순서', () => {
-    const { unmount } = renderSection(true, { tieBreakOrder: GOALS_FIRST });
-    expect(screen.getByText('득실차 우선 · 승점 → 득실차 → 다득점 → 맞대결 → 페어플레이 → 추첨')).toBeInTheDocument();
-    unmount();
-    const second = renderSection(true, { tieBreakOrder: DEFAULT_ORDER });
-    expect(screen.getByText('맞대결 우선 · 승점 → 맞대결 → 득실차 → 다득점 → 페어플레이 → 추첨')).toBeInTheDocument();
-    second.unmount();
-    renderSection(true, { tieBreakOrder: CUSTOM });
-    expect(screen.getByText(/^직접 정한 순서 · /)).toBeInTheDocument();
-  });
-
-  it('조별 순위가 없는 토너먼트 방식에는 순서 칸도 요약도 없다', () => {
-    renderSection(true, { format: 'knockout', tieBreakOrder: DEFAULT_ORDER });
-    expect(screen.queryByText('동점 순서')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.queryByRole('heading', { name: '동점일 때 순서' })).toBeNull();
-  });
-
-  it('수정 창이 지금 순서에 맞는 프리셋을 고른 채로 열리고, 다른 프리셋을 골라 저장하면 그 순서를 CAS 버전과 함께 보낸다', () => {
-    renderSection(true, { tieBreakOrder: DEFAULT_ORDER });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByRole('radio', { name: /맞대결 우선/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('radio', { name: /득실차 우선/ }));
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ tieBreakOrder: GOALS_FIRST, expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-
-  it('직접 정하기로 시트를 열어 순서를 옮기고 적용하면 직접 정한 순서를 보낸다', () => {
-    renderSection(true, { tieBreakOrder: DEFAULT_ORDER });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    fireEvent.click(screen.getByRole('radio', { name: /직접 정하기/ }));
-    const sheet = screen.getByRole('dialog', { name: '직접 정하기' });
-    fireEvent.click(within(sheet).getByRole('button', { name: '페어플레이 한 칸 위로' }));
-    fireEvent.click(within(sheet).getByRole('button', { name: '이 순서로 정하기' }));
-    expect(screen.queryByRole('dialog', { name: '직접 정하기' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({
-      tieBreakOrder: ['points', 'head_to_head', 'goal_difference', 'fair_play', 'goals_for', 'fewest_goals_against', 'seeded_draw'],
-      expectedVersion: tournament.updatedAt,
-    }, expect.any(Object));
-  });
-
-  it('순서를 옮긴 뒤 순위표가 없는 토너먼트 방식으로 바꾸면 숨은 순서는 보내지 않는다', () => {
-    renderSection(true, { tieBreakOrder: DEFAULT_ORDER });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    fireEvent.click(screen.getByRole('radio', { name: /득실차 우선/ }));
-    fireEvent.change(screen.getByLabelText('대회 형식'), { target: { value: 'knockout' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ format: 'knockout', expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-
-  it('순서를 건드리지 않고 다른 칸만 고치면 순서를 보내지 않는다', () => {
-    renderSection(true, { tieBreakOrder: GOALS_FIRST });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-
-  it('기본 프리셋(맞대결 우선)으로 되돌리면 null 을 보낸다', () => {
-    renderSection(true, { tieBreakOrder: GOALS_FIRST });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    fireEvent.click(screen.getByRole('radio', { name: /맞대결 우선/ }));
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ tieBreakOrder: null, expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-
-  it('이 순서를 상속한 단계에 결과가 확정돼 잠기면 서버의 사유를 보여주고 카드를 끄며, 다른 칸 저장은 막지 않는다', () => {
-    const reason = '이 순서를 따르는 단계의 경기 결과가 확정돼서 바꿀 수 없어요.';
-    renderSection(true, { tieBreakOrder: GOALS_FIRST, tieBreakOrderBlockedReason: reason });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByText(reason)).toBeInTheDocument();
-    for (const radio of screen.getAllByRole('radio')) expect(radio).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-});
-
-describe('6강 결승 직행 순서 수정', () => {
-  const sixTeam = { format: 'knockout', teamCount: 6, sixTeamMode: true } as Partial<V1Tournament>;
-  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
-
-  it('6강 방식이 아니면 순서 칸이 없다', () => {
-    renderSection(true, { format: 'knockout', teamCount: 6, sixTeamMode: false });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.queryByRole('heading', { name: '결승 직행팀 고르는 순서' })).toBeNull();
-  });
-
-  it('기본 순서와 운영자 선택 고정 칸을 보여주고, 옮겨 저장하면 바뀐 순서만 보낸다', () => {
-    renderSection(true, sixTeam);
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByRole('heading', { name: '결승 직행팀 고르는 순서' })).toBeInTheDocument();
-    expect(screen.getByText('운영자 선택')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '득실차 한 칸 위로' }));
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ sixTeamDirectFinalOrder: ['goal_difference', 'goals_for', 'fewest_goals_against'], expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-
-  it('건드리지 않으면 순서를 보내지 않는다', () => {
-    renderSection(true, { ...sixTeam, sixTeamDirectFinalOrder: ['goal_difference', 'goals_for', 'fewest_goals_against'] });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenLastCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-
-  it('기본 순서로 되돌리면 null 을 보낸다', () => {
-    renderSection(true, { ...sixTeam, sixTeamDirectFinalOrder: ['goal_difference', 'goals_for', 'fewest_goals_against'] });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    fireEvent.click(screen.getByRole('button', { name: '기본 순서로 되돌리기' }));
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(hooks.mutate).toHaveBeenLastCalledWith({ sixTeamDirectFinalOrder: null, expectedVersion: tournament.updatedAt }, expect.any(Object));
-  });
-
-  it('6강 결과가 확정돼 잠기면 사유를 보여주고 버튼을 끈다', () => {
-    const reason = '6강 경기 결과가 확정돼서 바꿀 수 없어요.';
-    renderSection(true, { ...sixTeam, sixTeamDirectFinalOrderBlockedReason: reason });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    expect(screen.getByText(reason)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '득실차 한 칸 위로' })).toBeDisabled();
-  });
-});
-
-describe('단계별 동점 순서 카드', () => {
-  const stageTieBreak = {
-    tournamentOrder: ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'],
-    stages: [
-      { stageKey: 'preliminary', stageName: '예선 조별리그', ranked: true, order: null, resolvedOrder: ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'fewest_goals_against', 'seeded_draw'], lockedReason: null },
-      { stageKey: 'final', stageName: '결선 토너먼트', ranked: false, order: null, resolvedOrder: [], lockedReason: null },
-    ],
-  } as V1Tournament['stageTieBreak'];
-  beforeEach(() => { hooks.stageMutate.mockReset(); });
-
-  it('단계형 대회가 아니면 카드가 없다', () => {
-    renderSection(true);
-    expect(screen.queryByRole('heading', { name: '단계별 동점 순서' })).toBeNull();
-  });
-
-  it('단계 select 를 고르면 단계 구성 revision 과 함께 바로 저장한다', () => {
-    renderSection(true, { stageTieBreak, stagePlanRevision: 7 });
-    expect(screen.getByRole('heading', { name: '단계별 동점 순서' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('1단계 · 예선 조별리그'), { target: { value: 'goals_for_first' } });
-    expect(hooks.stageMutate).toHaveBeenCalledWith(
-      { stageKey: 'preliminary', expectedRevision: 7, order: ['points', 'goals_for', 'goal_difference', 'fewest_goals_against', 'head_to_head', 'fair_play', 'seeded_draw'] },
-      expect.any(Object),
-    );
-  });
-
-  it('쓰기 권한이 없으면 select 가 꺼져 있다', () => {
-    renderSection(false, { stageTieBreak, stagePlanRevision: 7 });
-    expect(screen.getByLabelText('1단계 · 예선 조별리그')).toBeDisabled();
-  });
-});
-
-// 팀 파울 기준 — 대회마다 다른 개수를 쓰므로 생성 뒤에도 바꿀 수 있어야 하고, 출전정지 규정과 달리 진행 중에도 열려 있다.
-describe('TournamentInfoSection — 팀 파울 기준', () => {
-  beforeEach(() => {
-    hooks.mutate.mockReset();
-    hooks.showToast.mockReset();
-  });
-
-  function save(edit: () => void) {
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-    edit();
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-  }
-
-  it('값을 비워 둔 대회는 빈칸 + "비우면 5개" 안내로 열린다', () => {
-    renderSection(true, { teamFoulThreshold: null });
-    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
-
-    const input = screen.getByLabelText('팀 파울 기준 (개)');
-    expect(input).toHaveValue(null);
-    expect(input).toHaveAttribute('placeholder', '비우면 5개');
-  });
-
-  it('정한 대회는 그 개수로 채워 열리고, 바꾸면 그 값만 보낸다', () => {
-    renderSection(true, { teamFoulThreshold: 6 });
-    save(() => {
-      expect(screen.getByLabelText('팀 파울 기준 (개)')).toHaveValue(6);
-      fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: '8' } });
+    // 칸의 이름은 label·fieldset·묶음 제목·버튼 줄 가운데 하나로 붙어 있다.
+    await waitFor(() => {
+      const found =
+        sheet.queryAllByLabelText(label, { exact: true }).length +
+        sheet.queryAllByText(label, { exact: true }).length +
+        sheet.queryAllByRole('group', { name: label }).length;
+      expect(found).toBeGreaterThan(0);
     });
-
-    expect(hooks.mutate).toHaveBeenCalledTimes(1);
-    expect(hooks.mutate.mock.calls[0][0]).toEqual({ teamFoulThreshold: 8, expectedVersion: tournament.updatedAt });
   });
 
-  it('칸을 비우고 저장하면 null 을 명시적으로 보내 기본값(5개)으로 되돌린다', () => {
-    renderSection(true, { teamFoulThreshold: 6 });
-    save(() => fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: '' } }));
+  it('조건이 맞는 대회에만 나오는 칸: 리그전의 팀당 최소 경기 수, 혼성의 혼성 쿼터, 6팀 토너먼트의 6강 방식', async () => {
+    await renderPage({ initial: { format: 'league', genderCategory: 'mixed' }, search: '?edit=entry' });
+    const entry = within(await sheetOf('entry'));
+    expect(entry.getByLabelText('팀당 최소 경기 수')).toBeInTheDocument();
+    expect(entry.getByRole('switch', { name: '혼성 쿼터' })).toBeInTheDocument();
+    cleanup();
 
-    expect(hooks.mutate.mock.calls[0][0]).toEqual({ teamFoulThreshold: null, expectedVersion: tournament.updatedAt });
-  });
-
-  it('건드리지 않으면 팀 파울 기준을 보내지 않는다(다른 항목만 바꾼 수정이 값을 덮어쓰지 않게)', () => {
-    renderSection(true, { teamFoulThreshold: 6 });
-    save(() => fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } }));
-
-    expect(hooks.mutate.mock.calls[0][0]).not.toHaveProperty('teamFoulThreshold');
-  });
-
-  it('관전 화면 팀 파울 스위치는 켜진 채 열리고, 끄면 그 값만 보낸다(진행 중이어도)', () => {
-    renderSection(true, { status: 'in_progress', showTeamFouls: true });
-    save(() => {
-      expect(screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' })).toBeChecked();
-      fireEvent.click(screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' }));
-    });
-
-    expect(hooks.mutate.mock.calls[0][0]).toEqual({ showTeamFouls: false, expectedVersion: tournament.updatedAt });
-  });
-
-  it('필드가 없던 구버전 응답은 켜짐으로 읽고, 건드리지 않으면 표시 여부를 보내지 않는다', () => {
-    renderSection(true, {});
-    save(() => {
-      expect(screen.getByRole('switch', { name: '관전 화면에 팀 파울 보여주기' })).toBeChecked();
-      fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
-    });
-
-    expect(hooks.mutate.mock.calls[0][0]).not.toHaveProperty('showTeamFouls');
-  });
-
-  it('진행 중인 대회도 수정할 수 있다(출전정지 규정과 달리 잠그지 않는다)', () => {
-    renderSection(true, { status: 'in_progress', teamFoulThreshold: null });
-    save(() => fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: '4' } }));
-
-    expect(hooks.mutate.mock.calls[0][0]).toMatchObject({ teamFoulThreshold: 4 });
-  });
-
-  it.each(['0', '21', '2.5'])('%s 은(는) 저장하지 않고 이유를 알린다', (bad) => {
-    renderSection(true, { teamFoulThreshold: null });
-    save(() => fireEvent.change(screen.getByLabelText('팀 파울 기준 (개)'), { target: { value: bad } }));
-
-    expect(hooks.showToast).toHaveBeenCalledWith(expect.stringContaining('1부터 20 사이의 정수'), 'error');
-    expect(hooks.mutate).not.toHaveBeenCalled();
+    await renderPage({ initial: { format: 'knockout', teamCount: 6 }, search: '?edit=rules' });
+    expect(await within(await sheetOf('rules')).findByLabelText('6팀 토너먼트 진행')).toBeInTheDocument();
   });
 });

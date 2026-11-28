@@ -301,11 +301,8 @@ export function PenaltyShootoutPanel({
             </Button>
           </div>
 
-          {/* 요구사항 3(과제 2) — 킥 오조작 복구. 이 되돌리기는 로컬 상태
-              되감기일 뿐 서버 호출이 없다(아직 아무것도 안 보냈다) — 그래서
-              사용자 결정("모든 액션에 확인")의 대상이 아니다. revert-period가
-              확인 없이 즉시 실행되는 것과 같은 이유: 되돌리기 자체가 이미
-              교정 행동이다. */}
+          {/* 킥 되돌리기는 로컬 상태 되감기일 뿐 서버 호출이 없어 확인을 두지 않는다
+              (승부차기 시작·종료만 확인을 거친다). */}
           <Button size="md" variant="outline" block className="mt-2" disabled={kicks.length === 0} onClick={onUndoLastKick}>
             방금 킥 되돌리기
           </Button>

@@ -1,5 +1,5 @@
-// alpha 리그전 3폭 캡처 — 공개 통합 순위표 · 대회 생성 폼(최소 경기 수) · 대진 관리(회전 수 모달).
-// 조건부 UI(league 선택 시 / 모달 안)는 실제로 열어서 찍는다 — 기본 화면만 찍으면 검증이 안 된다.
+// alpha 리그전 3폭 캡처 — 공개 통합 순위표 · 대진 관리(회전 수 모달).
+// 조건부 UI(모달 안)는 실제로 열어서 찍는다 — 기본 화면만 찍으면 검증이 안 된다.
 // 헤더 dev 인증은 프로덕션 게이트로 막혀 있어 세션 쿠키를 주입한다.
 // Run: ALPHA_SESSION_TOKEN=... LEAGUE_TOURNAMENT_ID=... node scripts/capture_alpha_league_format.js
 const { chromium } = require('@playwright/test');
@@ -72,24 +72,7 @@ async function shotStandings(page, out, file) {
     results.push({ shot: 'standings', name, width, ...p1, sectionScreenshot: found });
     console.log(`  standings ${name}: section=${p1.sectionFound} rows=${p1.rowCount} progress=${p1.hasProgressNumbers} pct=${p1.hasPercent} magic=${p1.hasMagicOrClinched} overflowX=${p1.overflowX}`);
 
-    // 2) 대회 생성 폼 — format=league 선택 시에만 나오는 최소 경기 수
-    await page.goto(`${BASE}/admin/tournaments/new`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await settle(page);
-    const beforeSelect = await page.evaluate(() => /최소 경기 수/.test(document.body.innerText));
-    // 리그 옵션 선택 (버튼형/셀렉트형 모두 시도)
-    const leagueBtn = page.getByRole('button', { name: /리그/ }).first();
-    if (await leagueBtn.count()) await leagueBtn.click({ timeout: 5000 }).catch(() => {});
-    else {
-      const sel = page.locator('select').filter({ hasText: /리그/ }).first();
-      if (await sel.count()) await sel.selectOption('league').catch(() => {});
-    }
-    await page.waitForTimeout(1200);
-    const afterSelect = await page.evaluate(() => /최소 경기 수/.test(document.body.innerText));
-    await page.screenshot({ path: path.join(OUT, `league-new-form-${name}-${width}.png`), fullPage: true, scale: 'css' });
-    results.push({ shot: 'new-form', name, width, minMatchesBefore: beforeSelect, minMatchesAfter: afterSelect });
-    console.log(`  new-form  ${name}: 최소경기수 before=${beforeSelect} after=${afterSelect}`);
-
-    // 3) 대진 관리 — 자동 생성 클릭 시 뜨는 회전 수 모달
+    // 2) 대진 관리 — 자동 생성 클릭 시 뜨는 회전 수 모달
     await page.goto(`${BASE}/admin/tournaments/${TID}/bracket`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await settle(page, 3000);
     // group phase 조(A조/B조)의 자동 생성만 리그 회전 수 모달을 연다.

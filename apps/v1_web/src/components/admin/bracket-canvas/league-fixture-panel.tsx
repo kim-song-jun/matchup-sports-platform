@@ -137,8 +137,8 @@ export function LeagueFixturePanel({
     if (game.hasLiveRecords) {
       return (
         <div className="flex flex-col items-start gap-2">
-          <p className="tm-text-caption" style={MUTED}>라이브로 득점이 기록된 경기예요. 결과 정정 화면에서 처리해 주세요.</p>
-          <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 정정 화면 열기</Link>
+          <p className="tm-text-caption" style={MUTED}>라이브로 득점이 기록된 경기예요. 결과 고치기 화면에서 처리해 주세요.</p>
+          <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 고치기 화면 열기</Link>
         </div>
       );
     }

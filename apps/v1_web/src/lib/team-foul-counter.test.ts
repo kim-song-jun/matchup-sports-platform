@@ -36,7 +36,7 @@ describe('deriveFoulCounts', () => {
     const original = foul('e1', 's-home', 1);
     const reversal: GameEventRecord = { ...foul('e2', 's-home', 1), type: 'CORRECTION', reversesEventId: 'e1' };
     // 유일한 FOUL이 되돌려졌으므로 이 사이드는 아예 키를 갖지 않는다(0으로
-    // 채워진 키가 아니라). TeamFoulCounterBar 등 소비처는 항상
+    // 채워진 키가 아니라). 점수 카드 등 소비처는 항상
     // `counts[side.id] ?? 0` 으로 읽으므로 이 둘은 동치다 — 여기서는 파생
     // 함수가 실제로 만드는 값을 그대로 검증한다.
     expect(deriveFoulCounts([original, reversal], 1)).toEqual({});

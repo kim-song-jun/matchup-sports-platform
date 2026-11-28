@@ -159,8 +159,8 @@ await mkdir(outDir, { recursive: true });
 const results = [];
 const chromeCliExecutable = process.env.CHROME_CLI_EXECUTABLE;
 if (chromeCliExecutable) {
-  const chromeOutDirWsl = process.env.CHROME_CLI_OUT_WSL;
-  const chromeOutDirWin = process.env.CHROME_CLI_OUT_WIN;
+  const chromeOutDirWsl = process.env.CHROME_CLI_OUT_WSL?.trim();
+  const chromeOutDirWin = process.env.CHROME_CLI_OUT_WIN?.trim();
   if (!chromeOutDirWsl || !chromeOutDirWin) {
     throw new Error(
       'CHROME_CLI_EXECUTABLE requires CHROME_CLI_OUT_WSL and CHROME_CLI_OUT_WIN: the same output folder as a WSL path and as a Windows path',

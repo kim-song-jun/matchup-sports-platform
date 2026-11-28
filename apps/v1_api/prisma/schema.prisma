@@ -4524,6 +4524,26 @@ model V1AccessToken {
   revokedAt  DateTime?         @map("revoked_at")
   lastUsedAt DateTime?         @map("last_used_at")
 
+  liveActivities V1WidgetLiveActivity[]
+
   @@index([userId, kind, revokedAt], map: "v1_access_tokens_user_kind_idx")
   @@map("v1_access_tokens")
+}
+
+/// 아이폰 실시간 카드(Live Activity) 하나의 푸시 토큰. 위젯 토큰(기기)·경기마다 하나이며,
+/// 카드가 토큰을 새로 받으면(회전) 같은 행의 `pushToken` 만 바뀐다. 카드가 닫히거나 경기가 끝난 뒤 정리되면 지운다.
+model V1WidgetLiveActivity {
+  id        String   @id @default(uuid())
+  tokenId   String   @map("token_id")
+  userId    String   @map("user_id")
+  gameId    String   @map("game_id")
+  pushToken String   @map("push_token")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  token V1AccessToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenId, gameId], map: "v1_widget_live_activities_token_game_key")
+  @@index([gameId], map: "v1_widget_live_activities_game_idx")
+  @@map("v1_widget_live_activities")
 }

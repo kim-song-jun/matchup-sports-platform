@@ -1,5 +1,7 @@
 # 대회 만들기 한 화면 필수 폼 (L2 · S1) Implementation Plan
 
+> **상태:** 구현 완료 — PR #2581 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `/admin/tournaments/new` 를 5단계 마법사에서 「필수 6칸 + 성별」 한 화면 폼으로 바꾸고, 초안 생성 뒤 대회 개요로 보낸다.

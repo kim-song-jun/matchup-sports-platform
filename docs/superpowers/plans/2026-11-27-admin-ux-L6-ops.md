@@ -1,5 +1,7 @@
 # 현장 운영(L6, S6 C+B) 구현 계획
 
+> **상태:** 구현 완료 — PR #2583 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 운영 셸의 「운영 보드」를 구장 열 × 시간 줄 판(폰은 구장 칩 + 시간 목록)으로 바꾸고, 결과 검토·결과 정정을 「결과」 한 페이지로 합치며, 다리·런처·용어·한쪽 색 띠(L8)를 정리한다.

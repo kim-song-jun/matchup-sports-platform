@@ -1,5 +1,7 @@
 # 어드민 공용 부품 L0 (ActionMenu · SideSheet · 정보 섹션 계약 · 이름 표) Implementation Plan
 
+> **상태:** 구현 완료 — PR #2579 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 어드민 대회 개편의 모든 레인이 기대는 공용 계약을 먼저 머지한다 — `ActionMenu`(C-1), `SideSheet`(C-2), 대회 정보 섹션 키·딥링크·「채워야 할 설정」 판정(C-5 `info-sections.ts`), 대회 형식 이름 표(C-6), 경기 시간 단계 helper 이동. 화면 배치는 바꾸지 않는다 — 보이는 변화는 경기 시간 입력칸 이름 하나(정규 구간 3개 이상일 때 「n피리어드」 → 「n부」, 용어표)뿐이다.

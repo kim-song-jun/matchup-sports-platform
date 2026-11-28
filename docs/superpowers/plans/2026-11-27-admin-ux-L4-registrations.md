@@ -1,5 +1,7 @@
 # L4 신청 관리 (S4 처리할 것 + 확정 팀 · L8 tone) Implementation Plan
 
+> **상태:** 구현 완료 — PR #2580 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 어드민 신청 관리 탭을 상태 칩 8개 + 카드 5~6버튼에서 「처리할 것(다음 할 일 1개) · 확정 팀 · 접힌 대기·취소/작성 중」으로 바꾸고, 공용 목록의 한쪽 색 띠(tone)를 없앤다. 대회와 정규 리그 어드민이 같은 부품을 쓴다.

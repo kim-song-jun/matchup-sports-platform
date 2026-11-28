@@ -1,5 +1,7 @@
 # 어드민 대회 상세 셸(S2) + 사이드바 띠 제거(L8) Implementation Plan
 
+> **상태:** 구현 완료 — PR #2582 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 대회 상세의 머리를 한 줄(뒤로 · 대회명 · 상태 칩 메뉴 · 현장 운영 · 다음 단계 주 버튼 1개 · ⋯)로 줄이고, 세로 3그룹 내비를 가로 탭 5개 + 더보기로 바꾸고, 개요를 「요약 줄 · KPI 3 · 채워야 할 설정 · 참가자 화면」으로 다시 짠다. 같은 PR 에서 어드민 사이드바 선택 항목의 왼쪽 색 띠를 없앤다.

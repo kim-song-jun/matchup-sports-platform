@@ -1,5 +1,7 @@
 # L5 대진 관리 — 도구 메뉴 3개 + 패널 겹침 Implementation Plan
 
+> **상태:** 구현 완료 — PR #2586 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 대진 탭 도구를 `[그림|목록] · [팀 채우기 ▾] · [경기 ▾] · [시간·구장 ▾] · 공개 상태 + 「대진 공개」` 5개로 줄이고, 경기 패널은 그림 위에 겹쳐(그림 폭 불변) 기본 5칸만 보이게 하며, 폰은 같은 메뉴·패널을 시트로 써서 만들기·공개까지 한 보기에서 끝낸다.

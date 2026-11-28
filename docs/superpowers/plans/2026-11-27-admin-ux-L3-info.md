@@ -1,5 +1,7 @@
 # L3 대회 정보 (S3 섹션 요약 카드 + 수정 시트) Implementation Plan
 
+> **상태:** 구현 완료 — PR #2584 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `/admin/tournaments/:id/info` shows six read-only summary cards; every edit happens in one `SideSheet` per section (deep link `?edit=<key>`), replacing the 30-field modal and the four other edit patterns.
@@ -62,7 +64,7 @@ export function partialSaveMessage(doneLabels: readonly string[], failedLabel: s
 
 ### Task 2: Section keys, needs, edit param (C-3)
 **Files:** Modify `[id]/info-sections.ts`, `[id]/info-sections.test.ts` (L0 C-5 가 만든 파일 — L0 머지 뒤에 시작) · Create `[id]/use-info-edit-param.ts`, `[id]/use-info-edit-param.test.tsx`
-**Interfaces:** Produces:
+**Interfaces:** Consumes: `TOURNAMENT_FORMAT_NAMES` from `@/lib/tournament-format-labels` (L0 C-6 소유 — 재정의하지 않는다; group_knockout 「조별리그 → 토너먼트」 · knockout 「토너먼트만」 · league 「리그전」 · league_knockouts 「여러 단계」). Produces:
 ```ts
 export const TOURNAMENT_INFO_SECTIONS = ['basic','schedule','entry','rules','public','promo'] as const;
 export type TournamentInfoSectionKey = (typeof TOURNAMENT_INFO_SECTIONS)[number];
@@ -75,8 +77,6 @@ export type InfoNeedField = 'venue' | 'rosterDeadlineAt' | 'bankAccount';
 export interface InfoNeed { section: TournamentInfoSectionKey; field: InfoNeedField; label: string }
 export function tournamentInfoNeeds(t: V1Tournament): InfoNeed[];
 export const infoFieldId: (field: string) => string;                                      // `info-${field}`
-import { TOURNAMENT_FORMAT_NAMES } from '@/lib/tournament-format-labels'; // L0 C-6 소유 — 재정의하지 않는다
-// group_knockout '조별리그 → 토너먼트' · knockout '토너먼트만' · league '리그전' · league_knockouts '여러 단계'
 export function useInfoEditParam(): { section: TournamentInfoSectionKey | null; open(key): void; close(): void };
 ```
 Needs follow Q7 (not the mockup, which shows 대회 규정 as needed): 장소 (`venue` blank → section `schedule`), 명단 제출 마감 (`rosterDeadlineAt` null → `schedule`), 정산 계좌 (`entryFee>0 && !bankAccount?.trim()` → `entry`); `completed|cancelled` → `[]`.

@@ -1,5 +1,7 @@
 # L7 현장 경기 콘솔 (O4 · 큰 기록 버튼 격자 + 상태 한 줄) Implementation Plan
 
+> **상태:** 구현 완료 — PR #2585 로 dev 에 머지됐다. 아래 「Create」로 적힌 파일은 그 PR 이 만든 것이다. 레인 밖 마무리 수정(최종 리뷰·사용자 수정 요청)은 통합 PR #2589.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 폰 경기 콘솔의 첫 화면을 「작은 점수·시계 카드 + 상태 한 줄 + 엄지 닿는 2×3 기록 버튼 격자 + 하단 진행 바」로 바꾸고, 기록은 확인 창 없이 저장 + 5초 되돌리기, 진행 명령은 확인 유지로 만든다.

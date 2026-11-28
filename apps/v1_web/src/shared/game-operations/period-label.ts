@@ -1,9 +1,14 @@
 /**
- * 경기 시간 구간의 이름. 화면 어디서나 같은 말을 쓴다 — 첫째·둘째는 "전반"·"후반"이고, 정규 구간 뒤의
- * 셋째·넷째는 연장이다. 정규 구간이 셋 이상인 경기(`periodCount`)와 그 밖의 구간은 번호로 부른다.
+ * 경기 시간 구간의 이름. 화면 어디서나 같은 말을 쓴다 — 정규 구간이 둘이면 "전반"·"후반"이고, 정규 구간 뒤는
+ * 연장이다(단판은 "경기" 뒤가 연장 전반·후반). 정규 구간이 셋 이상인 경기(`periodCount`)와 그 밖의 구간은 번호로 부른다.
  */
 export function periodLabel(periodNumber: number, periodCount?: number | null): string {
-  if (periodCount === 1 && periodNumber === 1) return '경기';
+  if (periodCount === 1) {
+    if (periodNumber === 1) return '경기';
+    if (periodNumber === 2) return '연장 전반';
+    if (periodNumber === 3) return '연장 후반';
+    return `${periodNumber}번째 경기 시간`;
+  }
   if (periodNumber === 1) return '전반';
   if (periodNumber === 2) return '후반';
   const regularCount = periodCount ?? 2;

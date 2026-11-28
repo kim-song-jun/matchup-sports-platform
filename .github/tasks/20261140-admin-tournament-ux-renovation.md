@@ -1,6 +1,6 @@
 # Task 20261140: 어드민 대회 개설·운영 사용성 개편 (빠르게 만들고 나중에 채우기)
 
-Status: Planning
+Status: In Progress — 레인 L0~L7 PR(#2579~#2586) dev 머지 완료 · 통합 PR #2589(최종 리뷰·사용자 수정 요청) 진행 중 · alpha 실화면 QA·PR별 3폭 갤러리 남음
 **Owner**: head 세션(오케스트레이션) → 화면 묶음별 구현 레인(sonnet) · 목업·시각 검증(opus)
 **Created**: 2026-11-27
 

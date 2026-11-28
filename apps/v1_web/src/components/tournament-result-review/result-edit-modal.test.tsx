@@ -969,6 +969,26 @@ describe('ResultEditModal — 단판 경기의 득점 전·후반', () => {
     renderWith(periodCount);
     expect(screen.getByLabelText('1번째 득점 전·후반')).toBeInTheDocument();
   });
+
+  it('단판에 연장 구간 행이 있으면 득점·카드의 구간 칸이 남고 이름은 경기·연장 전반·연장 후반이다', () => {
+    const props = baseProps();
+    render(
+      <ResultEditModal
+        {...props}
+        periods={[{ number: 1 }, { number: 2 }, { number: 3 }]}
+        periodCount={1}
+        base={{ ...props.base, goalEvents: [{ id: 'goal-1', sideId: HOME_SIDE_ID, participantId: HOME_PARTICIPANT_ID, minute: 1, period: 1, ownGoal: false }] }}
+        lineups={[]}
+      />,
+    );
+
+    const goalPeriod = screen.getByLabelText('1번째 득점 전·후반');
+    expect(within(goalPeriod).getAllByRole('option').map((option) => option.textContent)).toEqual(['선택 안 함', '경기', '연장 전반', '연장 후반']);
+
+    fireEvent.click(screen.getByRole('button', { name: '카드 추가' }));
+    const cardPeriod = screen.getByLabelText('1번째 카드 전·후반');
+    expect(within(cardPeriod).getAllByRole('option').map((option) => option.textContent)).toEqual(['선택 안 함', '경기', '연장 전반', '연장 후반']);
+  });
 });
 
 describe('ResultEditModal — 공식 득점 타임라인 편집', () => {

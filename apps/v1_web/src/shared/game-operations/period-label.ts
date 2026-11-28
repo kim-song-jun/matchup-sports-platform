@@ -17,14 +17,19 @@ export function periodLabel(periodNumber: number, periodCount?: number | null): 
   return `${periodNumber}번째 경기 시간`;
 }
 
-/** 단판(정규 구간 1개) — 구간을 가를 이유가 없어 시각 앞의 "전반" 같은 말머리를 뺀다. */
+/** 단판(정규 구간 1개) — 정규 구간은 가를 이유가 없어 시각 앞의 "전반" 같은 말머리를 뺀다. 연장 구간은 그대로 이름을 붙인다. */
 export function isSinglePeriod(periodCount: number | null | undefined): boolean {
   return periodCount === 1;
 }
 
-/** "5:00" 같은 시각 앞에 붙는 말머리(끝 공백 포함). 단판이면 빈 문자열이다. */
+/** "5:00" 같은 시각 앞에 붙는 말머리(끝 공백 포함). 단판의 정규 구간만 빈 문자열이다. */
 export function periodPrefix(periodNumber: number, periodCount?: number | null): string {
-  return isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber, periodCount)} `;
+  return isSinglePeriod(periodCount) && periodNumber === 1 ? '' : `${periodLabel(periodNumber, periodCount)} `;
+}
+
+/** 기록에 구간을 고르는 칸이 필요한가. 단판이어도 연장 구간 행(`periodRowCount` 가 2 이상)이 있으면 필요하다. */
+export function needsPeriodChoice(periodCount: number | null | undefined, periodRowCount: number): boolean {
+  return !isSinglePeriod(periodCount) || periodRowCount > 1;
 }
 
 /** 지금 구간을 끝내는 버튼 문구. 단판의 유일한 정규 구간은 "정규 시간 종료"다. */

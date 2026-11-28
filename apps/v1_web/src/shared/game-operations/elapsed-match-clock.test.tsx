@@ -148,4 +148,18 @@ describe('ElapsedMatchClock — 경과 시간 표시', () => {
     expect(screen.queryByText('전반')).toBeNull();
     expect(screen.getByLabelText('전반 경과 시간 10:00')).toBeInTheDocument();
   });
+
+  it('단판에 붙은 연장 구간의 시계는 구간 이름을 aria-label 에 말한다', () => {
+    render(
+      <ElapsedMatchClock
+        periodNumber={2}
+        periodCount={1}
+        periodStartedAtMs={new Date('2026-08-08T00:00:00.000Z').getTime()}
+        offsetMs={0}
+        pausedTotalMs={0}
+        pausedAtMs={null}
+      />,
+    );
+    expect(screen.getByLabelText('연장 전반 경과 시간 10:00')).toBeInTheDocument();
+  });
 });

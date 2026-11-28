@@ -13,7 +13,7 @@ import type { GameLineup, GameEventRecord } from '@/types/game-operations';
 import { cardsForParticipant, deriveEditableCardEvents, type EditableCardEvent } from '@/lib/result-card-events';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 import { describeGoalTimelineMismatch, isScoreOnlyResult } from './goal-timeline-consistency';
-import { isSinglePeriod, periodLabel } from '@/shared/game-operations';
+import { needsPeriodChoice, periodLabel } from '@/shared/game-operations';
 import { participantIdentityName } from '@/shared/game-operations';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
@@ -62,7 +62,7 @@ export type ResultEditModalProps = {
   sides: readonly TournamentGameSide[];
   /** Pinned period rows from GET /games/:gameId. New goals may only use these numbers. */
   periods: readonly { number: number }[];
-  /** 정규 경기 시간 구간 수(전·후반이면 2). 1이면 단판이라 골의 전·후반 칸을 숨긴다(새 골은 첫 구간으로 들어간다). */
+  /** 정규 경기 시간 구간 수(전·후반이면 2). 1이면 단판이고, 연장 구간 행도 없으면 골의 구간 칸을 숨긴다(새 골은 첫 구간으로 들어간다). */
   periodCount?: number | null;
   /** `GET /games/:gameId/lineups`(`GamesService.listLineups()`)의 라인업 스냅샷 --
    * 실명 표시에 쓴다. 아직 로딩 중이거나 없으면 빈 배열을 넘기면 된다(폴백은
@@ -894,7 +894,7 @@ export function ResultEditModal({
                         }
                       />
                     </div>
-                    {isSinglePeriod(periodCount) ? null : (
+                    {!needsPeriodChoice(periodCount, periods.length) ? null : (
                       <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
                         <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-period`}>전·후반</label>
                         <select
@@ -918,7 +918,7 @@ export function ResultEditModal({
                           <option value="">선택 안 함</option>
                           {periods.map((period) => (
                             <option key={period.number} value={period.number}>
-                              {periodLabel(period.number)}
+                              {periodLabel(period.number, periodCount)}
                             </option>
                           ))}
                         </select>

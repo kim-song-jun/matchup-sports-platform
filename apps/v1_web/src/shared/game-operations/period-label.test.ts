@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
+import { endPeriodLabel, needsPeriodChoice, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
 
 describe('periodLabel', () => {
   it('1피리어드는 "전반", 2피리어드는 "후반"으로 부른다', () => {
@@ -53,6 +53,40 @@ describe('단판(정규 1개) 경기에 연장이 붙으면', () => {
     expect(endPeriodLabel(1, 1)).toBe('정규 시간 종료');
     expect(endPeriodLabel(2, 1)).toBe('연장 전반 종료');
     expect(endPeriodLabel(3, 1)).toBe('연장 후반 종료');
+  });
+});
+
+describe('시각 앞 말머리 — 빼는 것은 단판의 정규 구간뿐이다', () => {
+  it('단판의 정규 구간은 말머리가 없고 연장 구간은 이름이 붙는다', () => {
+    expect(periodPrefix(1, 1)).toBe('');
+    expect(periodPrefix(2, 1)).toBe('연장 전반 ');
+    expect(periodPrefix(3, 1)).toBe('연장 후반 ');
+    expect(periodPrefix(4, 1)).toBe('4번째 경기 시간 ');
+  });
+
+  it('정규 2개(또는 수를 모름)와 3개 이상 경기의 말머리는 그대로다', () => {
+    for (const count of [2, null, undefined]) {
+      expect([1, 2, 3, 4, 5].map((number) => periodPrefix(number, count))).toEqual([
+        '전반 ',
+        '후반 ',
+        '연장 전반 ',
+        '연장 후반 ',
+        '5번째 경기 시간 ',
+      ]);
+    }
+    expect([1, 2, 3, 4].map((number) => periodPrefix(number, 4))).toEqual(['전반 ', '후반 ', '3번째 경기 시간 ', '4번째 경기 시간 ']);
+  });
+});
+
+describe('needsPeriodChoice — 구간을 고르는 칸', () => {
+  it('단판이어도 연장 구간 행이 있으면 고를 칸이 필요하다', () => {
+    expect(needsPeriodChoice(1, 1)).toBe(false);
+    expect(needsPeriodChoice(1, 2)).toBe(true);
+    expect(needsPeriodChoice(1, 3)).toBe(true);
+  });
+
+  it('단판이 아니거나 정규 구간 수를 모르면 언제나 필요하다', () => {
+    for (const count of [2, 3, null, undefined]) expect(needsPeriodChoice(count, 1)).toBe(true);
   });
 });
 

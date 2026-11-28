@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Pause } from 'lucide-react';
 import { elapsedMatchMs, formatStopwatchClock, serverAlignedNowMs } from '@/lib/game-operations-clock';
-import { isSinglePeriod, periodLabel } from './period-label';
+import { periodPrefix } from './period-label';
 
 export interface ElapsedMatchClockProps {
   readonly periodNumber: number;
@@ -77,7 +77,7 @@ export function ElapsedMatchClock({
     <div className="flex items-center gap-2" aria-live="off">
       <span
         className={`text-3xl font-extrabold leading-none tabular-nums ${isPaused ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
-        aria-label={`${isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber, periodCount)} `}경과 시간 ${formatStopwatchClock(elapsedMs)}${isPaused ? ' (일시 중지됨)' : ''}`}
+        aria-label={`${periodPrefix(periodNumber, periodCount)}경과 시간 ${formatStopwatchClock(elapsedMs)}${isPaused ? ' (일시 중지됨)' : ''}`}
       >
         {formatStopwatchClock(elapsedMs)}
       </span>

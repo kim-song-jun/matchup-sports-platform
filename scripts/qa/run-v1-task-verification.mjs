@@ -3240,7 +3240,19 @@ function verifyTaskOneRelativeGrowthOverride(options, repoRoot, plan, phase, cha
   };
 }
 
-function taskOneMounts(repoRoot, snapshot, chain, preflightOverride = null) {
+function requireBoundSourcePath(envName, label) {
+  const supplied = process.env[envName];
+  if (!supplied) {
+    throw new HarnessError(
+      'MALFORMED_INPUT',
+      `${envName} must name the local ${label} bound to the Task-1 plan`,
+      64,
+    );
+  }
+  return resolve(supplied);
+}
+
+function taskOneMounts(repoRoot, snapshot, chain, boundSources, preflightOverride = null) {
   const designBytes = git(
     [
       'show',
@@ -3310,15 +3322,14 @@ function taskOneMounts(repoRoot, snapshot, chain, preflightOverride = null) {
       sha256: snapshot.sourceManifestSHA,
     },
     {
-      source:
-        '/Users/sungjun/Downloads/Teameet_app_v1_팀관리_대회운영_상세기획서_2026-07-28.pdf',
+      source: boundSources.pdf,
       target: '/verification/bound/product.pdf',
       envPath: 'V1_BOUND_PDF_PATH',
       envSHA: null,
       sha256: null,
     },
     {
-      source: '/Users/sungjun/Downloads/preview.html',
+      source: boundSources.preview,
       target: '/verification/bound/preview.html',
       envPath: 'V1_BOUND_PREVIEW_PATH',
       envSHA: null,
@@ -3385,6 +3396,10 @@ async function runTaskOneCleanRestart({
       ? verifyTaskOneNodeMcpOverride(options, repoRoot, plan, phase, chain)
       : null;
   assertTaskOneHostGates(preflightStart, chain, preflightOverride);
+  const boundSources = {
+    pdf: requireBoundSourcePath('V1_BOUND_PDF_PATH', 'product specification PDF'),
+    preview: requireBoundSourcePath('V1_BOUND_PREVIEW_PATH', 'preview HTML'),
+  };
   const attemptId = randomUUID();
   const evidenceRoot = resolve(options['evidence-root'] ?? DEFAULT_EVIDENCE_ROOT);
   const snapshot = candidate
@@ -3426,7 +3441,7 @@ async function runTaskOneCleanRestart({
     'com.teameet.owner': 'outer',
   };
   const labelArgs = Object.entries(labels).flatMap(([name, value]) => ['--label', `${name}=${value}`]);
-  const mounts = taskOneMounts(repoRoot, snapshot, chain, preflightOverride);
+  const mounts = taskOneMounts(repoRoot, snapshot, chain, boundSources, preflightOverride);
   const containerEnvironment = {
     CI: '1',
     TZ: 'UTC',

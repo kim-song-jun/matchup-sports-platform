@@ -4,11 +4,17 @@
 // 2) 필요 높이 측정 → 뷰포트 자체를 그 높이로 확장 (.tm-scroll-area 는 absolute inset 이라 함께 늘어남)
 // 3) 이미지 로드 대기 후 뷰포트 스크린샷
 // 실행: node scripts/capture_v5.js  (사후 blank-bottom 검증은 별도 python sweep)
+// 출력: CAPTURE_OUT_DIR(스크린샷)·CAPTURE_GIF_DIR(GIF 프레임), 없으면 os.tmpdir()/teameet-capture-v5 아래.
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { chromium } = require('playwright');
 
 const WEB = 'http://localhost:3013';
-const OUT = '/private/tmp/claude-501/-Users-sungjun-Documents-projects-matchup-sports-platform/95f8eae2-88a5-4daf-a4ec-ceb8f356baf9/scratchpad/fp-shots';
-const GIF = '/private/tmp/claude-501/-Users-sungjun-Documents-projects-matchup-sports-platform/95f8eae2-88a5-4daf-a4ec-ceb8f356baf9/scratchpad/gif-frames';
+const OUT = process.env.CAPTURE_OUT_DIR || path.join(os.tmpdir(), 'teameet-capture-v5', 'fp-shots');
+const GIF = process.env.CAPTURE_GIF_DIR || path.join(os.tmpdir(), 'teameet-capture-v5', 'gif-frames');
+fs.mkdirSync(OUT, { recursive: true });
+fs.mkdirSync(GIF, { recursive: true });
 
 const T_DONE = '5c46e679-7f80-4e55-a126-6075ca7ad4b2'; // completed
 const T_OPEN = 'ee3be1a6-cb15-4707-b29f-a0f2242e2cba'; // open (신청 위저드)

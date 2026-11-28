@@ -27,7 +27,7 @@
 - [ ] **Step 1: Create the worktree off the merged realtime-gateway branch**
 
 ```bash
-cd /Users/sungjun/Documents/projects/matchup-sports-platform
+cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 git fetch origin dev --quiet
 git worktree add .claude/worktrees/v1-web-push -b feat/v1-web-push origin/dev
 cd .claude/worktrees/v1-web-push
@@ -82,7 +82,7 @@ Add the reverse relation field to `model V1User { ... }` alongside its other one
 - [ ] **Step 3: Generate the migration**
 
 ```bash
-export PATH="/Users/sungjun/.nvm/versions/node/v24.15.0/bin:$PATH"
+export PATH="$HOME/.nvm/versions/node/v24.15.0/bin:$PATH"
 cd apps/v1_api
 pnpm exec prisma migrate dev --name v1_web_push --create-only
 ```
@@ -107,7 +107,7 @@ Expected: no diff output (empty). This mirrors what CI's "V1 migration replay + 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/sungjun/Documents/projects/matchup-sports-platform/.claude/worktrees/v1-web-push
+cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')"/.claude/worktrees/v1-web-push
 git add apps/v1_api/prisma/schema.prisma apps/v1_api/prisma/migrations
 git commit -m "feat(v1-api): add V1PushSubscription/V1WebPushFailureLog models"
 ```
@@ -127,7 +127,7 @@ git commit -m "feat(v1-api): add V1PushSubscription/V1WebPushFailureLog models"
 - [ ] **Step 1: Add the dependency**
 
 ```bash
-export PATH="/Users/sungjun/.nvm/versions/node/v24.15.0/bin:$PATH"
+export PATH="$HOME/.nvm/versions/node/v24.15.0/bin:$PATH"
 cd apps/v1_api
 pnpm add web-push@^3.6.7
 pnpm add -D @types/web-push@^3.6.4

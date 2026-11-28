@@ -67,7 +67,7 @@ Production CI/deployment gates; concurrent dev changes must not be silently prom
 | 2026-10-08 | Shared working tree branch/worktree restrictions | Root stays on existing dev checkout, uses explicit pathspecs, and preserves concurrent changes. |
 
 ## Progress Snapshot
-- Approved A; initial listing-media folder opened at `/Users/sungjun/Dev/projects/teameet-videos/app-store-v2/deliver`.
+- Approved A; initial listing-media folder opened at `app-store-v2/deliver` in the local teameet-videos project (outside the repository).
 - Existing Apple supplemental draft: 14 attachments, 3810-character response and 3757-character Notes; no final reply/resubmission yet.
 - Google publishing overview remains under review; no new rejection observed.
 - Initial eight-file fix committed as `72c991a4458c27113c04ec15d5838d120f8e98f9`; PR #1688 passed exact-head Gates/API/Web and merged to dev at `c1fbb55d3d12d85fc56e32872b51f6d85ce374af`. Shared dev was fast-forwarded cleanly without branch switching.

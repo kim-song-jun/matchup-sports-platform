@@ -44,7 +44,7 @@
 
 - 작업 위치: 이 worktree(`.claude/worktrees/bracket-league-add`, `feat/bracket-league-add-fixture`). 메인 트리·로컬 `dev`·`git stash`·`git add -A` 금지. `node_modules` 심링크는 디렉터리 pathspec 으로 add 하지 않는다.
 - 커밋: `git commit -m "..." -- <명시 파일들>` + 직후 `git show --stat HEAD`. 메시지는 한국어 conventional, 본문 끝에 `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
-- 서버 테스트: `cd apps/v1_api && ./node_modules/.bin/jest -c "/private/tmp/claude-501/-Users-sungjun-Dev-projects-matchup-sports-platform/d0179df9-b8cd-4d6a-8e02-f73ed90cf450/scratchpad/iso-league-add/jest.iso.config.cjs" <spec>`. 통합 스펙(`test/**/*.integration-spec.ts`)은 로컬에서 못 돈다 — 컴파일만: `./node_modules/.bin/tsc -p "/private/tmp/claude-501/-Users-sungjun-Dev-projects-matchup-sports-platform/d0179df9-b8cd-4d6a-8e02-f73ed90cf450/scratchpad/iso-league-add/tsconfig.isocheck.json"`. `prisma generate`·로컬 Next 서버 금지.
+- 서버 테스트: `cd apps/v1_api && ./node_modules/.bin/jest -c "<세션 임시 폴더>/iso-league-add/jest.iso.config.cjs" <spec>`. 통합 스펙(`test/**/*.integration-spec.ts`)은 로컬에서 못 돈다 — 컴파일만: `./node_modules/.bin/tsc -p "<세션 임시 폴더>/iso-league-add/tsconfig.isocheck.json"`. `prisma generate`·로컬 Next 서버 금지.
 - 웹 테스트: `cd apps/v1_web && ./node_modules/.bin/vitest run <파일>`; 타입 `./node_modules/.bin/tsc --noEmit`; 패턴 `node scripts/v1-pattern-check.mjs`.
 - 좁히는 변경의 테스트 규율: 거절 테스트는 항상 **같은 조 팀 허용 / 어느 조에도 없는 팀 자동 편성 / 다른 조 팀 거절 / 결선·조 없는 경기 불변** 네 쪽을 함께 둔다. fixture 에 조를 최소 둘 둔다.
 - UI 규칙: 토큰만 · 44px · 해요체 · `useId()` label · 에러는 `describeBracketCanvasError` · 컴포넌트는 `components/v1-ui` 재사용. 주석은 코드가 말하지 못하는 제약만, 추가 줄의 1/3 이하.

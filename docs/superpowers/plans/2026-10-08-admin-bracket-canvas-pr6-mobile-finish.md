@@ -124,7 +124,7 @@ PR-6 은 PR-3·4·5b 가 dev 에 머지된 뒤에 착수한다. **Task 1 Step 1*
 PR-3·4·5b 가 머지된 base 인지, 위 "선행 조건" 표의 이름이 실제로 있는지 확인한다. 하나라도 비면 만들지 말고 멈춘다.
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git fetch origin dev -q && git log origin/dev --oneline -1
 cd apps/v1_web
 ls src/components/admin/bracket-canvas/
@@ -2474,7 +2474,7 @@ PR-3 의 페이지(Task 15)는 `[그림 | 목록]` 탭 아래에서 `BracketCanv
 - [ ] **Step 1: PR-3 이후 페이지 구조 확인 (코드 변경 없음)**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 P="apps/v1_web/src/app/admin/tournaments/[id]/bracket"
 grep -n "BracketCanvasWorkspace\|view === 'canvas'\|onShowList\|<BracketTab" "$P/page.tsx"
 grep -n "beforeEach\|vi.clearAllMocks\|^import" "$P/page.test.tsx"
@@ -2882,7 +2882,7 @@ PR-5b Task 9 가 만든 `LeagueMatchFixturesClient` 는 `[일정 보드 | 목록
 - [ ] **Step 1: PR-5b 이후 구조 확인 (코드 변경 없음)**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas/apps/v1_web
+cd "$(git rev-parse --show-toplevel)/apps/v1_web"
 C="src/app/admin/league-matches/[leagueId]/league-match-fixtures-client.tsx"
 grep -n "LeagueScheduleBoard\|const canWrite\|const { data: teamsData }\|const \[view, setView\]\|import { useId, useState }\|if (isPending)" "$C"
 grep -n "describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환'\|function renderClient\|afterEach(() => {\|vi.mock('@/components/admin/bracket-canvas/bracket-team-tray'" "${C%.tsx}.test.tsx"
@@ -3508,7 +3508,7 @@ Expected: 판정 표의 모든 행이 `OK`(390·767 은 라운드 탭 ≥1·구�
   git commit -m "docs(tasks): 어드민 대진 그림 편집기 태스크 완료 처리" -- .github/tasks/20261057-admin-bracket-canvas.md .github/tasks/archive/20261057-admin-bracket-canvas.md
   ```
   실패한 시나리오가 있으면 `Done` 표기도 archive 이동도 하지 않고 원인 화면의 PR 을 새로 연다.
-- 머지 후 메인 작업트리의 로컬 `dev` 동기화: `cd /Users/sungjun/Dev/projects/matchup-sports-platform && git fetch origin dev -q && git merge --ff-only origin/dev`. `dev → main` 승격은 사용자만 한다.
+- 머지 후 메인 작업트리의 로컬 `dev` 동기화: `cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')" && git fetch origin dev -q && git merge --ff-only origin/dev`. `dev → main` 승격은 사용자만 한다.
 
 ---
 

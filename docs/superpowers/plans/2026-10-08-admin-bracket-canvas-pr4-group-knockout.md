@@ -30,7 +30,7 @@
 
 색인 `2026-10-08-admin-bracket-canvas-index.md` 의 Global Constraints 전부가 적용된다(worktree·pathspec 커밋·`prisma generate` 금지·테스트 명령·마이그레이션/해시 규칙·changeset·DTO 규칙·웹 토큰 규칙·주석 규칙). 이 PR 에만 해당하는 추가 제약:
 
-- **로컬 서버 `jest`·`tsc` 는 격리 하네스로 돌린다.** 슬롯·플래너 코드는 `V1TournamentSlot`·슬롯 컬럼 타입을 쓰는데 공유 Prisma client 는 옛 스키마라(`prisma generate` 금지) 평범한 `jest` 는 ts-jest 진단에서 깨진다 — 코드 결함이 아니다. 아래 서버 `jest` 명령은 전부 PR-1a Task 2 가 만든 `$ISO/jest.iso.config.cjs` 형태(`export ISO=/Users/sungjun/.cache/bracket-canvas-iso`)다. 하네스가 없으면 진단을 끈 임시 jest 설정을 scratchpad 에만 만들어 `-c` 로 넘기고, 커밋 전에 색인 Global Constraints 의 격리 `tsc` 를 반드시 한 번 돈다. 통합 스펙은 로컬에서 못 돌고 CI 에서만 돈다.
+- **로컬 서버 `jest`·`tsc` 는 격리 하네스로 돌린다.** 슬롯·플래너 코드는 `V1TournamentSlot`·슬롯 컬럼 타입을 쓰는데 공유 Prisma client 는 옛 스키마라(`prisma generate` 금지) 평범한 `jest` 는 ts-jest 진단에서 깨진다 — 코드 결함이 아니다. 아래 서버 `jest` 명령은 전부 PR-1a Task 2 가 만든 `$ISO/jest.iso.config.cjs` 형태(`export ISO="$HOME/.cache/bracket-canvas-iso"`)다. 하네스가 없으면 진단을 끈 임시 jest 설정을 scratchpad 에만 만들어 `-c` 로 넘기고, 커밋 전에 색인 Global Constraints 의 격리 `tsc` 를 반드시 한 번 돈다. 통합 스펙은 로컬에서 못 돌고 CI 에서만 돈다.
 - **새 마이그레이션·스키마 변경 없음.** 이 PR 은 PR-1a 가 만든 `V1TournamentSlot`(GROUP_RANK 포함)을 읽고 쓸 뿐이다. 스키마 해시 5곳은 건드리지 않는다.
 - 새 파일 커밋은 `git add <명시 경로>` 후 `git commit -m "…" -- <같은 경로>`. 트레일러(Co-Authored-By 등)는 실행 세션의 attribution 지침을 따른다(아래 명령에서는 생략).
 - 서버 테스트 파일은 새 Prisma enum 의 **런타임 값**(`V1TournamentSlotKind.ENTRY`)을 import 하지 않는다 — 문자열 리터럴(`'ENTRY'`)을 쓴다(PR-1b 와 같은 규칙: 공유 client 가 재생성되기 전에도 순수 함수 테스트가 돈다. 타입은 격리 생성 client 로 `tsc` 확인).
@@ -84,7 +84,7 @@
 - [ ] **Step 1: 계약 심볼이 실제로 있는지 확인**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+cd "$(git rev-parse --show-toplevel)"
 git fetch origin dev -q && git log --oneline -1 origin/dev
 for f in \
   apps/v1_api/src/tournaments/templates/bracket-template-plan.ts \

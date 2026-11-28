@@ -110,7 +110,7 @@ Personas: guest, ordinary team member, owner/manager, admin
 - The current upload API has only `POST /uploads` and `POST /uploads/videos`; it has no owner deletion endpoint. Restoring `profileImageUrl` alone does not clean the retained file, ledger row, or quota usage.
 - Until an authenticated owner-delete contract exists, the valid-upload live scenario must record the returned URL and use an exact alpha-only operator cleanup for that single owned asset after restoring the original profile URL. It must delete the file and ledger row together and then prove both are absent. Non-image and 2–5 MB client-rejection scenarios must show zero upload request and need no asset cleanup.
 - This missing owner cleanup contract is a product/security lifecycle gap, not a reason to claim the upload scenario complete. A future implementation must reject deletion of referenced assets and assets owned by another user; no broad filesystem cleanup is allowed.
-- Decision gate: [`teameet-upload-lifecycle-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/19/teameet-upload-lifecycle-decision.html). Static schema audit found active upload URL consumers in profile, match, team, tournament promo/campaign JSON, sponsor, popup, and fixture-video surfaces, so a generic filesystem delete is unsafe. Option B (asset-reference registration plus owner deletion only at zero active references) is recommended; no schema/API/product mutation starts before the user selects A, B, or C.
+- Decision gate: `teameet-upload-lifecycle-decision.html` (local file outside the repository). Static schema audit found active upload URL consumers in profile, match, team, tournament promo/campaign JSON, sponsor, popup, and fixture-video surfaces, so a generic filesystem delete is unsafe. Option B (asset-reference registration plus owner deletion only at zero active references) is recommended; no schema/API/product mutation starts before the user selects A, B, or C.
 
 ### TOURN-ALPHA-004 — Admin lifecycle and permissions
 
@@ -183,7 +183,7 @@ Current alpha advanced through the shared admin authorization hardening to relea
 
 ## Ambiguity Log
 
-- The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed. The interactive decision artifact is [`teameet-new-page-scope-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html): A extends the existing profile route, B creates the currently absent mercenary v1 flow (recommended), and C hardens the already-existing admin tournament-create wizard. No product/schema work starts before the user selects A, B, or C.
+- The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed. The interactive decision artifact is `teameet-new-page-scope-decision.html` (local file outside the repository): A extends the existing profile route, B creates the currently absent mercenary v1 flow (recommended), and C hardens the already-existing admin tournament-create wizard. No product/schema work starts before the user selects A, B, or C.
 - Alpha QA tournament persona rows do not include passwords in the seed. Browser mutation scenarios must use an explicitly authorized login flow or an isolated QA account; header-auth posture must not be weakened to make tests convenient.
 
 ### Progress Snapshot — participant personal-record recovery (2026-08-20)

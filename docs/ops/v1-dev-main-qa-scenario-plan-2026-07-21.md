@@ -471,4 +471,4 @@ Web Push(VAPID) + 운영 실패 대시보드(#93) · realtime Socket.IO gateway(
 
 ---
 
-**파일 경로**: `/private/tmp/claude-501/-Users-sungjun-Documents-projects-matchup-sports-platform/3ab9f315-c25f-43e9-9d92-b20b0a153315/scratchpad/teameet-v1-qa-master-plan.md`
+**파일 경로**: `<세션 임시 폴더>/teameet-v1-qa-master-plan.md`

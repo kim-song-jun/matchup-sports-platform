@@ -101,8 +101,8 @@
 - [ ] **Step 1: 리그전 트랙과의 재핀 상태를 확인한다**
 
 ```bash
-git -C /Users/sungjun/Dev/projects/matchup-sports-platform fetch origin dev
-git -C /Users/sungjun/Dev/projects/matchup-sports-platform log origin/dev --oneline -5
+git fetch origin dev
+git log origin/dev --oneline -5
 grep -n "schema:" apps/v1_api/test/fixtures/game-schema.fixture.ts | tail -3
 ```
 

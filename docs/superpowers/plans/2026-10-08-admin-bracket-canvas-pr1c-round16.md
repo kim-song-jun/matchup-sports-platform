@@ -30,7 +30,7 @@
 색인 `Global Constraints` 전부(공유 worktree·pathspec 커밋·`prisma generate` 금지·테스트 명령·주석 비율·해요체·토큰 규칙)가 적용된다. 이 PR 에만 해당하는 것:
 
 - **스키마·마이그레이션을 건드리지 않는다.** `round16` 은 PR-1a 마이그레이션이 이미 넣었다. 이 PR 에 `schema.prisma`·스키마 해시 5곳 변경이 보이면 범위 이탈이다(Task 0 이 확인).
-- **새 enum 값은 타입으로만 의존한다.** 공유 `node_modules` 의 Prisma client 에는 `round16` 이 없을 수 있다(생성은 CI). API 의 타입 검사·ts-jest 는 PR-1a Task 2 Step 10 이 만든 격리 하네스로 돌린다: `export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/<이 PR worktree> ISO=/Users/sungjun/.cache/bracket-canvas-iso/pr1c-round16` — **ISO 는 worktree 마다 따로**이므로 이 PR 은 위 값으로 PR-1a Task 2 Step 10 의 생성 명령을 `WT` 만 바꿔 다시 실행한다. 실행 전후 공유 client 오염(`git status`·`ls node_modules/.prisma`) 확인, 내가 띄운 프로세스는 직접 종료.
+- **새 enum 값은 타입으로만 의존한다.** 공유 `node_modules` 의 Prisma client 에는 `round16` 이 없을 수 있다(생성은 CI). API 의 타입 검사·ts-jest 는 PR-1a Task 2 Step 10 이 만든 격리 하네스로 돌린다: `export WT="$(git rev-parse --show-toplevel)" ISO="$HOME/.cache/bracket-canvas-iso/pr1c-round16"` — **ISO 는 worktree 마다 따로**이므로 이 PR 은 위 값으로 PR-1a Task 2 Step 10 의 생성 명령을 `WT` 만 바꿔 다시 실행한다. 실행 전후 공유 client 오염(`git status`·`ls node_modules/.prisma`) 확인, 내가 띄운 프로세스는 직접 종료.
 - 모든 jest 명령은 `cd apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 <파일>`, 격리 tsc 는 `./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"`. 웹은 `cd apps/v1_web && ./node_modules/.bin/vitest run <파일>` · `./node_modules/.bin/tsc --noEmit -p tsconfig.json` · `node scripts/v1-pattern-check.mjs`.
 - **화면은 로컬 next 로 검증하지 않는다.** UI 변경 PR 이므로 머지 → alpha 배포 확인 → ego-browser → 390/768/1440 갤러리를 이 PR 코멘트에 게시(마지막 Task). alpha 데이터 쓰기는 사용자 승인 후.
 - 16강엔 부전승이 없다 — `byeRound`·`limits`·`ROUND12_BYE_SORT_ORDERS` 에 `round16` 을 추가하지 않는다.
@@ -71,10 +71,10 @@
 
 하나라도 어긋나면 직접 만들지 말고 **BLOCKED** 로 멈춘다(두 벌 구현 금지).
 
-- [ ] **Step 1: PR 시작 체크리스트** — 색인 "PR 시작 체크리스트" 1~3 을 실행한다: `git -C /Users/sungjun/Dev/projects/matchup-sports-platform fetch origin dev` → PR-1a·1b 가 `origin/dev` 에 있는지 → `git worktree add .claude/worktrees/round16 -b feat/admin-bracket-round16 origin/dev` → node_modules 심링크(**`git add` 금지**) → 위 Global Constraints 의 `ISO` 로 격리 하네스 재생성.
+- [ ] **Step 1: PR 시작 체크리스트** — 색인 "PR 시작 체크리스트" 1~3 을 실행한다: `git fetch origin dev` → PR-1a·1b 가 `origin/dev` 에 있는지 → `git worktree add .claude/worktrees/round16 -b feat/admin-bracket-round16 origin/dev` → node_modules 심링크(**`git add` 금지**) → 위 Global Constraints 의 `ISO` 로 격리 하네스 재생성.
 
 ```bash
-git -C /Users/sungjun/Dev/projects/matchup-sports-platform log origin/dev --oneline | head -20   # 1a·1b 머지 커밋이 보여야 한다
+git log origin/dev --oneline | head -20   # 1a·1b 머지 커밋이 보여야 한다
 ```
 
 - [ ] **Step 2: PR-1a — enum 값과 순서** (`round16` 이 `round12` 앞, 이 PR 은 스키마 무변경)

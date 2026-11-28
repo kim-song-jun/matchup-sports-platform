@@ -80,12 +80,12 @@
 - [ ] **Step 1: worktree 만들기** (메인 트리·로컬 dev 건드리지 않는다)
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform
+cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 git fetch origin dev -q
 gh pr view 1745 --repo kim-song-jun/matchup-sports-platform --json state,baseRefName,mergedAt
 git worktree add .claude/worktrees/bracket-league-grid -b feat/bracket-league-grid origin/dev
-ln -s /Users/sungjun/Dev/projects/matchup-sports-platform/node_modules .claude/worktrees/bracket-league-grid/node_modules
-ln -s /Users/sungjun/Dev/projects/matchup-sports-platform/apps/v1_web/node_modules .claude/worktrees/bracket-league-grid/apps/v1_web/node_modules
+ln -s "$PWD"/node_modules .claude/worktrees/bracket-league-grid/node_modules
+ln -s "$PWD"/apps/v1_web/node_modules .claude/worktrees/bracket-league-grid/apps/v1_web/node_modules
 ```
 기대: PR-6 `state: MERGED`, `baseRefName: dev`. 아니면 중단하고 보고한다(미머지 상태에서 분기하지 않는다).
 
@@ -1334,7 +1334,7 @@ git show --stat HEAD
 - [ ] **Step 1: 정책 게이트가 지금 빨간지 확인(실패 먼저)**
 
 ```bash
-cd /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/bracket-league-grid
+cd "$(git rev-parse --show-toplevel)"
 node scripts/release/check-changeset-policy.mjs --help 2>/dev/null | head -3; git fetch origin dev -q
 node scripts/release/check-changeset-policy.mjs
 ```

@@ -188,7 +188,7 @@ SELECT COUNT(*) FROM v1_tournament_awards;
 
 3. PR 최신 상태 확인:
    ```bash
-   cd /Users/sungjun/Documents/projects/matchup-sports-platform
+   cd "$(git rev-parse --show-toplevel)"
    git log --oneline -8
    gh pr view 31 --json state,url
    ```

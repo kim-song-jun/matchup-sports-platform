@@ -42,7 +42,7 @@ PR-1a·1b 는 순서상 1a 가 먼저다. 각 PR 은 dev 머지 → alpha 배포
 
 ## Global Constraints (모든 태스크에 적용)
 
-- 작업 위치: worktree `/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas`(브랜치 `feat/admin-bracket-canvas`, base `origin/dev`). PR 을 나누면 PR 마다 `git fetch origin dev` 후 `origin/dev` 에서 새 worktree 를 만든다. PR base 는 항상 `dev`(머지 직전 `gh pr view <N> --json baseRefName --repo kim-song-jun/matchup-sports-platform` 로 확인).
+- 작업 위치: worktree `.claude/worktrees/admin-bracket-canvas`(브랜치 `feat/admin-bracket-canvas`, base `origin/dev`). PR 을 나누면 PR 마다 `git fetch origin dev` 후 `origin/dev` 에서 새 worktree 를 만든다. PR base 는 항상 `dev`(머지 직전 `gh pr view <N> --json baseRefName --repo kim-song-jun/matchup-sports-platform` 로 확인).
 - 커밋은 `git commit -m "..." -- <명시 경로>` + 직후 `git show --stat HEAD`. `git add -A`·`git stash`·브랜치 전환 금지. 디렉터리 pathspec 금지(node_modules 심링크가 섞인다).
 - **`prisma generate` 금지**(생성물이 모노레포 공유 경로). 새 Prisma 타입 검증은 격리 생성: `apps/v1_api/prisma-iso-tmp/schema.prisma` 사본의 generator `output` 만 scratchpad 로 돌려 생성하고, `@prisma/client` 를 그 출력으로 매핑한 `tsconfig.isocheck.json` 으로 `tsc` — 끝나면 두 임시 파일 즉시 삭제. 실행 전후 공유 client 오염이 없는지 확인. 진단을 끈 임시 jest 설정은 scratchpad 에만 두고, 썼다면 커밋 전에 격리 tsc 를 반드시 돌린다.
 - 테스트 명령(앱 디렉터리 안에서): API unit `cd apps/v1_api && ./node_modules/.bin/jest --maxWorkers=1 <파일>` · Web `cd apps/v1_web && ./node_modules/.bin/vitest run <파일>` · 타입 `./node_modules/.bin/tsc --noEmit -p tsconfig.json` · 패턴 `node scripts/v1-pattern-check.mjs`(web) / `node scripts/v1-surface-check.mjs`(api). 통합 스펙(`apps/v1_api/test/**/*.integration-spec.ts`)은 `DATABASE_URL` 이 있는 CI 에서 돈다 — 로컬에서 돌리려면 `migrate deploy` → `competition-config-backfill.cli` → 스펙 순서.
@@ -57,13 +57,13 @@ PR-1a·1b 는 순서상 1a 가 먼저다. 각 PR 은 dev 머지 → alpha 배포
 
 ## PR 시작 체크리스트 (PR 마다, 첫 태스크 전에)
 
-1. `git -C /Users/sungjun/Dev/projects/matchup-sports-platform fetch origin dev` → 직전 PR 이 `origin/dev` 에 머지됐는지 확인 →
-   `git -C /Users/sungjun/Dev/projects/matchup-sports-platform worktree add .claude/worktrees/<slug> -b feat/<slug> origin/dev`.
+1. `git fetch origin dev` → 직전 PR 이 `origin/dev` 에 머지됐는지 확인 →
+   `git -C "$(git worktree list --porcelain | sed -n '1s/^worktree //p')" worktree add .claude/worktrees/<slug> -b feat/<slug> origin/dev`.
 2. node_modules 심링크(읽기 전용, **절대 `git add` 하지 않는다** — `.gitignore` 의 `node_modules/` 는 심링크를 못 잡는다):
    `ln -s <main>/node_modules <wt>/node_modules`, `apps/v1_web`·`apps/v1_api` 도 같게.
 3. 격리 Prisma 하네스를 **새 worktree 경로로 다시 만든다** — PR-1a Task 2 Step 10 의 명령을 `WT=<새 worktree>` 로 재실행.
-   **`ISO` 는 worktree 마다 따로**: `ISO=/Users/sungjun/.cache/bracket-canvas-iso/<slug>`(병렬 웨이브에서 하네스가 서로 덮이지 않게 — 계획 본문의
-   `ISO=/Users/sungjun/.cache/bracket-canvas-iso` 는 이 값으로 바꿔 읽는다). rootDir·paths 가 worktree 절대경로라 PR 마다 재생성 필요. 실행 전후 공유 client 오염 확인.
+   **`ISO` 는 worktree 마다 따로**: `ISO="$HOME/.cache/bracket-canvas-iso/<slug>"`(병렬 웨이브에서 하네스가 서로 덮이지 않게 — 계획 본문의
+   `ISO="$HOME/.cache/bracket-canvas-iso"` 는 이 값으로 바꿔 읽는다). rootDir·paths 가 worktree 절대경로라 PR 마다 재생성 필요. 실행 전후 공유 client 오염 확인.
    내가 띄운 프로세스(postgres·dev 서버 등)는 태스크 끝에 PID 로 직접 종료한다.
 4. 계획의 Task 0(있으면)로 선행 PR 심볼이 실제 코드에 있는지 grep 확인 — 없으면 BLOCKED 로 멈춘다.
 

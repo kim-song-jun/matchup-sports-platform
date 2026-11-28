@@ -4,7 +4,7 @@ Status: In Progress (백엔드·웹 구현 완료, PR·alpha 실측 대기)
 **Created**: 2026-11-22
 
 ## Context
-운영에 시험으로 만든 개인 매치 2건(취소됨·보류)이 사이트맵에 남아 있다. 어드민 「보관」은 상태 이름만 바꿀 뿐 공개 목록·사이트맵이 거르는 `deletedAt` 을 건드리지 않고, 어드민에는 숨김·삭제 기능이 없다. 결정 페이지: `/Users/sungjun/.cache/teameet-audit-seo-aeo-kakao-20261113/week3/admin-match-hide/index.html`.
+운영에 시험으로 만든 개인 매치 2건(취소됨·보류)이 사이트맵에 남아 있다. 어드민 「보관」은 상태 이름만 바꿀 뿐 공개 목록·사이트맵이 거르는 `deletedAt` 을 건드리지 않고, 어드민에는 숨김·삭제 기능이 없다. 결정 페이지: `<저장소 밖 로컬 폴더>/teameet-audit-seo-aeo-kakao-20261113/week3/admin-match-hide/index.html`.
 
 ## Goal
 owner·ops 가 개인 매치를 사유와 함께 숨기고(soft delete) 다시 공개할 수 있고, 숨긴 매치가 모든 사용자 화면·후기·상태 변경에서 일관되게 빠진다. DB 구조 변경 없음.

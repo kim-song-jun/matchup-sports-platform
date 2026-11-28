@@ -21,8 +21,8 @@
 
 ### 사용자 선택·외부 게이트
 
-- Task 125 업로드 수명주기는 사용자가 B(자산 참조 등록 + 미참조 소유자 삭제)를 선택했다. 다음 구현 전 rolling 24시간 쿼터 결정 A/B/C가 남아 있다. 의사결정 UI: `/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-upload-quota-decision.html` (추천 B: 보관 한도만 해제, 최근 24시간 사용량 유지).
-- 신규 페이지 범위 A/B/C 선택이 남아 있다. UI: `/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html`; 추천 B는 실제 v1에 없는 mercenary create 도메인이다.
+- Task 125 업로드 수명주기는 사용자가 B(자산 참조 등록 + 미참조 소유자 삭제)를 선택했다. 다음 구현 전 rolling 24시간 쿼터 결정 A/B/C가 남아 있다. 의사결정 UI: `teameet-upload-quota-decision.html`(저장소 밖 로컬 파일) (추천 B: 보관 한도만 해제, 최근 24시간 사용량 유지).
+- 신규 페이지 범위 A/B/C 선택이 남아 있다. UI: `teameet-new-page-scope-decision.html`(저장소 밖 로컬 파일); 추천 B는 실제 v1에 없는 mercenary create 도메인이다.
 - 프로필 UI는 Lazyweb report가 필수지만 현재 세션에 Lazyweb MCP가 노출되지 않는다. connector 재연결 후 `lazyweb-update`가 필요하며, report 없이 수동 UI 변경하지 않는다.
 - `insane-review` GPT Pro는 전용 CDP/로그인/model 확인이 되지 않아 아직 유효한 최종 리뷰가 없다. 이전 장시간 시도는 final 없이 종료돼 인용할 수 없다.
 
@@ -52,7 +52,7 @@ Canonical entry: `.github/tasks/122-alpha-profile-tournament-persona-e2e.md`, `.
 ### 운영·보안 경고
 
 - 호스트는 12 cores 대비 load 약 35, Node 약 700~900, MCP match 약 650으로 과부하다. 로컬 전체 테스트·빌드는 시작하지 않았고 GitHub의 직렬 CI 결과를 사용했다.
-- Playwright MCP 재증식 원인은 `/Users/sungjun/.codex/config.toml`에서 plugin이 이미 disabled인데도 7일 이상 살아 있던 Codex app-server PID 51610이 stale tool config를 유지하는 것이다. 이번 세션이 만든 root/child 한 트리만 exact PID TERM cleanup했다. 영구 반영에는 이 작업을 안전하게 끝낸 뒤 Codex 앱 재시작이 필요하며, 다른 세션 소유 14개 tree는 임의 종료하지 않았다.
+- Playwright MCP 재증식 원인은 로컬 Codex 설정 파일(`config.toml`)에서 plugin이 이미 disabled인데도 7일 이상 살아 있던 Codex app-server PID 51610이 stale tool config를 유지하는 것이다. 이번 세션이 만든 root/child 한 트리만 exact PID TERM cleanup했다. 영구 반영에는 이 작업을 안전하게 끝낸 뒤 Codex 앱 재시작이 필요하며, 다른 세션 소유 14개 tree는 임의 종료하지 않았다.
 - Task 121에서 production workflow의 SSH host verification을 pinned `EC2_KNOWN_HOSTS` + fail-closed로 전환하고, secret을 argv가 아닌 encrypted stdin stream으로 전달하며, token permission을 `contents: read`로 제한했다. 기존 trusted ED25519 fingerprint와 live production EC2 scan 일치 후 public known_hosts 줄을 GitHub secret으로 등록했다. 남은 high-risk는 mutable `:latest` image/rollback provenance와 production header-auth posture 증명이다. alpha compose의 JSON log rotation과 alpha workflow permissions는 이미 존재한다.
 
 ### 다음 미완 범위
@@ -218,11 +218,11 @@ Canonical entry: `.github/tasks/122-alpha-profile-tournament-persona-e2e.md`, `.
 
 ## 0. 가장 먼저 확인할 것 (실행 순서)
 
-0. **루트 체크아웃(메인 작업트리, `/Users/sungjun/Documents/projects/matchup-sports-platform`)은 의도적으로 `feat/tournament-results-2leg-desktop` 브랜치에 그대로 둔다 — dev로 전환하지 않는다.** (2026-07-14 사용자 명시 확인: "지금은 전환하지 말기") 다른 세션이 이 경로/브랜치를 쓰고 있을 수 있어서다. **실제 작업(PR)은 전부 `.claude/worktrees/<name>` 격리 워크트리에서 `origin/dev` 기준으로 새로 만들어 진행**하고, 루트 체크아웃 자체는 절대 브랜치 전환·커밋하지 않는다. 새 세션에서도 이 원칙을 그대로 유지할 것 — 임의로 루트를 dev로 전환하지 말고, 필요하다고 판단되면 반드시 먼저 사용자에게 확인(AskUserQuestion)한다.
+0. **루트 체크아웃(메인 작업트리 = 첫 번째 worktree)은 의도적으로 `feat/tournament-results-2leg-desktop` 브랜치에 그대로 둔다 — dev로 전환하지 않는다.** (2026-07-14 사용자 명시 확인: "지금은 전환하지 말기") 다른 세션이 이 경로/브랜치를 쓰고 있을 수 있어서다. **실제 작업(PR)은 전부 `.claude/worktrees/<name>` 격리 워크트리에서 `origin/dev` 기준으로 새로 만들어 진행**하고, 루트 체크아웃 자체는 절대 브랜치 전환·커밋하지 않는다. 새 세션에서도 이 원칙을 그대로 유지할 것 — 임의로 루트를 dev로 전환하지 말고, 필요하다고 판단되면 반드시 먼저 사용자에게 확인(AskUserQuestion)한다.
 1. `.claude/worktrees/main-dev-integration` 워크트리에서 진행 중이던 **main→dev 통합 + 성별 쿼터 재조정** 워크플로우(§3, Task ID `wrmjqqhg9` / Run ID `wf_30ed6477-492`)가 끝났는지 확인:
    ```bash
    gh pr list --state open --json number,title,mergeStateStatus
-   cat /Users/sungjun/.claude/projects/-Users-sungjun-Documents-projects-matchup-sports-platform/95f8eae2-88a5-4daf-a4ec-ceb8f356baf9/subagents/workflows/wf_30ed6477-492/journal.jsonl
+   cat <세션 기록 폴더>/subagents/workflows/wf_30ed6477-492/journal.jsonl
    ```
    **핸드오프 문서 작성 시점(마지막 확인) 기준: 아직 진행 중** — journal.jsonl에 Phase 1(main→dev 통합) 에이전트의 `started` 이벤트만 있고 `result` 없음, 열린 PR도 0개(아직 PR 생성 전 단계, 충돌 해소/테스트 진행 중으로 추정). 끝났으면 PR 상태(CI/Copilot/머지 여부)를 확인해 마무리(§3 참고). 아직이면 이어서 모니터링(TaskList로 살아있는지 확인, 죽어있으면 §3 내용을 참고해 재실행).
 2. 열려 있는 PR 전체 확인: `gh pr list --state open` — 각각 CI/Copilot 리뷰 상태 확인 후 clean하면 `gh pr merge <N> --merge` (base는 항상 `dev`, **`main`은 절대 직접 push/merge 금지**).
@@ -445,4 +445,4 @@ PR #58, #59, #60, #61, #62, #63, #64, #65, #66, #67, #68 — 전부 dev에 머�
 
 - 전역 규칙: `~/.claude/CLAUDE.md`
 - 프로젝트 규칙: `matchup-sports-platform/CLAUDE.md` (Git 브랜치 정책, DB 마이그레이션 규율, 7대 원칙, PR·Copilot 리뷰 워크플로 등)
-- 자동 메모리: `~/.claude/projects/-Users-sungjun-Documents-projects-matchup-sports-platform/memory/` (특히 `sonnet-subagent-implementation.md` — 위임 원칙 최신 반영됨)
+- 자동 메모리: `<로컬 Claude 프로젝트 메모리 폴더>/` (특히 `sonnet-subagent-implementation.md` — 위임 원칙 최신 반영됨)

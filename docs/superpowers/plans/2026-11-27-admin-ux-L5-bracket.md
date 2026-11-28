@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16 App Router, React 19, TanStack Query, Vitest + Testing Library(+ `@/test/viewport`, `@/test/bracket-canvas-fixtures`).
 
-**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (S5, Q6, 2차 M5-1~M5-3, 공통 용어, R-K3, C-1~C-4). Mockups: `~/.cache/teameet-admin-tournament-ux-20261127/mockups/s5-bracket/{A.html,notes.md}`, `m5-bracket/{index.html,notes.md}`.
+**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (S5, Q6, 2차 M5-1~M5-3, 공통 용어, R-K3, C-1~C-4). Mockups: 로컬 목업 `mockups/s5-bracket/{A.html,notes.md}`(저장소 밖), `m5-bracket/{index.html,notes.md}`.
 
 Paths: `BC` = `apps/v1_web/src/components/admin/bracket-canvas`, `TID` = `apps/v1_web/src/app/admin/tournaments/[id]`.
 

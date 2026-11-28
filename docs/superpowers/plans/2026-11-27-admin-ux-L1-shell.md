@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19, Next.js 16 App Router, TanStack Query(hooks mock), Tailwind v4 토큰, Vitest + Testing Library.
 
-**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` — 「S2」, 「레인 사이 계약」 C-1·C-5(대회 정보 섹션 계약 — `info-sections.ts`), Q7, 2차 결정 M1-1·M1-2·M3-1, L8, head 추가 지시(`?created=1`). 목업: `~/.cache/teameet-admin-tournament-ux-20261127/mockups/s2-shell/A.html`(데스크톱 + 폰 2프레임), `m1-create/index.html` 프레임 (e). 선행: **L0 PR(ActionMenu·`test/match-media.ts`·`info-sections.ts`)이 `origin/dev` 에 머지된 뒤** 착수한다.
+**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` — 「S2」, 「레인 사이 계약」 C-1·C-5(대회 정보 섹션 계약 — `info-sections.ts`), Q7, 2차 결정 M1-1·M1-2·M3-1, L8, head 추가 지시(`?created=1`). 목업: 로컬 목업 `mockups/s2-shell/A.html`(저장소 밖)(데스크톱 + 폰 2프레임), `m1-create/index.html` 프레임 (e). 선행: **L0 PR(ActionMenu·`test/match-media.ts`·`info-sections.ts`)이 `origin/dev` 에 머지된 뒤** 착수한다.
 
 ## Global Constraints
 

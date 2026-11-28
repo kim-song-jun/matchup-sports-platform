@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16 App Router · React 19 · TanStack Query 5 · Tailwind v4 토큰 · Vitest + Testing Library + MSW(`setupServer`) · `@/test/viewport`(`installViewport`·`resizeViewport`)
 
-**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (S6·Q1·Q2·Q8·2차 S6-1..5·M6-1·M6-2·L8·공통 용어). 목업: `~/.cache/teameet-admin-tournament-ux-20261127/mockups/s6-ops/CB.html`·`notes.md`(「CB 합친 안」), `m6-ops/index.html`·`notes.md`. 실행자는 spec 과 이 계획만 본다.
+**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (S6·Q1·Q2·Q8·2차 S6-1..5·M6-1·M6-2·L8·공통 용어). 목업: 로컬 목업 `mockups/s6-ops/CB.html`(저장소 밖)·`notes.md`(「CB 합친 안」), `m6-ops/index.html`·`notes.md`. 실행자는 spec 과 이 계획만 본다.
 
 **Lane:** `git fetch origin dev` 후 `git worktree add .claude/worktrees/admin-ux-l6 -b feat/admin-ux-l6-ops origin/dev`, `node_modules` 심링크. L0(ActionMenu·SideSheet)·L1 에 의존하지 않는다(`BottomSheet`·`ConfirmModal` 등 기존 부품만). PR 은 `dev` 대상·한국어, 마지막에 `.changeset/*.md`. 커밋은 Task 마다 `git commit -m "<한국어>" -- <내 파일 경로>` + `git show --stat HEAD` 로 휩쓸린 파일 확인.
 

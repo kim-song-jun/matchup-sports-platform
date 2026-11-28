@@ -56,7 +56,7 @@
 
 **Interfaces — Produces:** `ActionSheetProps.header?: ReactNode`; `ActionSheetAction`(onSelect 변형)`.checked?: boolean`(다른 두 변형은 `checked?: undefined`); `export function ActionLabel({ action, children }: { action: ActionSheetAction; children: ReactNode })` — 이제 export, `checked !== undefined` 면 맨 끝에 `<span aria-hidden="true" className="tm-toggle ml-auto [tm-toggle-on]">`.
 
-- [ ] **Step 1: 작업 공간.** `git fetch origin dev` 후 `git worktree add .claude/worktrees/admin-ux-l0 -b feat/admin-ux-l0-primitives origin/dev`. 새 worktree 의 루트와 `apps/v1_web` 에 메인 트리 `node_modules` 를 심링크한다(`ln -s ~/Dev/projects/matchup-sports-platform/node_modules node_modules`, `apps/v1_web/node_modules` 도 같게). 이후 명령은 `apps/v1_web` 에서 `./node_modules/.bin/…`(pnpm 은 PATH 에 없다).
+- [ ] **Step 1: 작업 공간.** `git fetch origin dev` 후 `git worktree add .claude/worktrees/admin-ux-l0 -b feat/admin-ux-l0-primitives origin/dev`. 새 worktree 의 루트와 `apps/v1_web` 에 메인 트리 `node_modules` 를 심링크한다(`ln -s <메인 작업 트리>/node_modules node_modules`, `apps/v1_web/node_modules` 도 같게). 이후 명령은 `apps/v1_web` 에서 `./node_modules/.bin/…`(pnpm 은 PATH 에 없다).
 - [ ] **Step 2: 실패하는 시험**(`action-sheet.test.tsx` 의 기존 `setup`):
   - `it('checked 항목은 switch 로 그려지고 켜짐 여부를 aria-checked 와 .tm-toggle-on 으로 말한다')` — `checked:true`/`false` 두 항목. `getByRole('switch', { name: /참가자에게 공개/ })` 의 `aria-checked` 가 `'true'`, 다른 하나 `'false'`; `.tm-toggle-on` 은 켜진 쪽 안에만. 누르면 `onSelect` 1회.
   - `it('checked 가 없는 항목은 switch 가 아니라 평범한 button 이다')`.

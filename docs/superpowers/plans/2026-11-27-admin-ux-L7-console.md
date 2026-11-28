@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19, Vitest + Testing Library(폭은 `@/test/viewport` 의 `installViewport`), 기존 `useConfirm`·`ActionSheet`·`BottomSheet`·`writeExpiringDraft`·`useMediaQuery`, Tailwind 토큰(`var(--…)`).
 
-**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (L7 · O4 · 2차 결정 표 O4/O4-1/O4-2) · 목업 `~/.cache/teameet-admin-tournament-ux-20261127/mockups/m7-console/{A,C}.html`, `notes.md`
+**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (L7 · O4 · 2차 결정 표 O4/O4-1/O4-2) · 목업 로컬 목업 `mockups/m7-console/{A,C}.html`(저장소 밖), `notes.md`
 
 ## Global Constraints
 - 용어(공통 용어표): 홈 · 원정(「어웨이」 금지) / 구장(「필드·경기장·코트」 금지) / 「경기 시간」(전·후반 / 단판) — 사용자에게 보이는 글자에 「피리어드」 금지 / 쉬는 시간(「휴식 시간」 금지) / 결과 처리는 「결과 확정」·「결과 고치기」(「정정」 금지).

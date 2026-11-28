@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16 App Router · React 19 · TanStack Query 5 · Vitest + Testing Library + MSW · Tailwind v4 토큰(`tm-card`·`tm-input`·`tm-text-*`).
 
-**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (「S1」, Q5, Q6, A1, G2, 2차 M1-3) · 목업 `~/.cache/teameet-admin-tournament-ux-20261127/mockups/s1-create/A.html`·`notes.md`, `m1-create/index.html`·`notes.md`. 이 계획이 구현자에게 문서 전체를 대신하지 않는다 — 두 문서를 먼저 읽는다.
+**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (「S1」, Q5, Q6, A1, G2, 2차 M1-3) · 목업 로컬 목업 `mockups/s1-create/A.html`(저장소 밖)·`notes.md`, `m1-create/index.html`·`notes.md`. 이 계획이 구현자에게 문서 전체를 대신하지 않는다 — 두 문서를 먼저 읽는다.
 
 ## Global Constraints
 

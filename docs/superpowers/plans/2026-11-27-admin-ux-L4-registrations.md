@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16 / React 19 / Tailwind v4 tokens / TanStack Query(훅 mock) / Vitest + Testing Library / `@/test/viewport` `installViewport`.
 
-**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (S4 · Q3 · Q8 · M4-1 · M4-2 · L8). 목업: `~/.cache/teameet-admin-tournament-ux-20261127/mockups/s4-registrations/C.html`+`notes.md`, `m4-registrations/index.html`+`notes.md`.
+**Spec:** `.github/tasks/20261140-admin-tournament-ux-renovation.md` (S4 · Q3 · Q8 · M4-1 · M4-2 · L8). 목업: 로컬 목업 `mockups/s4-registrations/C.html`(저장소 밖)+`notes.md`, `m4-registrations/index.html`+`notes.md`.
 
 ## Global Constraints
 

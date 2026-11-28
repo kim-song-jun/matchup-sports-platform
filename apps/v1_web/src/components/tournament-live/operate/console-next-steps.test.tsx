@@ -91,7 +91,7 @@ describe('ConsoleNextSteps', () => {
 
     expect(screen.getByRole('link', { name: '결과 고치기' })).toHaveAttribute(
       'href',
-      '/admin/live/league-1/records/corrections?fixtureId=m1',
+      '/admin/live/league-1/results?fixtureId=m1',
     );
   });
 
@@ -103,7 +103,7 @@ describe('ConsoleNextSteps', () => {
 
     expect(screen.getByRole('link', { name: '결과 고치기' })).toHaveAttribute(
       'href',
-      '/tournament-ops/tournaments/t-1/records/corrections?fixtureId=f1',
+      '/tournament-ops/tournaments/t-1/results?fixtureId=f1',
     );
   });
 

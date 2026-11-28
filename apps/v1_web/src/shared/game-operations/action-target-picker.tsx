@@ -305,7 +305,7 @@ export function ActionTargetPicker({
           <button
             type="button"
             onClick={onCancel}
-            aria-label="이벤트 기록 취소"
+            aria-label="기록 그만두기"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             <X size={18} aria-hidden="true" />

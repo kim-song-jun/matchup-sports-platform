@@ -119,13 +119,13 @@ describe('LineupGrid — 선수 검색', () => {
   it('검색어를 입력하면 맞는 선수만 남는다', () => {
     render(<LineupGrid sides={SIDES} lineups={[lineup(SQUAD)]} onSelectPlayer={vi.fn()} />);
 
-    expect(screen.getAllByRole('button', { name: /선수 이벤트 기록/ })).toHaveLength(4);
+    expect(screen.getAllByRole('button', { name: /선수로 기록/ })).toHaveLength(4);
 
     fireEvent.change(screen.getByLabelText('등번호 또는 이름으로 선수 찾기'), {
       target: { value: '홍' },
     });
 
-    const remaining = screen.getAllByRole('button', { name: /선수 이벤트 기록/ });
+    const remaining = screen.getAllByRole('button', { name: /선수로 기록/ });
     expect(remaining).toHaveLength(2);
     expect(screen.queryByRole('button', { name: /김철수/ })).not.toBeInTheDocument();
   });
@@ -168,7 +168,7 @@ describe('LineupGrid — 선수 검색', () => {
     );
 
     expect(screen.queryByLabelText('등번호 또는 이름으로 선수 찾기')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /선수 이벤트 기록/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /선수로 기록/ })).toHaveLength(1);
   });
 
   it('명단 자체가 없으면 안내 문구를 보여준다', () => {
@@ -205,7 +205,7 @@ describe('LineupGrid — 포지션 표시 (MD-QA #167)', () => {
       />,
     );
 
-    const button = screen.getByRole('button', { name: '홍길동 선수 이벤트 기록' });
+    const button = screen.getByRole('button', { name: '홍길동 선수로 기록' });
     expect(button).toHaveTextContent('GK');
     expect(button).not.toHaveTextContent('GOLEIRO');
   });
@@ -266,7 +266,7 @@ describe('LineupGrid — 도착 전 선수 (F71)', () => {
       />,
     );
 
-    const pending = screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 도착 전' });
+    const pending = screen.getByRole('button', { name: '김철수 선수로 기록, 도착 전' });
     expect(pending).toHaveTextContent('도착 전');
     expect(screen.getByText('김철수')).toHaveClass('text-[var(--text-muted)]');
     expect(pending).toBeEnabled();
@@ -275,7 +275,7 @@ describe('LineupGrid — 도착 전 선수 (F71)', () => {
       expect.objectContaining({ participant: expect.objectContaining({ id: 'p-2' }) }),
     );
 
-    const done = screen.getByRole('button', { name: '홍길동 선수 이벤트 기록' });
+    const done = screen.getByRole('button', { name: '홍길동 선수로 기록' });
     expect(done).not.toHaveTextContent('도착 전');
     expect(screen.getByText('홍길동')).toHaveClass('text-[var(--text-strong)]');
   });
@@ -284,7 +284,7 @@ describe('LineupGrid — 도착 전 선수 (F71)', () => {
     render(<LineupGrid sides={SIDES} lineups={[lineup(SQUAD)]} onSelectPlayer={vi.fn()} />);
 
     expect(screen.queryByText('도착 전')).toBeNull();
-    expect(screen.getByRole('button', { name: '김철수 선수 이벤트 기록' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '김철수 선수로 기록' })).toBeEnabled();
   });
 
   it('다른 팀만 검인했어도 경기 전체로 판단한다 — 보이는 팀만 보고 칩을 빼지 않는다', () => {
@@ -299,7 +299,7 @@ describe('LineupGrid — 도착 전 선수 (F71)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 도착 전' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '김철수 선수로 기록, 도착 전' })).toBeEnabled();
   });
 });
 
@@ -315,7 +315,7 @@ describe('LineupGrid — 퇴장 선수 (MD-QA #97)', () => {
       />,
     );
 
-    const sentOff = screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 퇴장' });
+    const sentOff = screen.getByRole('button', { name: '김철수 선수로 기록, 퇴장' });
     expect(sentOff).toHaveTextContent('퇴장');
     expect(sentOff).toBeEnabled();
     fireEvent.click(sentOff);
@@ -323,7 +323,7 @@ describe('LineupGrid — 퇴장 선수 (MD-QA #97)', () => {
       expect.objectContaining({ participant: expect.objectContaining({ id: 'p-2' }) }),
     );
 
-    expect(screen.getByRole('button', { name: '홍길동 선수 이벤트 기록' })).not.toHaveTextContent('퇴장');
+    expect(screen.getByRole('button', { name: '홍길동 선수로 기록' })).not.toHaveTextContent('퇴장');
   });
 
   it('퇴장 선수가 도착 전이기도 하면 두 칩을 모두 단다', () => {
@@ -337,7 +337,7 @@ describe('LineupGrid — 퇴장 선수 (MD-QA #97)', () => {
       />,
     );
 
-    const both = screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 퇴장, 도착 전' });
+    const both = screen.getByRole('button', { name: '김철수 선수로 기록, 퇴장, 도착 전' });
     expect(both).toHaveTextContent('퇴장');
     expect(both).toHaveTextContent('도착 전');
   });
@@ -357,7 +357,7 @@ describe('LineupGrid — 운영진 실명', () => {
   ])('%s — 선수 버튼 글자와 접근성 이름이 같은 규칙을 따른다', (_, row, name) => {
     render(<LineupGrid sides={SIDES} lineups={[lineup([row])]} onSelectPlayer={vi.fn()} />);
 
-    const button = screen.getByRole('button', { name: `${name} 선수 이벤트 기록` });
+    const button = screen.getByRole('button', { name: `${name} 선수로 기록` });
     expect(button).toHaveTextContent(name);
   });
 
@@ -431,7 +431,7 @@ describe('LineupGrid — columns 배치(두 팀 한 화면)', () => {
     expect(within(away).getAllByRole('button')).toHaveLength(2);
     for (const row of within(home).getAllByRole('button')) expect(row).toHaveClass('min-h-12');
 
-    fireEvent.click(within(away).getByRole('button', { name: '원정선수2 선수 이벤트 기록' }));
+    fireEvent.click(within(away).getByRole('button', { name: '원정선수2 선수로 기록' }));
     expect(onSelectPlayer).toHaveBeenCalledWith(
       expect.objectContaining({ sideId: 'side-away', participant: expect.objectContaining({ id: '원정-2' }) }),
     );

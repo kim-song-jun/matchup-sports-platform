@@ -177,8 +177,9 @@ export function useRestTimer({
   };
 }
 
+// 글자 크기는 안쪽 span 이 정한다 — 전역 `button { font: inherit }` 가 버튼에 단 글자 유틸리티를 이긴다.
 const CHIP_CLASS =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-[var(--grey500)] bg-[var(--card-surface)] px-1 text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500';
+  'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-[var(--button-fill-neutral)] px-1 text-[var(--button-text-neutral)] transition-colors hover:bg-[var(--grey150)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500';
 
 function PresetChips({ onPick }: { onPick: (minutes: number) => void }) {
   // 6열 고정: 줄바꿈으로 두면 390px 에서 마지막 칩만 다음 줄로 떨어진다.
@@ -186,14 +187,17 @@ function PresetChips({ onPick }: { onPick: (minutes: number) => void }) {
     <div className="grid grid-cols-6 gap-2">
       {REST_PRESET_MINUTES.map((minutes) => (
         <button key={minutes} type="button" className={CHIP_CLASS} onClick={() => onPick(minutes)}>
-          {minutes}분
+          <span className="text-[length:var(--font-size-label)] font-bold">{minutes}분</span>
         </button>
       ))}
     </div>
   );
 }
 
-/** 쉬는 시간이 도는 동안의 큰 카드. 시간이 다 되면 「확인」을 누를 때까지 알림으로 남는다. */
+/**
+ * 쉬는 시간이 도는 동안의 큰 카드. 시간이 다 되면 「확인」을 누를 때까지 알림으로 남는다.
+ * 콘솔의 다른 카드처럼 흰 카드에 검정 숫자이고, 지금 흐르는 것(남은 시간 막대)만 파랑이다.
+ */
 export function RestTimerCard({ api }: { api: RestTimerApi }) {
   const [lengthOpen, setLengthOpen] = useState(false);
   const { state } = api;
@@ -212,13 +216,13 @@ export function RestTimerCard({ api }: { api: RestTimerApi }) {
       <section
         role="alert"
         aria-live="assertive"
-        className="flex flex-col items-center gap-2 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-4 text-center"
+        className="flex flex-col items-center gap-3 rounded-[var(--radius-container)] bg-[var(--card-surface)] p-4 text-center"
       >
-        <p className="flex items-center gap-2 text-[length:var(--font-size-body-lg)] font-extrabold text-[var(--orange700)]">
+        <p className="flex items-center gap-2 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
           <Timer size={18} aria-hidden="true" />
           쉬는 시간이 끝났어요
         </p>
-        <Button size="sm" variant="warning" className="min-h-[44px]" onClick={api.end}>
+        <Button size="md" variant="neutral" className="min-w-24" onClick={api.end}>
           확인
         </Button>
       </section>
@@ -229,16 +233,16 @@ export function RestTimerCard({ api }: { api: RestTimerApi }) {
   const progressPercent = state.totalMs > 0 ? Math.round((1 - remainingMs / state.totalMs) * 100) : 0;
   const totalMinutes = Math.round(state.totalMs / 60_000);
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-3">
+    <section className="flex flex-col gap-3 rounded-[var(--radius-container)] bg-[var(--card-surface)] p-4">
       <button
         type="button"
         aria-expanded={lengthOpen}
         onClick={() => setLengthOpen((open) => !open)}
-        className="flex min-h-[44px] items-center gap-2 self-start rounded-lg text-[length:var(--font-size-body-sm)] font-semibold text-[var(--orange700)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--orange500)]"
+        className="-ml-1 flex min-h-[44px] items-center gap-1.5 self-start rounded-lg px-1 text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue500)]"
       >
-        <Timer size={14} aria-hidden="true" />
-        쉬는 시간 {totalMinutes}분
-        <ChevronDown size={14} aria-hidden="true" className={lengthOpen ? 'rotate-180' : ''} />
+        <Timer size={16} aria-hidden="true" />
+        <span className="text-[length:var(--font-size-body)] font-semibold">쉬는 시간 {totalMinutes}분</span>
+        <ChevronDown size={16} aria-hidden="true" className={lengthOpen ? 'rotate-180' : ''} />
       </button>
       {lengthOpen ? (
         <PresetChips
@@ -248,18 +252,19 @@ export function RestTimerCard({ api }: { api: RestTimerApi }) {
           }}
         />
       ) : null}
-      <p className="text-center text-4xl font-black leading-none tabular-nums text-[var(--orange700)]" aria-live="off">
-        {formatRestCountdown(remainingMs)} 남았어요
+      <p className="flex items-baseline justify-center gap-2 tabular-nums" aria-live="off">
+        <span className="text-4xl font-extrabold leading-none text-[var(--text-strong)]">{formatRestCountdown(remainingMs)}</span>{' '}
+        <span className="text-[length:var(--font-size-body-lg)] font-semibold text-[var(--text-body)]">남았어요</span>
       </p>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--card-surface)]">
-        <div className="h-full rounded-full bg-[var(--orange500)]" style={{ width: `${progressPercent}%` }} />
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--grey200)]">
+        <div className="h-full rounded-full bg-[var(--blue500)]" style={{ width: `${progressPercent}%` }} />
       </div>
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" className="min-h-[44px] flex-1" onClick={api.addMinute}>
+        <Button size="md" variant="neutral" className="flex-1" onClick={api.addMinute}>
           <Plus size={14} aria-hidden="true" />
           1분 추가
         </Button>
-        <Button size="sm" variant="outline" className="min-h-[44px] flex-1" onClick={api.end}>
+        <Button size="md" variant="neutral" className="flex-1" onClick={api.end}>
           쉬는 시간 끝내기
         </Button>
       </div>

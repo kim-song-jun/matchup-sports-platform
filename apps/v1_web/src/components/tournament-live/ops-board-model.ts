@@ -109,7 +109,10 @@ export function buildBoardCards(input: BuildBoardCardsInput): BoardCard[] {
   const operators = activeFieldOperators(staff);
   const canResults = canManageTournamentResults(role);
   const canAssign = canAssignOperations(role);
+  const todayKey = kstDayKey(now.toISOString());
   const seenField = new Set<string>();
+  // 구장이 없는 경기에는 구장별 다음이 없다 — 앞으로의 가장 이른 시각 묶음 전체가 다음이다.
+  let noFieldNextAt: string | null = null;
 
   return sorted.map((item) => {
     const live = liveWarnings.get(item.fixtureId) ?? [];
@@ -122,8 +125,13 @@ export function buildBoardCards(input: BuildBoardCardsInput): BoardCard[] {
     // 구장이 없는 경기는 「구장 미정」 열에서 먼저 해결하므로 담당자 없음으로 겹쳐 세지 않는다.
     const staffMissing = staffInUse && open && item.fieldId !== null && !operators.some((a) => coversAt(a, item, baseline));
 
+    // 지난 날 예정으로 남은 경기가 오늘의 다음 경기 자리를 차지하지 않는다.
     let isFieldNext = false;
-    if (state === 'scheduled' && !seenField.has(fieldKey)) {
+    const upcoming = state === 'scheduled' && (item.scheduledAt === null || kstDayKey(item.scheduledAt) >= todayKey);
+    if (upcoming && fieldKey === NO_FIELD_KEY) {
+      if (noFieldNextAt === null) noFieldNextAt = item.scheduledAt ?? '';
+      isFieldNext = (item.scheduledAt ?? '') === noFieldNextAt;
+    } else if (upcoming && !seenField.has(fieldKey)) {
       seenField.add(fieldKey);
       isFieldNext = true;
     }

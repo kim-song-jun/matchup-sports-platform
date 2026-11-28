@@ -265,7 +265,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
       </div>
 
       {started ? (
-        <AlertBanner tone="info" message="현장 변동은 운영진에게 알려 주세요. 경기 중 바뀐 출전은 운영진이 결과 정정으로 고쳐요." />
+        <AlertBanner tone="info" message="현장 변동은 운영진에게 알려 주세요. 경기 중 바뀐 출전은 운영진이 결과 고치기로 고쳐요." />
       ) : !canEdit ? (
         <AlertBanner
           tone="info"

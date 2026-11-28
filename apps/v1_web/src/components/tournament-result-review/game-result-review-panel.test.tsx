@@ -217,7 +217,7 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
 
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    const rows = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
     expect(rows.map((row) => /전반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['1', '7', '13']);
   });
 
@@ -243,7 +243,7 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
 
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    const [row] = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    const [row] = within(screen.getByRole('list', { name: '기록 목록' })).getAllByRole('listitem');
     expect(row.textContent).toMatch(/12:00/);
     expect(row.textContent).not.toMatch(/전반/);
   });

@@ -135,7 +135,7 @@ export function usePatchPeriods(tournamentId: string) {
   );
 }
 
-/** 대회 생성 마법사용 — 대회 id 가 생성 직후에야 생기므로 변수로 받는다. */
+/** 리그 생성용 — 리그 id 가 생성 직후에야 생기므로 변수로 받는다. */
 export function useSaveTournamentPeriodSettings() {
   const queryClient = useQueryClient();
 

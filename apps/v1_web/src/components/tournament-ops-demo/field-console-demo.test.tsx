@@ -58,6 +58,7 @@ describe('필드 운영콘솔 안내와 체험', () => {
     expect(screen.getByText('콘솔 사용 안내 · 5/5')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '직접 체험하기' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: '경기 콘솔 체험' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '대회 운영으로 돌아가기' })).toHaveAttribute('href', '/tournament-management');
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     expect(screen.getByLabelText(/스코어 블루 FC 0점, 오렌지 FS 0점/)).toBeInTheDocument();
@@ -88,7 +89,7 @@ describe('필드 운영콘솔 안내와 체험', () => {
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /김하늘/ }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /윤겨울/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    const history = screen.getByRole('heading', { name: /^최근 기록/ }).parentElement!;
+    const history = screen.getByRole('heading', { name: /^최근 기록/ }).closest('section')!;
     expect(within(history).getByText(/옐로카드/)).toBeInTheDocument();
     expect(within(history).getByText(/윤겨울/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '안내 다시 보기' }));

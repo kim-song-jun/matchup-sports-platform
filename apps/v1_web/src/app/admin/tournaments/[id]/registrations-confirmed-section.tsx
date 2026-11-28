@@ -2,6 +2,7 @@
 
 import { AdminRegistrationGameRosters } from '@/components/game-roster/admin-registration-game-rosters';
 import { Button } from '@/components/v1-ui/button';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { ExportAllCsvButton } from './registration-csv';
 import { registrationMetaText } from './registration-row-parts';
@@ -102,7 +103,7 @@ export function RegistrationsConfirmedSection({
                       tournamentId={tournamentId}
                       registrationId={row.id}
                       teamName={teamName}
-                      correctionHref={`/admin/live/${encodeURIComponent(tournamentId)}/records/corrections`}
+                      correctionHref={resultsHref(adminLiveBase(tournamentId))}
                       onDirtyChange={onGameRostersDirtyChange}
                     />
                   </div>

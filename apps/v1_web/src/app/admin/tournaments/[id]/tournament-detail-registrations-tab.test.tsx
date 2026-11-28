@@ -243,7 +243,7 @@ describe('RegistrationsTab — 묶음과 상태', () => {
     expect(confirm).toBeDisabled();
     fireEvent.click(confirm);
     const waitlist = menuItem(openMenuOf('테스트 FC'), '대기로 두기');
-    expect(waitlist).toBeDisabled();
+    expect(waitlist).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(waitlist);
     expect(mutate).not.toHaveBeenCalled();
   });
@@ -667,7 +667,7 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
 
   afterEach(() => vi.clearAllMocks());
 
-  it('확정 신청의 ⋯ 에만 항목이 있고, 한 번에 한 팀만 펼치며 리그도 같은 결과 정정 경로를 넘긴다', () => {
+  it('확정 신청의 ⋯ 에만 항목이 있고, 한 번에 한 팀만 펼치며 리그도 같은 결과 화면 경로를 넘긴다', () => {
     arrangeAll([
       baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
       baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
@@ -681,7 +681,7 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
     fireEvent.click(menuItem(openMenuOf('성수 FC'), '경기별 명단'));
     const panel = screen.getByTestId('game-rosters-panel');
     expect(panel).toHaveAttribute('data-registration-id', 'reg-1');
-    expect(panel).toHaveAttribute('data-correction-href', '/admin/live/league-1/records/corrections');
+    expect(panel).toHaveAttribute('data-correction-href', '/admin/live/league-1/results');
     expect(menuItem(openMenuOf('성수 FC'), '경기별 명단 접기')).toBeInTheDocument();
 
     fireEvent.click(menuItem(openMenuOf('마포 FC'), '경기별 명단'));

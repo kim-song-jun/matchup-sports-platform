@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ConfirmModal } from './confirm-modal';
+import { ConfirmModal, useConfirm } from './confirm-modal';
 
 // 읽고 닫기만 하는 안내창(예: 신청이 거절된 사유) — 취소 버튼 없이 확인 하나만 둔다.
 describe('ConfirmModal hideCancel', () => {
@@ -316,5 +316,32 @@ describe('ConfirmModal details', () => {
     expect(describedBy.split(' ')).toHaveLength(1);
     expect(describedBy.endsWith('-confirm-message')).toBe(true);
     expect(document.querySelector('[id$="-confirm-details"]')).toBeNull();
+  });
+});
+
+describe('useConfirm hosts side by side', () => {
+  function TwoHosts() {
+    const first = useConfirm();
+    const second = useConfirm();
+    return (
+      <div>
+        <button type="button" onClick={() => void second.confirm({ title: '두 번째 창', message: '열렸어요' })}>두 번째 열기</button>
+        {first.ConfirmModal}
+        {second.ConfirmModal}
+      </div>
+    );
+  }
+
+  it('closed hosts rendered as siblings do not collide on React keys, and either one still opens', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(<TwoHosts />);
+      await userEvent.click(screen.getByRole('button', { name: '두 번째 열기' }));
+      expect(await screen.findByRole('dialog', { name: '두 번째 창' })).toBeInTheDocument();
+      const keyWarnings = errors.mock.calls.filter((call) => String(call[0]).includes('same key'));
+      expect(keyWarnings).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

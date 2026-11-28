@@ -62,7 +62,7 @@ export function BracketToolsBar({ tools, tournament, tournamentId, canWrite, vie
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         {wide ? (
-          <SegmentedTabs ariaLabel="대진 보기 방식" role="tablist" items={VIEW_ITEMS} activeId={view} onSelect={(id) => onViewChange(id === 'list' ? 'list' : 'canvas')} />
+          <SegmentedTabs ariaLabel="대진 보기 방식" role="tablist" items={VIEW_ITEMS} activeId={view} className="w-36 shrink-0" onSelect={(id) => onViewChange(id === 'list' ? 'list' : 'canvas')} />
         ) : null}
         {showMenus ? (
           <div className={wide ? 'flex flex-wrap items-center gap-2' : 'grid w-full grid-cols-3 gap-2'}>

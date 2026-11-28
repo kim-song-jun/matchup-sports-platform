@@ -60,7 +60,7 @@ function renderPanel(onDirtyChange?: (dirty: boolean) => void) {
         tournamentId={tournamentId}
         registrationId={registrationId}
         teamName="성수 FC"
-        correctionHref={`/admin/live/${tournamentId}/records/corrections`}
+        correctionHref={`/admin/live/${tournamentId}/results`}
         onDirtyChange={onDirtyChange}
       />
     </QueryClientProvider>,
@@ -144,14 +144,14 @@ describe('어드민 경기별 명단 — 칸 토글과 저장', () => {
     expect(await cell('박서준', G2.opponentName, '출전')).toBeInTheDocument();
   });
 
-  it('시작된 경기 칸은 누를 수 없고, 결과 정정으로 가는 링크를 준다', async () => {
+  it('시작된 경기 칸은 누를 수 없고, 결과 고치기로 가는 링크를 준다', async () => {
     mock.setGameState(G2.gameId, 'LIVE');
     renderPanel();
     await cell('김민재', G1.opponentName, '출전');
     expect(screen.queryByRole('button', { name: new RegExp(`vs ${G2.opponentName}`) })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '결과 정정' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '결과 고치기' })).toHaveAttribute(
       'href',
-      `/admin/live/${tournamentId}/records/corrections`,
+      `/admin/live/${tournamentId}/results`,
     );
   });
 

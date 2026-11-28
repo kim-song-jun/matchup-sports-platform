@@ -35,7 +35,7 @@ export interface LeagueParticipationPanelProps {
  */
 export function LeagueParticipationPanel({ gameId, sides, disabled = false, onError }: LeagueParticipationPanelProps) {
   return (
-    <section className="flex flex-col gap-3 px-4" aria-label="킥오프 준비">
+    <section className="flex flex-col gap-3" aria-label="킥오프 준비">
       <div>
         <h3 className="text-[length:var(--font-size-body-sm)] font-semibold">킥오프 준비 · 출전 선수</h3>
         <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">

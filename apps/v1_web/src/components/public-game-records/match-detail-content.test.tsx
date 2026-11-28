@@ -146,6 +146,29 @@ describe('MatchDetailContent — 단판 경기 구간 표기', () => {
     expect(screen.queryByText('기타')).toBeNull();
   });
 
+  it('단판에 연장 기록이 있으면 연장 구간은 따로 이름을 달고 정규 구간만 머리말을 감춘다', () => {
+    const extra = [
+      ...events,
+      goal('away', '최선수', 2, 100_000),
+      goal('home', '정선수', 3, 200_000),
+    ];
+    render(<MatchDetailContent data={makeDetail({ periodCount: 1, events: extra })} />);
+
+    const single = screen.getByRole('group', { name: '경기 결과' });
+    expect(single).toHaveTextContent('김선수');
+    expect(single).toHaveTextContent('박선수');
+    expect(single).not.toHaveTextContent('최선수');
+    expect(within(screen.getByRole('group', { name: '연장 전반' })).getByText('최선수')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: '연장 후반' })).getByText('정선수')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: '연장 전반' })).getByText('연장 전반')).not.toHaveClass('sr-only');
+  });
+
+  it('단판의 기록이 연장에만 있어도 기록을 잃지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({ periodCount: 1, events: [goal('home', '정선수', 2, 100_000)] })} />);
+
+    expect(within(screen.getByRole('group', { name: '연장 전반' })).getByText('정선수')).toBeInTheDocument();
+  });
+
   it.each([[2], [null], [undefined]])('periodCount=%s 이면 전반·기타 구간을 지금처럼 나눈다', (periodCount) => {
     render(<MatchDetailContent data={makeDetail({ periodCount, events })} />);
 

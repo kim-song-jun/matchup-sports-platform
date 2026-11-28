@@ -214,7 +214,7 @@ export function AdminRegistrationGameRosters({
         <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           {usageHint}개인 기록이 있는 선수는{' '}
           <Link href={correctionHref} className="font-semibold text-[var(--blue700)] underline underline-offset-2">
-            결과 정정
+            결과 고치기
           </Link>
           에서 고쳐요
         </p>

@@ -259,6 +259,7 @@ describe('AdminShell 가 하위 탭 줄에 내려 주는 고정 기준', () => {
 
     const hosts = ancestorClasses(screen.getByRole('navigation', { name: '섹션' }));
     expect(hosts).toContain('[--admin-sticky-top:52px]');
+    expect(hosts).toContain('[--admin-sidebar-width:240px]');
     expect(hosts).toContain('[--admin-gutter:1rem]');
     expect(hosts).toContain('md:[--admin-gutter:1.5rem]');
     // 52px 는 같은 셸의 모바일 앱바 높이다.

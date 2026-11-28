@@ -592,7 +592,7 @@ describe('LeagueMatchFixturesClient', () => {
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 3, fixtureCount: 5 }));
   });
 
-  it('F40: 경기일 수는 팀 수로 제안한다 — 2팀은 단일 1일(기본)·홈앤어웨이 2일 칩, 요약이 경기 수를 말한다', async () => {
+  it('F40: 경기일 수는 팀 수로 제안한다 — 2팀은 단일 1일(기본)·홈·원정 2일 칩, 요약이 경기 수를 말한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
@@ -612,7 +612,8 @@ describe('LeagueMatchFixturesClient', () => {
     expect(screen.getByText(/경기일 1일 · 1경기가 만들어져요/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '단일 1일' })).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: '홈앤어웨이 2일' }));
+    fireEvent.click(screen.getByRole('button', { name: '홈·원정 2일' }));
+    expect(screen.getByText('2팀 · 홈·원정 리그')).toBeInTheDocument();
     expect(screen.getByLabelText('경기일 수')).toHaveValue(2);
     expect(screen.getByText(/경기일 2일 · 2경기가 만들어져요/)).toBeInTheDocument();
 
@@ -1575,7 +1576,7 @@ describe('LeagueMatchFixturesClient', () => {
   // 감사 확인(A-league-void-stage): voided(무효화된 결과)도 백엔드가 신규 입력을 이미
   // 허용하므로 '결과 입력' 버튼이 떠야 한다 — 여기서 빠지면 무효 대진은 재입력 버튼
   // 자체가 사라져 그 시즌 승강 확정이 영구히 막힌다.
-  it('결과 진행 단계에 따라 ⋯ 시트의 결과 항목이 갈린다 — 결과 없음은 항목 없음, 확정은 결과 정정, 그 밖에는 결과 검토', () => {
+  it('결과 진행 단계에 따라 ⋯ 시트의 결과 항목이 갈린다 — 결과 없음은 항목 없음, 확정은 결과 고치기, 그 밖에는 결과 확정', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -1615,22 +1616,20 @@ describe('LeagueMatchFixturesClient', () => {
     const results = new Map<string, { label: string; href: string } | null>();
     for (const title of ['1주차', '2주차', '3주차', '4주차', '5주차', '6주차']) {
       const { sheet, close } = sheetFor(title);
-      const link = within(sheet).queryByRole('link', { name: /^결과 (정정|검토)/ });
+      const link = within(sheet).queryByRole('link', { name: /^결과 (고치기|확정)/ });
       results.set(title, link === null ? null : { label: link.textContent ?? '', href: link.getAttribute('href') ?? '' });
       close();
     }
-    // 아직 결과가 없는 경기에는 항목이 없다 — 눌러도 빈 화면인 "결과 정정"을 두지 않는다.
+    // 아직 결과가 없는 경기에는 항목이 없다 — 눌러도 빈 화면인 "결과 고치기"를 두지 않는다.
     expect(results.get('1주차')).toBeNull();
-    // 제출·초안·정정 요청·무효는 결과 검토 화면으로 간다.
+    // 제출·초안·고치기 요청·무효는 결과 화면의 확정으로 간다.
     for (const title of ['2주차', '3주차', '5주차', '6주차']) {
-      expect(results.get(title)?.label).toMatch(/^결과 검토/);
-      expect(results.get(title)?.href).toMatch(/^\/admin\/live\/league-1\/result-review\?fixtureId=tm-/);
+      expect(results.get(title)?.label).toMatch(/^결과 확정/);
+      expect(results.get(title)?.href).toMatch(/^\/admin\/live\/league-1\/results\?fixtureId=tm-/);
     }
-    // 확정된 경기는 **정정 화면**으로 간다. `result-review` 는 *검토 대기* 목록이라 확정된 경기가 거기
-    // 없어, 라벨은 "결과 정정" 인데 "검토할 결과가 없어요" 가 열리는 데드엔드였다(alpha 실측).
-    // 라벨이 아니라 **href** 로 잰다.
-    expect(results.get('4주차')?.label).toMatch(/^결과 정정/);
-    expect(results.get('4주차')?.href).toBe('/admin/live/league-1/records/corrections?fixtureId=tm-official');
+    // 확정된 경기도 같은 결과 화면이고 그 경기가 골라진 채 열린다. 라벨이 아니라 **href** 로 잰다.
+    expect(results.get('4주차')?.label).toMatch(/^결과 고치기/);
+    expect(results.get('4주차')?.href).toBe('/admin/live/league-1/results?fixtureId=tm-official');
   });
 
   // U1: 요구사항 3 — 정정 모드는 확정 전 "전 → 후" 비교를 보여준다. 이게 이 안의 존재 이유라
@@ -1734,7 +1733,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(screen.queryByText(/마지막 경기일에는/)).not.toBeInTheDocument();
   });
 
-  it('F40: 홈앤어웨이는 경기가 두 배라 같은 하루 경기 수에서 주차와 마지막 주차 경기 수가 달라진다', () => {
+  it('F40: 홈·원정 리그는 경기가 두 배라 같은 하루 경기 수에서 주차와 마지막 주차 경기 수가 달라진다', () => {
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
 
     render(
@@ -1746,8 +1745,8 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '6' } });
     // 단일: 6경기 · 하루 6경기 → 1주뿐이라 안내가 없다.
     expect(screen.queryByText(/마지막 경기일에는/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /홈앤어웨이/ }));
-    // 홈앤어웨이 12경기 · 하루 6경기 → 2주, 딱 나눠떨어져 안내가 없다.
+    fireEvent.click(screen.getByRole('button', { name: /홈·원정/ }));
+    // 홈·원정 12경기 · 하루 6경기 → 2주, 딱 나눠떨어져 안내가 없다.
     expect(screen.getByText(/경기일 2일 · 12경기가 만들어져요/)).toBeInTheDocument();
     expect(screen.queryByText(/마지막 경기일에는/)).not.toBeInTheDocument();
     // 하루 5경기 → 3주(5 + 5 + 2).
@@ -2356,7 +2355,7 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     expect(screen.getByLabelText('날짜')).toHaveValue('2026-09-12');
     expect(screen.getByLabelText('1번째 경기 시작 시각')).toHaveValue('10:00');
     fireEvent.change(screen.getByLabelText('1번째 경기 홈 팀'), { target: { value: 't2' } });
-    fireEvent.change(screen.getByLabelText('1번째 경기 어웨이 팀'), { target: { value: 't1' } });
+    fireEvent.change(screen.getByLabelText('1번째 경기 원정 팀'), { target: { value: 't1' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 1개 만들기' }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith([
       expect.objectContaining({ homeTeamId: 't2', awayTeamId: 't1', startsAt: '2026-09-12T01:00:00.000Z' }),

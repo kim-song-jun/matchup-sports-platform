@@ -219,7 +219,10 @@ export function formatClock(clockMs: number | null): string {
  * always-exactly-2-period games; a numbered fallback once a sport/format
  * has more periods than that.
  */
-export function periodLabel(periodNumber: number): string {
+export function periodLabel(periodNumber: number, periodCount?: number | null): string {
+  // 단판(정규 구간 1개) 뒤의 둘째·셋째 구간은 연장이다.
+  if (isSinglePeriod(periodCount) && periodNumber === 2) return '연장 전반';
+  if (isSinglePeriod(periodCount) && periodNumber === 3) return '연장 후반';
   if (periodNumber === 1) return '전반';
   if (periodNumber === 2) return '후반';
   return `${periodNumber}피리어드`;
@@ -232,9 +235,9 @@ export function isSinglePeriod(periodCount: number | null | undefined): boolean 
   return periodCount === 1;
 }
 
-/** 시각 앞에 붙는 피리어드 말머리. 단판이면 구분할 피리어드가 없으니 빈 문자열이다. */
+/** 시각 앞에 붙는 피리어드 말머리. 단판의 정규 구간은 구분할 피리어드가 없으니 빈 문자열이고, 연장 구간은 이름이 붙는다. */
 export function periodPrefix(periodNumber: number, periodCount: number | null | undefined): string {
-  return isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber)} `;
+  return isSinglePeriod(periodCount) && periodNumber === 1 ? '' : `${periodLabel(periodNumber, periodCount)} `;
 }
 
 /**

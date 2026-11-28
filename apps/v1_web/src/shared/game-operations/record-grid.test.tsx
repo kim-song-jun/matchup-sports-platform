@@ -22,6 +22,8 @@ describe('RecordGrid — 큰 기록 버튼 격자', () => {
     const buttons = within(grid).getAllByRole('button');
     expect(buttons.map((button) => button.textContent)).toEqual(['골', '자책골', '옐로카드', '레드카드', '파울', '더보기']);
     for (const button of buttons) expect(button).toHaveClass('h-[68px]');
+    // 칸마다 선수 시트나 더보기 시트를 연다.
+    for (const button of buttons) expect(button).toHaveAttribute('aria-haspopup', 'dialog');
 
     for (const cell of FUTSAL_CELLS) fireEvent.click(within(grid).getByRole('button', { name: cell.label }));
     expect(onSelect.mock.calls.map(([key]) => key)).toEqual(['GOAL', 'OWN_GOAL', 'YELLOW', 'RED', 'FOUL', 'MORE']);

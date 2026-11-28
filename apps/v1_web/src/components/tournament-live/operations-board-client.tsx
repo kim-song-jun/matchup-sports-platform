@@ -12,7 +12,7 @@ import { canAssignOperations, useTournamentOpsRole } from '@/components/tourname
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1Tournament, useV1TournamentFields, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
-import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
+import { DESKTOP_LIST_MEDIA_QUERY, MD_UP_MEDIA_QUERY, WIDE_TABLE_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { extractErrorMessage } from '@/lib/error-message';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { competitionFixtureName } from '@/lib/tournament-round-label';
@@ -20,6 +20,7 @@ import type { V1TournamentOperationsBoardItem } from '@/types/api';
 import { BoardCardView } from './board-card';
 import { FieldChips } from './field-chips';
 import { MatchInfoSheet } from './match-info-sheet';
+import { OperationsBoardPhoneHeader } from './operations-board-phone-header';
 import { OperationsListView } from './operations-list-view';
 import { OperationsPhoneList } from './operations-phone-list';
 import { OperationsTimeline } from './operations-timeline';
@@ -61,6 +62,8 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const consoleQuery = liveBase.startsWith('/admin/') ? '' : '?from=board';
   const role = useTournamentOpsRole();
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
+  const isMdUp = useMediaQuery(MD_UP_MEDIA_QUERY);
+  const isWideTable = useMediaQuery(WIDE_TABLE_MEDIA_QUERY);
   const bundleHeadingId = useId();
 
   const board = useOperationsBoardAll(tournamentId);
@@ -112,6 +115,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
   const todayKey = kstDayKey(now.toISOString());
   const nowLabel = kstTimeLabel(now.toISOString());
+  // 「기준」은 보드 데이터를 마지막으로 받은 시각이다. 기기 시계를 쓰면 갱신이 멈춰도 계속 최신처럼 보인다.
+  const updatedLabel = board.dataUpdatedAt > 0 ? kstTimeLabel(new Date(board.dataUpdatedAt).toISOString()) : nowLabel;
+  const refreshStalled = board.data !== undefined && (board.isError || board.fetchStatus === 'paused');
   const days = useMemo(() => listMatchDays(cards), [cards]);
   const activeDay = pickedDay !== null && days.includes(pickedDay) ? pickedDay : pickBoardDay(days, todayKey);
   const dayIndex = activeDay === null ? -1 : days.indexOf(activeDay);
@@ -167,27 +173,44 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const phoneColumn = !isDesktop && selectedKeys.length === 1 ? columnsAll.find((column) => column.key === selectedKeys[0]) : undefined;
   const nowTimeLabel = activeDay !== null && activeDay === todayKey ? nowLabel : null;
   const eyebrowDay = activeDay === null ? '' : ` · ${formatDayLabel(activeDay)}`;
+  const headerTitle = `${tournament.data?.title ?? '대회 운영'}${eyebrowDay}`;
+  const stats = `끝남 ${endedCount} · 진행 중 ${liveCount} · 남은 경기 ${remainingCount}`;
+  const caption = `${updatedLabel} 기준 · ${refreshStalled ? '새로 고치지 못했어요' : '15초마다 새로 고쳐요'}`;
 
   return (
     <div className="tm-content-enter flex flex-col gap-5">
-      <OpsPageHeader
-        tournamentTitle={`${tournament.data?.title ?? '대회 운영'}${eyebrowDay}`}
-        title="운영 보드"
-        description={`끝남 ${endedCount} · 진행 중 ${liveCount} · 남은 경기 ${remainingCount} · ${nowLabel} 기준 · 15초마다 새로 고쳐요`}
-        action={
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <button type="button" onClick={refresh} disabled={isRefreshing} className={CONTROL_BUTTON}>
-              <RefreshCw size={16} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
-              새로고침
-            </button>
-            <Link href={publicHref} target="_blank" rel="noopener noreferrer" className={CONTROL_BUTTON}>
-              참가자 화면 보기
-              <ExternalLink size={14} aria-hidden="true" />
-              <span className="sr-only">(새 탭에서 열려요)</span>
-            </Link>
-          </div>
-        }
-      />
+      {isMdUp ? (
+        <OpsPageHeader
+          tournamentTitle={headerTitle}
+          title="운영 보드"
+          description={`${stats} · ${caption}`}
+          action={
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <button type="button" onClick={refresh} disabled={isRefreshing} className={CONTROL_BUTTON}>
+                <RefreshCw size={16} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
+                새로고침
+              </button>
+              <Link href={publicHref} target="_blank" rel="noopener noreferrer" className={CONTROL_BUTTON}>
+                참가자 화면 보기
+                <ExternalLink size={14} aria-hidden="true" />
+                <span className="sr-only">(새 탭에서 열려요)</span>
+              </Link>
+            </div>
+          }
+        />
+      ) : (
+        <OperationsBoardPhoneHeader title={headerTitle} stats={stats} caption={caption} publicHref={publicHref} isRefreshing={isRefreshing} onRefresh={refresh} />
+      )}
+
+      {refreshStalled ? (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-[var(--tint-orange)] px-3 py-2 text-[length:var(--font-size-label)] text-[var(--orange700)]">
+          <TriangleAlert size={16} aria-hidden="true" className="shrink-0" />
+          <span>새로 고치지 못했어요. {updatedLabel} 기준 화면이에요.</span>
+          <button type="button" onClick={refresh} className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
+            다시 시도
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
@@ -273,12 +296,24 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
           {shown.length === 0 ? (
             <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
-              <AdminEmpty title="조건에 맞는 경기가 없어요" description="다른 구장이나 날짜를 골라 보세요." />
+              {onlyChecks ? (
+                <AdminEmpty
+                  title="확인할 것이 없어요"
+                  description="이 날짜·구장에서는 따로 챙길 경기가 없어요."
+                  action={
+                    <button type="button" onClick={() => setOnlyChecks(false)} className={CONTROL_BUTTON}>
+                      모든 경기 보기
+                    </button>
+                  }
+                />
+              ) : (
+                <AdminEmpty title="조건에 맞는 경기가 없어요" description="다른 구장이나 날짜를 골라 보세요." />
+              )}
             </div>
           ) : view === 'list' ? (
             <OperationsListView
               cards={[...dayShown, ...unscheduledShown]}
-              isDesktop={isDesktop}
+              asTable={isWideTable}
               liveBase={liveBase}
               consoleQuery={consoleQuery}
               onOpenInfo={openInfo}

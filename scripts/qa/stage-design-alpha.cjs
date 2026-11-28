@@ -12,7 +12,7 @@ if (filterCaptures && bottomCaptures) throw Error('Choose one focused capture sc
 const captureScope = filterCaptures ? 'filter' : bottomCaptures ? 'admin-bottom' : 'full';
 const destination = path.resolve('tmp/stage-design-alpha', filterCaptures ? 'filter-captures' : bottomCaptures ? 'admin-bottom-captures' : phase);
 const routes = [
-  ['admin-create', '/admin/tournaments/new-staged'],
+  ['admin-create', '/admin/tournaments/new?format=staged'],
   ['admin-bracket', `/admin/tournaments/${tournamentId}/bracket`],
   ['admin-awards', `/admin/tournaments/${tournamentId}/awards`],
   ['detail', `/tournaments/${tournamentId}`],
@@ -110,13 +110,8 @@ async function exerciseDraftPreservation(page, report, dialog, width) {
 }
 async function exercise(page, report, name, width) {
   if (name === 'admin-create') {
-    await page.getByRole('button', { name: '20팀 순위별 리그 템플릿' }).click();
-    await page.getByRole('button', { name: '구성 바꾸기', exact: true }).click();
-    await expect(page.getByText('모집 20팀 · 2단계 · 예상 70경기')).toBeVisible();
-    await page.getByText('1위 리그 · 5팀 · 풀리그', { exact: true }).click();
-    await expect(page.getByRole('combobox', { name: '1번 자리', exact: true })).toBeVisible();
-    await page.getByRole('combobox', { name: '1번 자리', exact: true }).scrollIntoViewIfNeeded();
-    await interactionShot(page, report, 'create-20-team-editor', width);
+    await expect(page.getByRole('radio', { name: /여러 단계/ })).toBeChecked();
+    await interactionShot(page, report, 'create-staged-format-selected', width);
   }
   if (name === 'admin-bracket') {
     await page.getByRole('button', { name: '단계·진출팀 관리', exact: true }).click();

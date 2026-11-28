@@ -184,41 +184,44 @@ function TeamMatchOperateConsoleRuntime({
     })),
     [lineups.data],
   );
+  // 콘솔 카드는 테두리 없는 흰 카드라 회색 지면 위에 놓는다(대회 운영 셸과 같은 지면·여백).
   return (
-    <OperateConsoleCore
-      gameId={gameId}
-      runtime={{
-        authUserId: authMe.data?.user.id,
-        resultRevisions: resultRevisions.data,
-        queryClient,
-        confirm,
-        confirmModal: ConfirmModal,
-        postGameCommand: postV1GameCommand,
-        gameOperationsErrorMessage,
-        isRetryableGameOperationsErrorCode,
-        operations,
-      }}
-      gameDetail={gameDetail}
-      lineupsQuery={{
-        data: safeLineups,
-        isLoading: lineups.isLoading,
-        isError: lineups.isError,
-        error: lineups.error,
-        refetch: () => lineups.refetch(),
-      }}
-      refreshLineupsAfterStart={async () => {
-        await lineups.refetch({ throwOnError: true });
-      }}
-      leaseRequired={false}
-      takeoverEnabled
-      operatorScopeKey={JSON.stringify(teamMatchContext)}
-      operationContextKey={teamMatchContext.teamMatchId}
-      headerTopClass="top-[52px] lg:top-0"
-      allowPenaltyShootout={false}
-      resultReviewEnabled={false}
-      hostContext={teamMatchContext}
-      resultHref={resultHref}
-      renderAbnormalEndDialog={(props) => <AbnormalEndDialog {...props} />}
-    />
+    <main className="min-h-dvh bg-[var(--surface-soft)] px-4 py-4 sm:px-6">
+      <OperateConsoleCore
+        gameId={gameId}
+        runtime={{
+          authUserId: authMe.data?.user.id,
+          resultRevisions: resultRevisions.data,
+          queryClient,
+          confirm,
+          confirmModal: ConfirmModal,
+          postGameCommand: postV1GameCommand,
+          gameOperationsErrorMessage,
+          isRetryableGameOperationsErrorCode,
+          operations,
+        }}
+        gameDetail={gameDetail}
+        lineupsQuery={{
+          data: safeLineups,
+          isLoading: lineups.isLoading,
+          isError: lineups.isError,
+          error: lineups.error,
+          refetch: () => lineups.refetch(),
+        }}
+        refreshLineupsAfterStart={async () => {
+          await lineups.refetch({ throwOnError: true });
+        }}
+        leaseRequired={false}
+        takeoverEnabled
+        operatorScopeKey={JSON.stringify(teamMatchContext)}
+        operationContextKey={teamMatchContext.teamMatchId}
+        headerTopClass="top-[52px] lg:top-0"
+        allowPenaltyShootout={false}
+        resultReviewEnabled={false}
+        hostContext={teamMatchContext}
+        resultHref={resultHref}
+        renderAbnormalEndDialog={(props) => <AbnormalEndDialog {...props} />}
+      />
+    </main>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { ScopedLink as Link } from '@/components/providers/navigation-scope';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
 import { StatusChip } from '@/components/v1-ui/status-chip';
@@ -20,12 +20,13 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
 import { ByeSlotEditor } from './bye-slot-editor';
-import { fixtureDeleteConfirm } from './fixture-delete-confirm';
+import { fixtureDeleteBlockedReason, fixtureDeleteConfirm } from './fixture-delete-confirm';
 import { fixtureTitle } from './bracket-canvas';
 import { FixtureMetadataEditor } from './fixture-metadata-editor';
 import { ByeSideControl } from './bye-side-control';
@@ -130,16 +131,16 @@ function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone
     );
   }
 
-  // 라이브로 득점이 기록된 경기는 그림에서 점수만 고치면 기록과 어긋난다 — 기존 결과 고치기 화면으로 보낸다.
+  // 라이브로 득점이 기록된 경기는 그림에서 점수만 고치면 기록과 어긋난다 — 결과 화면의 결과 고치기로 보낸다.
   if (node.state === 'official' && node.game.hasLiveRecords) {
     return (
       <div className="flex flex-col gap-2">
-        <Note>득점 기록이 있는 경기는 결과 고치기 화면에서 고쳐요.</Note>
+        <Note>득점 기록이 있는 경기는 결과 화면에서 고쳐요.</Note>
         <Link
-          href={`/admin/live/${encodeURIComponent(competitionId)}/records/corrections?fixtureId=${encodeURIComponent(node.fixtureId)}`}
+          href={resultsHref(adminLiveBase(competitionId), node.fixtureId)}
           className="tm-btn tm-btn-md tm-btn-outline min-h-[44px]"
         >
-          결과 고치기 화면으로 가기
+          결과 고치기
         </Link>
       </div>
     );
@@ -360,6 +361,8 @@ function MobileDeleteButton({ fixture, groups, fixtures, competitionId, showToas
 }) {
   const deleteFixture = useV1DeleteFixture(competitionId);
   const { confirm, ConfirmModal } = useConfirm();
+  const reasonId = useId();
+  const blockedReason = fixtureDeleteBlockedReason(fixture);
   const remove = async () => {
     if (!await confirm(fixtureDeleteConfirm({ title: fixtureTitle(fixture, groups), fixture, fixtures }))) return;
     deleteFixture.mutate(fixture.id, {
@@ -368,10 +371,12 @@ function MobileDeleteButton({ fixture, groups, fixtures, competitionId, showToas
     });
   };
   return <>
-    <button type="button" aria-label="경기 삭제" onClick={() => void remove()} disabled={deleteFixture.isPending}
+    <button type="button" aria-label="경기 삭제" onClick={() => void remove()} disabled={deleteFixture.isPending || blockedReason !== null}
+      title={blockedReason ?? undefined} aria-describedby={blockedReason !== null ? reasonId : undefined}
       className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-[var(--red700)] transition-colors hover:bg-[var(--surface-soft)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
       <Trash2 size={18} aria-hidden="true" />
     </button>
+    {blockedReason !== null ? <span id={reasonId} className="sr-only">{blockedReason}</span> : null}
     {ConfirmModal}
   </>;
 }

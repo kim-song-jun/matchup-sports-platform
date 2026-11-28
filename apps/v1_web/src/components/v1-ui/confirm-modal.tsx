@@ -95,22 +95,25 @@ export function useConfirm() {
     [],
   );
 
+  // The fragment scopes the key below, so two hosts rendered as siblings never share a key.
   const modal = (
-    <ConfirmModal
-      // A new opening must be blank on its first committed frame, before reset effects run.
-      key={state === null ? 'closed' : 'open'}
-      open={state !== null}
-      title={state?.title ?? ''}
-      message={state?.message ?? ''}
-      confirmLabel={state?.confirmLabel}
-      cancelLabel={state?.cancelLabel}
-      tone={state?.tone}
-      acknowledgement={state?.acknowledgement}
-      confirmationText={state?.confirmationText}
-      reasonField={state?.reason ? { ...state.reason, value: reasonValue, onChange: setReasonValue } : undefined}
-      onConfirm={() => handleResolve(true)}
-      onCancel={() => handleResolve(false)}
-    />
+    <>
+      <ConfirmModal
+        // A new opening must be blank on its first committed frame, before reset effects run.
+        key={state === null ? 'closed' : 'open'}
+        open={state !== null}
+        title={state?.title ?? ''}
+        message={state?.message ?? ''}
+        confirmLabel={state?.confirmLabel}
+        cancelLabel={state?.cancelLabel}
+        tone={state?.tone}
+        acknowledgement={state?.acknowledgement}
+        confirmationText={state?.confirmationText}
+        reasonField={state?.reason ? { ...state.reason, value: reasonValue, onChange: setReasonValue } : undefined}
+        onConfirm={() => handleResolve(true)}
+        onCancel={() => handleResolve(false)}
+      />
+    </>
   );
 
   return { confirm, confirmWithReason, ConfirmModal: modal } as const;

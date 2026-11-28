@@ -426,6 +426,22 @@ describe('ScheduleContent — 단판 경기 기록 요약', () => {
     expect(screen.queryByRole('group', { name: '기타 기록' })).toBeNull();
   });
 
+  it('단판에 연장 기록이 있으면 연장 구간은 따로 이름을 달고 정규 구간 기록은 한 묶음에 남는다', () => {
+    const withExtra = [
+      ...scorers,
+      { side: 'away' as const, participantName: '최선수', jerseyNumber: 3, period: 2, clockMs: 100_000 },
+      { side: 'home' as const, participantName: '정선수', jerseyNumber: 4, period: 3, clockMs: 200_000 },
+    ];
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ periodCount: 1, scorers: withExtra })] }} />);
+
+    const single = screen.getByRole('group', { name: '경기 결과 기록' });
+    expect(single).toHaveTextContent('김선수');
+    expect(single).toHaveTextContent('박선수');
+    expect(single).not.toHaveTextContent('최선수');
+    expect(screen.getByRole('group', { name: '연장 전반 기록' })).toHaveTextContent('최선수');
+    expect(screen.getByRole('group', { name: '연장 후반 기록' })).toHaveTextContent('정선수');
+  });
+
   it.each([[2], [null], [undefined]])('periodCount=%s 이면 전반·기타 구간 그대로다', (periodCount) => {
     renderWith(periodCount);
 

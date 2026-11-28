@@ -245,12 +245,17 @@ function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
   // 모른다고 내려온 값이 화면에서는 단정으로 바뀐다.
   const known = items.filter((item) => item.period !== null);
   const unknown = items.filter((item) => item.period === null).sort(byClock);
-  // 단판은 구간이 하나다 — 시간대를 모르는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
-  // 구간이 하나뿐이면 가를 말이 없으니 머리말 글자는 그리지 않고 선만 둔다(`hideLabel`) — 이름은 스크린리더용 그룹 이름으로만 남는다.
+  // 단판은 정규 구간이 하나다 — 시간대를 모르는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
+  // 정규 구간뿐이면 가를 말이 없으니 머리말 글자는 그리지 않고 선만 둔다(`hideLabel`) — 이름은 스크린리더용 그룹 이름으로만 남는다.
+  // 연장 구간(둘째 이후)은 정규 구간과 가를 이유가 있으니 이름을 단 구간으로 따로 둔다.
   type EventSection = { key: string; label: string; hideLabel?: boolean; items: ScheduleEventItem[] };
   const sections: EventSection[] = (
     isSinglePeriod(entry.periodCount)
-      ? [{ key: 'single', label: SINGLE_PERIOD_HEADING, hideLabel: true, items: [...known.sort(byClock), ...unknown] }]
+      ? [
+          { key: 'single', label: SINGLE_PERIOD_HEADING, hideLabel: true, items: [...known.filter((item) => (item.period ?? 1) < 2).sort(byClock), ...unknown] },
+          { key: 'extra-first', label: '연장 전반', items: known.filter((item) => item.period === 2).sort(byClock) },
+          { key: 'extra-second', label: '연장 후반', items: known.filter((item) => (item.period ?? 0) >= 3).sort(byClock) },
+        ]
       : [
           { key: 'first', label: '전반', items: items.filter((item) => item.period === 1).sort(byClock) },
           { key: 'second', label: '후반', items: known.filter((item) => item.period !== 1).sort(byClock) },

@@ -2,7 +2,7 @@
 
 import { useId } from 'react';
 import type { EditableCardEvent } from '@/lib/result-card-events';
-import { isSinglePeriod, periodLabel } from '@/shared/game-operations';
+import { needsPeriodChoice, periodLabel } from '@/shared/game-operations';
 
 type Props = {
   events: readonly EditableCardEvent[];
@@ -65,13 +65,13 @@ export function CardTimelineEditor({ events, participants, periods, periodCount,
                   onChange={(e) => update(index, { minute: e.target.value === '' ? undefined : Math.max(0, Math.trunc(Number(e.target.value) || 0)) })} />
                 {event.minute === undefined ? <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>시간 미입력</p> : null}
               </div>
-              {isSinglePeriod(periodCount) ? null : <div className="min-w-0">
+              {!needsPeriodChoice(periodCount, periods.length) ? null : <div className="min-w-0">
                 <label className="tm-text-caption" htmlFor={`${prefix}-${index}-period`}>전·후반</label>
                 <select id={`${prefix}-${index}-period`} aria-label={`${index + 1}번째 카드 전·후반`}
                   className="tm-input w-full" style={{ minHeight: 44 }} value={event.period ?? ''}
                   onChange={(e) => update(index, { period: e.target.value ? Number(e.target.value) : undefined })}>
                   <option value="">선택 안 함</option>
-                  {periods.map((period) => <option key={period.number} value={period.number}>{periodLabel(period.number)}</option>)}
+                  {periods.map((period) => <option key={period.number} value={period.number}>{periodLabel(period.number, periodCount)}</option>)}
                 </select>
               </div>}
             </div>

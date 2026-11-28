@@ -9,6 +9,7 @@ import { TournamentGenderChoiceField } from '@/components/admin/tournaments/tour
 import { AlertBanner } from '@/components/v1-ui/primitives';
 import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { TOURNAMENT_TITLE_MAX_LENGTH } from '@/lib/tournament-limits';
 import { CreateBottomBar } from './create-bottom-bar';
 import {
   CREATE_FORMAT_OPTIONS,
@@ -276,7 +277,7 @@ export function CreateTournamentForm({ initialFormat }: { initialFormat: CreateF
                 clearErrors('title');
               }}
               disabled={pending}
-              maxLength={120}
+              maxLength={TOURNAMENT_TITLE_MAX_LENGTH}
               autoComplete="off"
               placeholder="예: 2026 서울 풋살 오픈"
               aria-invalid={Boolean(errors.title)}

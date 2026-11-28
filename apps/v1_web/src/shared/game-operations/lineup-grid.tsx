@@ -286,7 +286,7 @@ export function LineupGrid({
                           type="button"
                           disabled={disabled}
                           onClick={() => onSelectPlayer({ sideId: side.id, participant })}
-                          aria-label={`${name} 선수 이벤트 기록${sentOff ? `, ${SENT_OFF_CHIP.label}` : ''}${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
+                          aria-label={`${name} 선수로 기록${sentOff ? `, ${SENT_OFF_CHIP.label}` : ''}${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
                           className={[
                             columns
                               ? 'flex min-h-12 w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors'

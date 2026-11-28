@@ -345,11 +345,11 @@ describe('BracketNodePanel — 자리 배정', () => {
         expect(screen.getByLabelText('홈 팀 선택')).toBeEnabled();
       });
 
-      it('공식 결과가 있으면 선택창 대신 무효 안내와 결과 고치기 화면 링크를 보여 준다', () => {
+      it('공식 결과가 있으면 선택창 대신 무효 안내와 결과 고치기 링크를 보여 준다', () => {
         renderPanel(started({ game: makeGame({ state: 'ENDED', hasOfficialResult: true, latestRevision: revision('OFFICIAL') }) }));
         expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
         expect(screen.getAllByText('공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.')).toHaveLength(2);
-        expect(screen.getAllByRole('link', { name: '결과 고치기 화면 열기' })[0]).toHaveAttribute('href', expect.stringContaining('/records/corrections?fixtureId=f1'));
+        expect(screen.getAllByRole('link', { name: '결과 고치기' })[0]).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f1');
       });
 
       it('제출만 된 결과는 서버가 교체 때 폐기하므로 바꿀 수 있다', () => {
@@ -419,14 +419,29 @@ describe('BracketNodePanel — 구성·시간·삭제', () => {
     expect(mocks.updateFixture.mock.calls.at(-1)?.[0]).toMatchObject({ fixtureId: 'f1', venue: '상암 보조구장' });
   });
 
-  it('머리의 휴지통이 확인 창을 거쳐 deleteFixture 를 부르고, 후속 경기 수·결과 보호 문구가 메시지에 남는다', async () => {
+  it('진행 중이거나 결과가 있는 경기의 휴지통은 눌리지 않고 이유를 알린다', () => {
+    const live = fixtureOf({ game: makeGame({ id: 'game-1', state: 'LIVE' }) });
+    renderPanel(live);
+    const trash = screen.getByRole('button', { name: '경기 삭제' });
+    expect(trash).toBeDisabled();
+    expect(trash).toHaveAccessibleDescription('진행 중인 경기는 삭제할 수 없어요.');
+    cleanup();
+
+    renderPanel(fixtureOf({ game: makeGame({ id: 'game-1', hasOfficialResult: true }) }));
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toHaveAccessibleDescription('결과가 있는 경기는 삭제할 수 없어요.');
+    cleanup();
+
+    renderPanel();
+    expect(screen.getByRole('button', { name: '경기 삭제' })).toBeEnabled();
+  });
+
+  it('머리의 휴지통이 확인 창을 거쳐 deleteFixture 를 부르고, 후속 경기 수가 메시지에 남는다', async () => {
     const downstream = makeFixture({ id: 'f2', groupId: 'g-qf', fixtureNumber: 2, bracketSources: [{ fixtureId: 'f1', side: 'HOME', outcome: 'WINNER' }] });
-    const fixture = fixtureOf({ game: makeGame({ id: 'game-1', state: 'LIVE' }) });
+    const fixture = fixtureOf();
     const props = renderPanel(fixture, { fixtures: [fixture, downstream] });
     fireEvent.click(screen.getByRole('button', { name: '경기 삭제' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('후속 경기 1개도 영향을 받아요');
-    expect(dialog).toHaveTextContent('진행 중인 경기는 삭제할 수 없어요');
     expect(mocks.deleteFixture).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
     await vi.waitFor(() => expect(mocks.deleteFixture).toHaveBeenCalledWith('f1', expect.any(Object)));
@@ -459,6 +474,19 @@ describe('BracketNodePanel — 구성·시간·삭제', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('autoFocusTitle: 열리면 제목으로 포커스가 들어가고, 거기서 누른 ESC 로 닫힌다', () => {
+    const props = renderPanel(fixtureOf(), { autoFocusTitle: true });
+    const heading = screen.getByRole('heading', { level: 2 });
+    expect(heading).toHaveFocus();
+    fireEvent.keyDown(heading, { key: 'Escape' });
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('autoFocusTitle 이 없으면 포커스를 옮기지 않는다 — 시트는 자기 포커스를 관리한다', () => {
+    renderPanel();
+    expect(screen.getByRole('heading', { level: 2 })).not.toHaveFocus();
   });
 
   it('단계 관리 경기(bracketTrack stage:)와 읽기 전용에는 휴지통이 없고, 팀 자리는 「팀 채우기」 메뉴 안내만 보인다', () => {
@@ -529,9 +557,9 @@ describe('BracketNodePanel — 결과 구역', () => {
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 
-  it('라이브 득점 기록이 있고 결과가 없으면 결과 고치기 화면 링크를 준다', () => {
+  it('라이브 득점 기록이 있고 결과가 없으면 결과 화면 링크를 준다', () => {
     renderPanel(readyFixture({ game: makeGame({ id: 'game-1', state: 'ENDED', hasLiveRecords: true }) }));
-    expect(screen.getByRole('link', { name: '결과 고치기 화면 열기' })).toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=f1');
+    expect(screen.getByRole('link', { name: '결과 화면 열기' })).toHaveAttribute('href', '/admin/live/t-1/results?fixtureId=f1');
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
 

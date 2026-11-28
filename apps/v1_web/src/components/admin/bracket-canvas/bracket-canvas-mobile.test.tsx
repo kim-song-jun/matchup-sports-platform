@@ -347,13 +347,13 @@ describe('BracketCanvasMobile — 시트', () => {
     expect(within(sheet()).getByText(/득점자는 기록되지 않았어요/)).toBeInTheDocument();
   });
 
-  it('라이브 득점 기록이 있는 확정 경기는 그림에서 고치지 않고 결과 고치기 화면으로 보낸다', () => {
+  it('라이브 득점 기록이 있는 확정 경기는 그림에서 고치지 않고 결과 화면의 결과 고치기로 보낸다', () => {
     renderMobile();
     fireEvent.click(card(/8강 · 4번 경기/));
     expect(screen.queryByTestId('result-actions')).not.toBeInTheDocument();
-    expect(within(sheet()).getByRole('link', { name: /결과 고치기 화면으로 가기/ })).toHaveAttribute(
+    expect(within(sheet()).getByRole('link', { name: '결과 고치기' })).toHaveAttribute(
       'href',
-      '/admin/live/t-1/records/corrections?fixtureId=fx-4',
+      '/admin/live/t-1/results?fixtureId=fx-4',
     );
   });
 
@@ -828,6 +828,15 @@ describe('BracketCanvasMobile — 대회 시트(기본 5칸 + 더 보기 + 휴�
     deleteFixture.mock.calls[0][1].onSuccess();
     expect(showToast).toHaveBeenCalledWith('경기를 삭제했어요.');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('진행 중인 경기의 휴지통은 눌리지 않고 이유를 알린다', () => {
+    tournamentSheet();
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 9번 경기/));
+    const trash = within(sheet()).getByRole('button', { name: '경기 삭제' });
+    expect(trash).toBeDisabled();
+    expect(trash).toHaveAccessibleDescription('진행 중인 경기는 삭제할 수 없어요.');
   });
 
   it('삭제가 거절되면 시트를 닫지 않고 이유를 알린다', async () => {

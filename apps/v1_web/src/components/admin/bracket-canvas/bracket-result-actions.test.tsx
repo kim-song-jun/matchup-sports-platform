@@ -121,11 +121,11 @@ describe('BracketResultActions — 분기', () => {
     expect(screen.queryByRole('button', { name: '결과 무효' })).not.toBeInTheDocument();
   });
 
-  it('라이브 득점 기록이 있는 경기는 고치기·무효 대신 결과 고치기 화면 링크만 준다', () => {
+  it('라이브 득점 기록이 있는 경기는 고치기·무효 대신 결과 고치기 링크만 준다', () => {
     renderActions({ game: officialGame({ hasLiveRecords: true }) });
-    expect(screen.getByRole('link', { name: '결과 고치기 화면 열기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '결과 고치기' })).toHaveAttribute(
       'href',
-      '/admin/live/t-1/records/corrections?fixtureId=f-1',
+      '/admin/live/t-1/results?fixtureId=f-1',
     );
     expect(screen.queryByRole('button', { name: '점수 고치기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '결과 무효' })).not.toBeInTheDocument();

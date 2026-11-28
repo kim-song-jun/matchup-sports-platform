@@ -62,6 +62,7 @@ import { useV1ApplyLeagueTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { LeagueTemplateDialog } from './league-template-dialog';
 import { buildLeagueMobileRounds, candidatesFromLeagueTeams } from '@/lib/bracket-canvas-mobile-model';
 import { buildLeagueBoard, type LeagueBoardColumn } from '@/lib/league-board-model';
+import { adminLiveBase, resultsHref } from '@/lib/tournament-live-routes';
 import {
   LEAGUE_FIXTURE_CANCEL_HINT,
   LEAGUE_FIXTURE_DELETE_HINT,
@@ -375,8 +376,8 @@ export default function LeagueMatchFixturesClient({
 
   /**
    * 행의 ⋯ 시트 항목. 일정 수정·몰수패·취소는 표에서 물러나 여기 모였다. 결과 항목은 **결과가 있는
-   * 경기에만** 둔다(F55) — 안 치른 경기에 "결과 정정"을 두면 빈 화면으로 가는 헛걸음이다. 확정된 경기는
-   * 정정 화면, 확정 전(제출·초안·정정 요청·무효)은 결과 검토 화면으로 간다.
+   * 경기에만** 둔다 — 안 치른 경기에 "결과 고치기"를 두면 빈 화면으로 가는 헛걸음이다. 확정된 경기는
+   * 「결과 고치기」, 확정 전은 「결과 확정」이고 둘 다 결과 화면에서 그 경기가 골라진 채 열린다.
    */
   const rowActions = (row: V1LeagueFixture): ActionSheetAction[] => {
     const actions: ActionSheetAction[] = [
@@ -395,11 +396,9 @@ export default function LeagueMatchFixturesClient({
       const officialStage = stage === 'official';
       actions.push({
         key: 'result',
-        label: officialStage ? '결과 정정' : '결과 검토',
+        label: officialStage ? '결과 고치기' : '결과 확정',
         description: officialStage ? '확정된 결과를 고쳐요' : '제출된 결과를 확인하고 확정해요',
-        href: officialStage
-          ? `/admin/live/${encodeURIComponent(leagueId)}/records/corrections?fixtureId=${encodeURIComponent(row.teamMatchId)}`
-          : `/admin/live/${encodeURIComponent(leagueId)}/result-review?fixtureId=${encodeURIComponent(row.teamMatchId)}`,
+        href: resultsHref(adminLiveBase(leagueId), row.teamMatchId),
       });
     }
     // R11(C-6): 상대팀이 확정된(matched) 대진만 몰수 처리 대상이다.

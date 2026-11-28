@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, ChevronRight, Info } from 'lucide-react';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
 import type { QueuedGameEvent } from '@/lib/game-operations-queue';
@@ -30,8 +30,9 @@ export interface ConsoleStatusPanelProps {
   readonly actionsDisabled: { readonly [kind in ConsoleStatusActionKind]?: boolean };
 }
 
+// 정상일 때는 바탕 없이 회색 바탕 위 한 줄 글자다. 알릴 것이 있을 때만 색 바탕을 깐다.
 const TONE_CLASS: Record<ConsoleStatus['tone'], string> = {
-  ok: 'bg-[var(--surface-soft)] text-[var(--text-body)]',
+  ok: 'text-[var(--text-body)]',
   info: 'bg-[var(--tint-blue)] text-[var(--blue700)]',
   warning: 'bg-[var(--tint-orange)] text-[var(--orange700)]',
   danger: 'bg-[var(--tint-red)] text-[var(--red700)]',
@@ -44,8 +45,9 @@ const TONE_ICON: Record<ConsoleStatus['tone'], typeof Info> = {
   danger: AlertCircle,
 };
 
+// 글자 크기는 안쪽 span 이 정한다 — 전역 `button { font: inherit }` 가 버튼에 단 글자 유틸리티를 이긴다.
 const DETAIL_BUTTON_CLASS =
-  'flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg px-2 text-[length:var(--font-size-body-sm)] font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]';
+  '-mr-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-0.5 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]';
 
 /** 콘솔의 안내를 한 줄로 보여 주고, 나머지는 「자세히」 시트에 모은다. */
 export function ConsoleStatusPanel({ status, roster, queue, actions, actionsDisabled }: ConsoleStatusPanelProps) {
@@ -72,7 +74,8 @@ export function ConsoleStatusPanel({ status, roster, queue, actions, actionsDisa
   );
   const detailButton = (
     <button type="button" aria-haspopup="dialog" className={DETAIL_BUTTON_CLASS} onClick={() => setOpen(true)}>
-      자세히
+      <span className="text-[length:var(--font-size-label)] font-semibold">자세히</span>
+      <ChevronRight size={14} aria-hidden="true" />
     </button>
   );
 
@@ -80,7 +83,7 @@ export function ConsoleStatusPanel({ status, roster, queue, actions, actionsDisa
     <>
       <div
         role={status.tone === 'danger' ? 'alert' : 'status'}
-        className={`mx-4 flex flex-col rounded-xl px-3 py-1 text-[length:var(--font-size-body-sm)] font-medium ${TONE_CLASS[status.tone]}`}
+        className={`flex flex-col rounded-xl text-[length:var(--font-size-label)] font-medium ${status.tone === 'ok' ? 'px-1' : 'px-3 py-1'} ${TONE_CLASS[status.tone]}`}
       >
         <div className="flex items-center gap-2">
           <Icon size={16} aria-hidden="true" className="shrink-0" />

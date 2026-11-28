@@ -116,6 +116,12 @@ describe('BracketCanvasNode — 표시', () => {
     expect(props.onSelect).toHaveBeenCalledWith('f1');
   });
 
+  it('푸터의 시간·구장 버튼은 푸터 줄 높이와 남는 폭을 모두 채워 누를 자리가 줄 전체다', () => {
+    renderNode(base);
+    const footer = screen.getByRole('button', { name: /^시간 미정 · 구장 미정$/ });
+    expect(footer).toHaveClass('h-full', 'flex-1', 'min-w-0', 'truncate');
+  });
+
   it('필터에 해당하는 칸(filterMatch=true)은 푸터 글자를 굵고 진하게 해 색만이 아니라 글자로 눈에 띈다', () => {
     renderNode(base, { filterMatch: true });
     const group = document.querySelector('[data-fixture-id="f1"]') as HTMLElement;

@@ -41,6 +41,10 @@ let boards: Boards;
 let tournamentRows: Row[];
 /** 이 상태(또는 'recent')의 대회 목록 요청은 500 으로 실패한다. */
 let failListFor: string | null;
+/** 이름 검색(`q`) 요청만 500 으로 실패한다. */
+let failSearch: boolean;
+/** 이 상태의 대회 목록 응답을 풀어 줄 때까지 붙잡는다. */
+let holdListFor: { status: string; release: () => void; gate: Promise<void> } | null;
 const boardReads: string[] = [];
 const listRequests: URLSearchParams[] = [];
 
@@ -57,9 +61,13 @@ const server = setupServer(
     return ok({ items: entry.map((at, i) => ({ fixtureId: `${id}-${i}`, scheduledAt: at })), nextCursor: null, watermark: 'w', liveWarnings: [] });
   }),
   // 서버 어드민 대회 목록과 같은 제약: 한 번에 50건까지, 생성 최신순, 커서 페이지.
-  http.get('*/api/v1/admin/tournaments', ({ request }) => {
+  http.get('*/api/v1/admin/tournaments', async ({ request }) => {
     const params = new URL(request.url).searchParams;
     listRequests.push(params);
+    if (failSearch && params.get('q') !== null) {
+      return HttpResponse.json({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: '서버가 응답하지 못했어요.' }, { status: 500 });
+    }
+    if (holdListFor !== null && params.get('status') === holdListFor.status) await holdListFor.gate;
     const limit = Number(params.get('limit') ?? 20);
     if (limit > 50) {
       return HttpResponse.json({ status: 'error', statusCode: 400, code: 'VALIDATION_FAILED', message: '페이지 크기는 50을 넘을 수 없어요.' }, { status: 400 });
@@ -97,6 +105,8 @@ beforeEach(() => {
   boardReads.length = 0;
   listRequests.length = 0;
   failListFor = null;
+  failSearch = false;
+  holdListFor = null;
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(kst('2026-12-20', '12:00')));
@@ -205,6 +215,19 @@ describe('TournamentOpsPickerClient', () => {
     for (const href of targets) expect(href).toBe('/admin/live/l-active/operations');
   });
 
+  it('대회 행 알약은 대회 상태 이름(접수 마감)을 쓰고, 리그 행은 리그 상태 이름 그대로다', async () => {
+    tournamentRows = [...tournamentRows, tournament('t-closed', '여름 풋살컵', 'closed', kst('2027-06-01', '10:00'))];
+    renderPicker();
+    await screen.findByRole('region', { name: '오늘 경기 있는 대회·리그 1' });
+
+    const closedRow = within(allSection()).getAllByText('여름 풋살컵')[0].closest('tr') as HTMLElement;
+    expect(within(closedRow).getByText('접수 마감')).toBeInTheDocument();
+    expect(within(closedRow).queryByText('마감')).not.toBeInTheDocument();
+
+    const leagueRow = within(allSection()).getAllByText('마포 주말 리그')[0].closest('tr') as HTMLElement;
+    expect(within(leagueRow).getByText('시즌 진행 중')).toBeInTheDocument();
+  });
+
   it('오늘 경기가 있는 곳이 하나뿐이고 후보를 다 읽었으면 그 운영 보드를 바로 연다', async () => {
     renderPicker();
 
@@ -263,6 +286,49 @@ describe('TournamentOpsPickerClient', () => {
     expect(await screen.findByText(/오늘 경기를 확인하는 대회·리그는 8곳까지예요/)).toBeInTheDocument();
     expect(boardReads.filter((id) => id.startsWith('t-many-'))).toHaveLength(8);
     expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it('진행 중 대회가 8곳을 넘어도 기간이 오늘을 덮는 리그가 후보에서 밀려나지 않는다', async () => {
+    // 끝난 지 오래인 진행 중 대회 8곳이 리그보다 늦게 시작했다 — 시작 최신순만으로 자르면 리그가 밀려난다.
+    const stale = Array.from({ length: 8 }, (_, i) => tournament(`t-stale-${i}`, `지난 대회 ${i}`, 'in_progress', kst('2026-12-10', '09:00'), kst('2026-12-11', '18:00')));
+    tournamentRows = stale;
+    boards = { 'l-active': [kst('2026-12-20', '11:00')], ...Object.fromEntries(stale.map((row) => [row.id, [kst('2026-12-10', '10:00')]])) };
+    renderPicker();
+
+    await waitFor(() => expect(boardReads).toContain('l-active'));
+    await waitFor(() => expect(within(todaySection()).getAllByText('마포 주말 리그').length).toBeGreaterThan(0));
+  });
+
+  it('목록이 다 도착하기 전에는 후보 보드를 읽지 않는다 — 도착할 때마다 후보가 바뀌어 다시 읽지 않게', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    holdListFor = { status: 'in_progress', release, gate };
+    renderPicker();
+
+    await waitFor(() => expect(listRequests.some((p) => p.get('status') === 'in_progress')).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(boardReads).toEqual([]);
+
+    release();
+    await waitFor(() => expect(boardReads.length).toBeGreaterThan(0));
+  });
+
+  it('이름 검색이 실패하면 「찾는 대회·리그가 없어요」가 아니라 검색을 못 마쳤다고 알린다', async () => {
+    failSearch = true;
+    const user = userEvent.setup();
+    renderPicker();
+    await screen.findByRole('region', { name: /^전체/ });
+
+    await user.type(screen.getByRole('searchbox', { name: '대회·리그 이름으로 찾기' }), '없는이름');
+
+    expect(await screen.findByText('이름 검색을 마치지 못했어요. 지금 보이는 목록 안에서만 찾았어요.')).toBeInTheDocument();
+  });
+
+  it('표 머리는 실제 첫 경기가 아니라 대회·리그의 시작 일정이라고 말한다', async () => {
+    renderPicker();
+
+    expect((await screen.findAllByText('시작 일정')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('첫 경기')).not.toBeInTheDocument();
   });
 
   it('이름 검색이 두 묶음을 모두 거른다', async () => {

@@ -25,8 +25,8 @@ vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
 }));
 // 패널은 자기 테스트가 있다 — 여기서는 열림/닫힘과 넘겨 받는 값만 본다.
 vi.mock('./bracket-node-panel', () => ({
-  BracketNodePanel: (props: { fixture: { id: string }; canWrite: boolean; onClose: () => void }) => (
-    <aside data-testid="panel" data-can-write={String(props.canWrite)}>
+  BracketNodePanel: (props: { fixture: { id: string }; canWrite: boolean; autoFocusTitle?: boolean; onClose: () => void }) => (
+    <aside data-testid="panel" data-can-write={String(props.canWrite)} data-auto-focus-title={String(props.autoFocusTitle === true)}>
       {props.fixture.id}
       <button type="button" onClick={props.onClose}>패널 닫기</button>
     </aside>
@@ -240,6 +240,18 @@ describe('BracketCanvasWorkspace — 칸 패널', () => {
 
     fireEvent.click(within(screen.getByTestId('panel')).getByRole('button', { name: '패널 닫기' }));
     expect(second).toHaveFocus();
+  });
+
+  it('1440: 겹친 패널은 열리면 제목으로 포커스를 가져가게 하고, 1023 시트는 그러지 않는다(시트가 자기 포커스를 관리)', () => {
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: '8강 2번 경기 열기' }));
+    expect(screen.getByTestId('panel')).toHaveAttribute('data-auto-focus-title', 'true');
+    cleanup();
+
+    resizeViewport(1023);
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: '8강 2번 경기 열기' }));
+    expect(screen.getByTestId('panel')).toHaveAttribute('data-auto-focus-title', 'false');
   });
 
   it('읽기 전용: 패널에 쓰기 권한 없음을 그대로 넘긴다(저장·삭제는 패널이 숨긴다)', () => {

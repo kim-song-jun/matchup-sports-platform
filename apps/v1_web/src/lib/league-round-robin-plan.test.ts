@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { plannedGameCount, resolveFixturePlan } from './league-round-robin-plan';
 
 describe('리그 대진 계획 — 서버 라운드로빈과 같은 셈', () => {
-  it('하루 경기 수가 없으면 하루 한 라운드 — 2팀 단일 1주·홈앤어웨이 2주(옛 기본값 7이 아니다)', () => {
+  it('하루 경기 수가 없으면 하루 한 라운드 — 2팀 단일 1주·홈·원정 2주(옛 기본값 7이 아니다)', () => {
     expect(resolveFixturePlan({ kind: 'single' }, 2, null)).toEqual({ rounds: 1, games: 1, days: 1 });
     expect(resolveFixturePlan({ kind: 'double' }, 2, null)).toEqual({ rounds: 2, games: 2, days: 2 });
   });
 
-  it('홀수 팀은 부전 한 자리를 더한다 — 3팀 단일 3주·3경기, 5팀 홈앤어웨이 10주·20경기', () => {
+  it('홀수 팀은 부전 한 자리를 더한다 — 3팀 단일 3주·3경기, 5팀 홈·원정 10주·20경기', () => {
     expect(resolveFixturePlan({ kind: 'single' }, 3, null)).toEqual({ rounds: 3, games: 3, days: 3 });
     expect(resolveFixturePlan({ kind: 'double' }, 5, null)).toEqual({ rounds: 10, games: 20, days: 10 });
   });

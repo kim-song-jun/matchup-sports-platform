@@ -113,21 +113,21 @@ function StagePoolAssignment({ pool, view, initialDraft, onDraftChange, canWrite
     try { setBusy(true); setError(''); await onRename({ name, stageName, ...(finalStage ? { overallRankStart: rankStart === '' ? null : Number(rankStart) } : {}) }); } catch (e) { setError(extractErrorMessage(e, '표시 설정을 저장하지 못했어요.')); } finally { setBusy(false); }
   }
   async function acknowledgeCorrection() {
-    if (!reason.trim() || !await confirm({ title: '현재 참가팀을 유지하고 정정 영향을 확인할까요?', message: '이미 시작한 편성의 참가팀과 경기 기록을 유지해요. 이전 단계의 변경된 공식 결과를 확인한 사유를 감사 기록에 남겨요.', confirmLabel: '참가팀 유지 확인' })) return;
-    try { setBusy(true); setError(''); acceptSavedAssignment(await onSave({ registrationIds: pool.registrationIds as string[], reason, acknowledgeStartedCorrection: true })); setSaved(true); } catch (e) { setError(extractErrorMessage(e, '정정 영향을 확인하지 못했어요.')); } finally { setBusy(false); }
+    if (!reason.trim() || !await confirm({ title: '현재 참가팀을 유지하고 바뀐 결과의 영향을 확인할까요?', message: '이미 시작한 편성의 참가팀과 경기 기록을 유지해요. 이전 단계의 변경된 공식 결과를 확인한 사유를 감사 기록에 남겨요.', confirmLabel: '참가팀 유지 확인' })) return;
+    try { setBusy(true); setError(''); acceptSavedAssignment(await onSave({ registrationIds: pool.registrationIds as string[], reason, acknowledgeStartedCorrection: true })); setSaved(true); } catch (e) { setError(extractErrorMessage(e, '바뀐 결과의 영향을 확인하지 못했어요.')); } finally { setBusy(false); }
   }
   return <section className="space-y-4">
     <SectionTitle title={`${pool.stageName} · ${pool.name}`} />
     {canWrite && <div className="grid gap-3 sm:grid-cols-2"><label className="tm-text-label">단계 이름<input className={stageControl} value={stageName} maxLength={60} disabled={busy} onChange={e => setStageName(e.target.value)} /></label><label className="tm-text-label">편성 이름<input className={stageControl} value={name} maxLength={60} disabled={busy} onChange={e => setName(e.target.value)} /></label>
       {finalStage && <label className="tm-text-label">전체 순위 시작 번호<input className={stageControl} type="number" min={1} max={stagePlanCounts(view.config).teams} value={rankStart} disabled={busy} onChange={event => setRankStart(event.target.value)} /><span className="tm-text-caption text-[var(--text-muted)]">비워 두면 이 편성의 순위만 표시해요.</span></label>}
       <Button variant="neutral" disabled={busy || !name.trim() || !stageName.trim() || rankInvalid || name === pool.name && stageName === pool.stageName && !rankChanged} onClick={() => void saveNames()}>표시 설정 저장</Button></div>}
-    {pool.stale && <AlertBanner tone="warning" message="배정 이후 이전 단계 결과나 참가팀이 바뀌었어요. 시작 전이라면 공식 순위로 추천하고 다시 확정해 주세요. 이미 시작했다면 현재 참가팀을 유지하는 사유를 남겨 정정 영향을 확인해 주세요." />}
+    {pool.stale && <AlertBanner tone="warning" message="배정 이후 이전 단계 결과나 참가팀이 바뀌었어요. 시작 전이라면 공식 순위로 추천하고 다시 확정해 주세요. 이미 시작했다면 현재 참가팀을 유지하는 사유를 남겨 바뀐 결과의 영향을 확인해 주세요." />}
     {!pool.generated && <p className="tm-text-label">단계별 대진을 생성한 뒤 참가팀을 배정해요.</p>}
     {pool.started && <p className="tm-text-label">시작했거나 기록이 있는 편성이에요. 참가팀 배정은 고정돼요.</p>}
     {pool.stageIndex > 0 && <p className="tm-text-label">이전 단계의 공식 결과가 모두 반영돼야 추천할 수 있어요. 동률 자리는 후보 중에서 결정하고 사유를 남겨요.</p>}
     {error && <AlertBanner tone="error" message={error} />}{saved && <p role="status">참가팀을 확정했어요.</p>}
     {assignmentChanged && <AlertBanner tone="warning" message="서버의 참가팀 배정이나 진출 출처가 바뀌었어요. 입력은 보존했으며 최신 구성을 다시 불러온 뒤 배정해 주세요." />}
-    {canAssign && pool.started && pool.stale && pool.assigned && pool.stageIndex > 0 && <div className="space-y-3"><label className="block tm-text-label">참가팀 유지 사유<textarea className={stageControl} maxLength={500} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><Button variant="neutral" disabled={busy || !reason.trim() || pool.candidates.some(c => !c.length)} onClick={() => void acknowledgeCorrection()}>현재 참가팀 유지 · 정정 확인</Button></div>}
+    {canAssign && pool.started && pool.stale && pool.assigned && pool.stageIndex > 0 && <div className="space-y-3"><label className="block tm-text-label">참가팀 유지 사유<textarea className={stageControl} maxLength={500} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><Button variant="neutral" disabled={busy || !reason.trim() || pool.candidates.some(c => !c.length)} onClick={() => void acknowledgeCorrection()}>현재 참가팀 유지 · 영향 확인</Button></div>}
     <fieldset disabled={disabled} className="grid min-w-0 gap-3 sm:grid-cols-2 [&>button]:sm:col-span-2 [&>div]:sm:col-span-2">
       {canOverride && pool.stageIndex > 0 && <label className="flex min-h-11 items-center gap-2 tm-text-label"><input type="checkbox" checked={override} onChange={e => setOverride(e.target.checked)} />공식 후보 밖 예외 배정 · 사유 필수</label>}
       {pool.stageIndex > 0 && <Button variant="neutral" disabled={pool.candidates.some(c => !c.length)} onClick={() => setIds(pool.candidates.map(c => c.length === 1 ? c[0] : ''))}>공식 순위로 추천 배정</Button>}

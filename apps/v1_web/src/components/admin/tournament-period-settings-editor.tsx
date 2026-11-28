@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Button } from '@/components/v1-ui/button';
@@ -296,10 +296,13 @@ export function PeriodSettingsFields({
   draft,
   disabled,
   stagePlan,
+  compositionLink,
 }: {
   draft: ReturnType<typeof usePeriodSettingsDraft>;
   disabled: boolean;
   stagePlan?: StagePlan | null;
+  /** 단계·편성별 시간을 고치는 화면으로 가는 링크 — 없으면 안내만 보인다. 클릭 처리는 호출부(시트)가 맡는다. */
+  compositionLink?: { href: string; onClick: (event: MouseEvent<HTMLAnchorElement>) => void };
 }) {
   const settings = draft.query.data;
   if (!settings || !draft.ready) {
@@ -448,12 +451,15 @@ export function PeriodSettingsFields({
               );
             })}
           </ul>
-          <Link
-            href={`/admin/tournaments/${draft.tournamentId}/bracket`}
-            className="inline-flex min-h-11 items-center text-[length:var(--font-size-caption)] text-[var(--text-body)] underline underline-offset-2"
-          >
-            단계·편성 경기 시간 수정
-          </Link>
+          {compositionLink ? (
+            <Link
+              href={compositionLink.href}
+              onClick={compositionLink.onClick}
+              className="inline-flex min-h-11 items-center text-[length:var(--font-size-caption)] text-[var(--text-body)] underline underline-offset-2"
+            >
+              단계·편성 경기 시간 수정
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

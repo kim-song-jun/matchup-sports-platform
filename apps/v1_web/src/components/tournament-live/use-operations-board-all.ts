@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useV1DataSource } from '@/components/providers/v1-data-source';
+import { mergeByFixtureId } from '@/lib/merge-board-pages';
 import { v1Keys } from '@/lib/query-keys';
 import { OPERATIONS_BOARD_PAGE_LIMIT, readOperationsBoardPages } from '@/lib/operations-board-pages';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
@@ -25,8 +26,8 @@ export async function fetchOperationsBoardAll(get: typeof v1Get, tournamentId: s
     }),
   );
   return {
-    items: pages.flatMap((page) => page.items),
-    liveWarnings: pages.flatMap((page) => page.liveWarnings),
+    items: mergeByFixtureId(pages.flatMap((page) => page.items)),
+    liveWarnings: mergeByFixtureId(pages.flatMap((page) => page.liveWarnings)),
   };
 }
 

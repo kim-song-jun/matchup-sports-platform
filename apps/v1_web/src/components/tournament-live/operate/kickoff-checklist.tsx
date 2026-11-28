@@ -23,7 +23,7 @@ export function KickoffChecklist({ gameId, sides, onRosterError, disabled }: Kic
   // 조회가 실패하면 계속 엉뚱한 화면을 본다. 한 번 읽은 뒤의 재조회 실패는 마지막 값을 그대로 쓴다.
   if (probeTeamId !== null && probe.data === undefined) {
     return (
-      <section className="flex flex-col items-start gap-2 px-4" aria-label="킥오프 준비">
+      <section className="flex flex-col items-start gap-2" aria-label="킥오프 준비">
         <p role={probe.isError ? 'alert' : 'status'} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           {probe.isError ? '킥오프 준비를 불러오지 못했어요.' : '킥오프 준비를 불러오는 중이에요…'}
         </p>

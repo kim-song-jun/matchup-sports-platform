@@ -20,6 +20,7 @@ function input(overrides: Partial<ConsoleStatusInput> = {}): ConsoleStatusInput 
     expiryError: null,
     startBlockedByTeams: false,
     commandError: null,
+    recordError: null,
     bannerMessage: null,
     retryLabel: null,
     queue: { waiting: 0, failed: 0 },
@@ -46,6 +47,7 @@ const SINGLE_CONDITIONS: ReadonlyArray<
   ],
   ['takeover-denied', { takeover: { status: 'denied', code: 'STAFF_SCOPE_DENIED' }, canOperate: false }, 'danger', '이 기기에서 기록할 수 없어요'],
   ['read-only', { takeoverEnabled: false, takeover: { status: 'none' }, canOperate: false }, 'info', '보기만 할 수 있어요'],
+  ['record-error', { recordError: { kind: 'undo', message: '기록을 되돌리지 못했어요. 기록 목록의 「고치기」에서 취소해 주세요.' } }, 'danger', '기록을 되돌리지 못했어요'],
   ['command-error', { commandError: '명령을 처리하지 못했어요.' }, 'danger', '요청을 처리하지 못했어요'],
   ['command-retry', { retryLabel: '전반 종료' }, 'danger', '전반 종료 요청의 응답을 받지 못했어요'],
   ['banner-message', { bannerMessage: '기록 권한을 다시 확인하지 못했어요.' }, 'danger', '기록을 확인해 주세요'],
@@ -69,8 +71,8 @@ describe('deriveConsoleStatus — 조건 하나', () => {
     expect(status.headline).toBe(title);
   });
 
-  it('처리표의 16개 key 를 빠짐없이 다룬다', () => {
-    expect(new Set(SINGLE_CONDITIONS.map(([key]) => key)).size).toBe(16);
+  it('처리표의 17개 key 를 빠짐없이 다룬다', () => {
+    expect(new Set(SINGLE_CONDITIONS.map(([key]) => key)).size).toBe(17);
   });
 });
 
@@ -89,6 +91,7 @@ describe('deriveConsoleStatus — 겹침과 우선순위', () => {
         takeover: { status: 'denied', code: 'TAKEOVER_SUPERSEDED', holderName: null },
         handoff: { code: 'TAKEOVER_SUPERSEDED', holderName: null },
         commandError: 'e',
+        recordError: { kind: 'save', message: 'r' },
         retryLabel: '경기 시작',
         bannerMessage: 'b',
         expiryError: 'x',
@@ -104,6 +107,7 @@ describe('deriveConsoleStatus — 겹침과 우선순위', () => {
     expect(status.items.map((item) => item.key)).toEqual([
       'undoing',
       'takeover-handoff',
+      'record-error',
       'command-error',
       'command-retry',
       'banner-message',
@@ -132,6 +136,27 @@ describe('deriveConsoleStatus — 겹침과 우선순위', () => {
   it('연결 중 전송 실패가 있으면 queue 항목은 danger 이고 실패 수를 말한다', () => {
     const status = deriveConsoleStatus(input({ queue: { waiting: 3, failed: 1 } }));
     expect(status.items[0]).toMatchObject({ key: 'queue', tone: 'danger', title: '기록 1개를 보내지 못했어요' });
+  });
+});
+
+describe('deriveConsoleStatus — 기록 실패와 진행 요청 실패가 함께 남을 때', () => {
+  it('방금 누른 기록의 실패가 진행 요청 오류보다 앞이고 둘 다 항목으로 남는다', () => {
+    const status = deriveConsoleStatus(
+      input({
+        commandError: '다른 화면에서 경기가 바뀌었어요. 새로고침해 주세요.',
+        recordError: { kind: 'undo', message: '그사이 경기 기록이 바뀌어 되돌리지 못했어요.' },
+      }),
+    );
+    expect(status.items.map((item) => [item.key, item.body])).toEqual([
+      ['record-error', '그사이 경기 기록이 바뀌어 되돌리지 못했어요.'],
+      ['command-error', '다른 화면에서 경기가 바뀌었어요. 새로고침해 주세요.'],
+    ]);
+    expect(status.headline).toBe('기록을 되돌리지 못했어요 외 1개');
+  });
+
+  it('제목은 저장 실패와 되돌리기 실패를 가른다', () => {
+    expect(deriveConsoleStatus(input({ recordError: { kind: 'save', message: 'x' } })).items[0].title).toBe('기록을 저장하지 못했어요');
+    expect(deriveConsoleStatus(input({ recordError: { kind: 'undo', message: 'x' } })).items[0].title).toBe('기록을 되돌리지 못했어요');
   });
 });
 
@@ -214,11 +239,11 @@ describe('deriveConsoleStatus — 문구', () => {
 });
 
 describe('deriveConsoleStatus — 정상 줄', () => {
-  it('조건이 없으면 tone ok 와 정상 줄 문구 4종', () => {
+  it('조건이 없으면 tone ok 와 정상 줄 문구 4종 — 기록 중이면 「연결됨」을 덧붙이지 않는다', () => {
     const ok = (overrides: Partial<ConsoleStatusInput>) => deriveConsoleStatus(input(overrides));
-    expect(ok({ gameState: 'SCHEDULED' })).toMatchObject({ tone: 'ok', headline: '이 기기에서 기록할 수 있어요 · 연결됨', items: [] });
-    expect(ok({ gameState: 'LIVE' }).headline).toBe('이 기기에서 기록 중 · 연결됨');
-    expect(ok({ gameState: 'PAUSED' }).headline).toBe('이 기기에서 기록 중 · 연결됨');
+    expect(ok({ gameState: 'SCHEDULED' })).toMatchObject({ tone: 'ok', headline: '이 기기에서 기록할 수 있어요', items: [] });
+    expect(ok({ gameState: 'LIVE' }).headline).toBe('이 기기에서 기록 중');
+    expect(ok({ gameState: 'PAUSED' }).headline).toBe('이 기기에서 기록 중');
     expect(ok({ gameState: 'ENDED' }).headline).toBe('연결됨');
     expect(ok({ leaseRequired: false, takeover: { status: 'none' } }).headline).toBe('연결됨');
     expect(ok({ sampleMode: true })).toMatchObject({ tone: 'ok', headline: '체험 중 · 서버 연결 없음' });

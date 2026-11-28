@@ -29,14 +29,14 @@ export function setupTournamentInfoBackend() {
 type Backend = ReturnType<typeof createTournamentInfoServer>;
 
 /** 섹션 하나의 수정 시트를 실제 `SideSheet`·저장 훅과 함께 연다. */
-export function renderInfoSheet(definition: InfoSectionDefinition, backend: Backend, options: { focusField?: string } = {}) {
+export function renderInfoSheet(definition: InfoSectionDefinition, backend: Backend, options: { focusField?: string; basePath?: string } = {}) {
   const onClose = vi.fn();
   const onSaved = vi.fn();
   const showToast = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <TournamentAdminProvider value={{ tournamentId: backend.state.tournament.id, role: 'PLATFORM_OPS', canWrite: true, showToast }}>
+      <TournamentAdminProvider value={{ tournamentId: backend.state.tournament.id, basePath: options.basePath ?? `/admin/tournaments/${backend.state.tournament.id}`, role: 'PLATFORM_OPS', canWrite: true, showToast, overviewAdvance: null }}>
         <InfoSectionSheet
           definition={definition}
           initialTournament={backend.state.tournament}

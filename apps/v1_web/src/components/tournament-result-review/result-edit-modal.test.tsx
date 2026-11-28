@@ -114,7 +114,7 @@ function baseProps() {
     open: true,
     title: '결과를 고칠까요?',
     message: '메시지',
-    confirmLabel: '고친 결과로 확정',
+    confirmLabel: '고친 내용 저장',
     base: {
       score: SCORE,
       goalEvents: goalsMatching(SCORE),
@@ -133,6 +133,18 @@ function baseProps() {
   };
 }
 
+describe('제출 안내', () => {
+  it('submitHint 를 주면 제출 버튼 앞에 안내로 보이고, 안 주면 안내 줄이 없다', () => {
+    const { rerender } = render(<ResultEditModal {...baseProps()} lineups={[]} />);
+    expect(screen.queryByText('저장한 뒤 결과 확정을 눌러야 순위표에 반영돼요.')).not.toBeInTheDocument();
+
+    rerender(<ResultEditModal {...baseProps()} lineups={[]} submitHint="저장한 뒤 결과 확정을 눌러야 순위표에 반영돼요." />);
+    const hint = screen.getByText('저장한 뒤 결과 확정을 눌러야 순위표에 반영돼요.');
+    const submit = screen.getByRole('button', { name: '고친 내용 저장' });
+    expect(hint.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
 describe('card timeline correction', () => {
   it('shows aggregate cards without time, edits color/player/time and submits consistent totals', () => {
     const props = baseProps();
@@ -146,7 +158,7 @@ describe('card timeline correction', () => {
     fireEvent.change(screen.getByLabelText('1번째 카드 선수'), { target: { value: AWAY_PARTICIPANT_ID } });
     fireEvent.click(screen.getByRole('button', { name: '2번째 카드 삭제' }));
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '카드 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 내용 저장' }));
     const submitted = props.onConfirm.mock.calls[0][0].actualParticipants;
     expect(submitted[0].cards).toEqual({ yellow: 0, red: 0, events: [] });
     expect(submitted[1].cards).toMatchObject({ yellow: 0, red: 1,
@@ -158,7 +170,7 @@ describe('card timeline correction', () => {
     fireEvent.click(screen.getByRole('button', { name: '카드 추가' }));
     fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '0' } });
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '누락 카드 추가' } });
-    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 내용 저장' }));
     expect(props.onConfirm.mock.calls[0][0].actualParticipants[0].cards).toMatchObject({
       yellow: 1, red: 0, events: [{ minute: 0, card: 'YELLOW' }],
     });
@@ -260,7 +272,7 @@ describe('ResultEditModal — 출전자 빼기·추가(어드민이 누가 뛰�
     expect(options).toEqual(['선수 선택', '원정 · #7 강아라']);
 
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '출전 명단 정정' } });
-    fireEvent.click(screen.getByRole('button', { name: '고친 결과로 확정' }));
+    fireEvent.click(screen.getByRole('button', { name: '고친 내용 저장' }));
     const submitted = onConfirm.mock.calls[0][0].actualParticipants as Array<{ participantId: string; goals: number; started: boolean }>;
     expect(submitted.map((participant) => participant.participantId)).toEqual([HOME_PARTICIPANT_ID, THIRD_ID]);
     expect(submitted[1]).toMatchObject({ goals: 0, started: true, cards: { yellow: 0, red: 0 } });
@@ -956,6 +968,26 @@ describe('ResultEditModal — 단판 경기의 득점 전·후반', () => {
   it.each([[2], [null], [undefined]])('periodCount=%s 이면 전·후반 칸이 그대로 있다', (periodCount) => {
     renderWith(periodCount);
     expect(screen.getByLabelText('1번째 득점 전·후반')).toBeInTheDocument();
+  });
+
+  it('단판에 연장 구간 행이 있으면 득점·카드의 구간 칸이 남고 이름은 경기·연장 전반·연장 후반이다', () => {
+    const props = baseProps();
+    render(
+      <ResultEditModal
+        {...props}
+        periods={[{ number: 1 }, { number: 2 }, { number: 3 }]}
+        periodCount={1}
+        base={{ ...props.base, goalEvents: [{ id: 'goal-1', sideId: HOME_SIDE_ID, participantId: HOME_PARTICIPANT_ID, minute: 1, period: 1, ownGoal: false }] }}
+        lineups={[]}
+      />,
+    );
+
+    const goalPeriod = screen.getByLabelText('1번째 득점 전·후반');
+    expect(within(goalPeriod).getAllByRole('option').map((option) => option.textContent)).toEqual(['선택 안 함', '경기', '연장 전반', '연장 후반']);
+
+    fireEvent.click(screen.getByRole('button', { name: '카드 추가' }));
+    const cardPeriod = screen.getByLabelText('1번째 카드 전·후반');
+    expect(within(cardPeriod).getAllByRole('option').map((option) => option.textContent)).toEqual(['선택 안 함', '경기', '연장 전반', '연장 후반']);
   });
 });
 

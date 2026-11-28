@@ -37,18 +37,18 @@ describe('AdminHubPage — 할 일 인박스', () => {
     render(<AdminHubPage />);
 
     expect(screen.getByLabelText('미승인 대회 신청: 10건')).toBeInTheDocument();
-    expect(screen.getByLabelText('결과 검토 대기: 2건')).toBeInTheDocument();
+    expect(screen.getByLabelText('결과 확정 대기: 2건')).toBeInTheDocument();
     expect(screen.getByLabelText('미답변 문의: 4건')).toBeInTheDocument();
     expect(screen.getByLabelText('진행중 대회: 1개')).toBeInTheDocument();
 
-    // 대회별 딥링크 — 신청 관리 탭 / 운영 콘솔 결과 검토
+    // 대회별 딥링크 — 신청 관리 탭 / 결과 화면
     expect(screen.getByRole('link', { name: /신청 관리/ })).toHaveAttribute(
       'href',
       '/admin/tournaments/tour-2/registrations',
     );
-    expect(screen.getByRole('link', { name: /검토하기/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '가을 풋살컵 결과 확정' })).toHaveAttribute(
       'href',
-      '/admin/live/tour-1/result-review',
+      '/admin/live/tour-1/results',
     );
     // 처리할 일이 남아 있으면 초록 안내는 없다
     expect(screen.queryByText('지금은 처리할 일이 없어요.')).not.toBeInTheDocument();
